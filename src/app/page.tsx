@@ -132,6 +132,13 @@ export default function DashboardPage() {
         debts: [],
       };
 
+      try {
+        const stored = JSON.parse(localStorage.getItem('tripsplit_custom_trips') || '[]');
+        localStorage.setItem('tripsplit_custom_trips', JSON.stringify([newTrip, ...stored]));
+      } catch {
+        // storage fallback
+      }
+
       setTrips([newTrip, ...trips]);
       toast.success('Trip created successfully! 🎉', {
         description: `${tripData.title} is ready for itinerary & splits.`,

@@ -1,5 +1,6 @@
 -- ==============================================================================
 -- TripSplit 🇮🇳 — Production PostgreSQL Database Schema & Security Layer
+-- Complete 16-Table Schema with Strict Row Level Security (RLS) & Indexes
 -- ==============================================================================
 -- Instructions: Run this in your Supabase SQL Editor:
 -- https://supabase.com/dashboard/project/_/sql
@@ -55,29 +56,49 @@ CREATE TABLE IF NOT EXISTS public.trip_members (
 );
 
 -- ------------------------------------------------------------------------------
--- 4. Expenses Table
+-- 4. Trip Invitations Table
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.trip_invitations (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  trip_id UUID REFERENCES public.trips(id) ON DELETE CASCADE NOT NULL,
+  invite_code TEXT UNIQUE NOT NULL,
+  invited_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  email TEXT,
+  role TEXT DEFAULT 'member' CHECK (role IN ('admin', 'member')),
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected', 'expired')),
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- ------------------------------------------------------------------------------
+-- 5. Expenses Table
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.expenses (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   trip_id UUID REFERENCES public.trips(id) ON DELETE CASCADE NOT NULL,
   paid_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL NOT NULL,
   vendor_name TEXT NOT NULL CHECK (char_length(trim(vendor_name)) >= 1),
-  vendor_upi_id TEXT NOT NULL CHECK (vendor_upi_id ~* '^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$'),
+  vendor_upi_id TEXT,
   total_amount NUMERIC(12, 2) NOT NULL CHECK (total_amount > 0),
+  total_amount_paise BIGINT NOT NULL DEFAULT 0 CHECK (total_amount_paise >= 0),
   split_type TEXT DEFAULT 'EQUAL' CHECK (split_type IN ('EQUAL', 'EXACT', 'ITEMIZED')),
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
 -- ------------------------------------------------------------------------------
--- 5. Expense Splits Table (Individual Shares)
+-- 6. Expense Splits Table (Individual Shares)
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.expense_splits (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   expense_id UUID REFERENCES public.expenses(id) ON DELETE CASCADE NOT NULL,
   user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
   amount_owed NUMERIC(12, 2) NOT NULL CHECK (amount_owed >= 0),
-  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'paid')),
+  amount_owed_paise BIGINT NOT NULL DEFAULT 0 CHECK (amount_owed_paise >= 0),
+  status TEXT DEFAULT 'pending' CHECK (status IN (
+    'pending', 'payment_initiated', 'awaiting_confirmation',
+    'manually_reported_paid', 'verified_paid', 'failed', 'rejected'
+  )),
   paid_at TIMESTAMPTZ,
   transaction_ref TEXT,
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
@@ -85,7 +106,65 @@ CREATE TABLE IF NOT EXISTS public.expense_splits (
 );
 
 -- ------------------------------------------------------------------------------
--- 6. Itinerary Items Table
+-- 7. Vendor Splits Table (Direct-to-Vendor Multi-QR Splits)
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.vendor_splits (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  trip_id UUID REFERENCES public.trips(id) ON DELETE CASCADE NOT NULL,
+  created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  vendor_name TEXT NOT NULL CHECK (char_length(trim(vendor_name)) >= 1),
+  vendor_upi_id TEXT NOT NULL CHECK (vendor_upi_id ~* '^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$'),
+  total_bill_amount NUMERIC(12, 2) NOT NULL CHECK (total_bill_amount > 0),
+  total_bill_amount_paise BIGINT NOT NULL CHECK (total_bill_amount_paise > 0),
+  split_mode TEXT DEFAULT 'EQUAL' CHECK (split_mode IN ('EQUAL', 'EXACT', 'ITEMIZED')),
+  invoice_ref TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- ------------------------------------------------------------------------------
+-- 8. Vendor Split Members Table
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.vendor_split_members (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  vendor_split_id UUID REFERENCES public.vendor_splits(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  share_amount NUMERIC(12, 2) NOT NULL CHECK (share_amount >= 0),
+  share_amount_paise BIGINT NOT NULL CHECK (share_amount_paise >= 0),
+  payment_status TEXT DEFAULT 'pending' CHECK (payment_status IN (
+    'pending', 'payment_initiated', 'awaiting_confirmation',
+    'manually_reported_paid', 'verified_paid', 'failed', 'rejected'
+  )),
+  upi_uri TEXT,
+  transaction_ref TEXT,
+  paid_at TIMESTAMPTZ,
+  verified_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
+  UNIQUE(vendor_split_id, user_id)
+);
+
+-- ------------------------------------------------------------------------------
+-- 9. Settlements Table (Direct Peer-to-Peer Balances)
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.settlements (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  trip_id UUID REFERENCES public.trips(id) ON DELETE CASCADE NOT NULL,
+  from_user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  to_user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  amount NUMERIC(12, 2) NOT NULL CHECK (amount > 0),
+  amount_paise BIGINT NOT NULL CHECK (amount_paise > 0),
+  status TEXT DEFAULT 'pending' CHECK (status IN (
+    'pending', 'payment_initiated', 'awaiting_confirmation',
+    'manually_reported_paid', 'verified_paid', 'failed', 'rejected'
+  )),
+  upi_ref TEXT,
+  proof_image_url TEXT,
+  settled_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- ------------------------------------------------------------------------------
+-- 10. Itinerary Items Table
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.itinerary_items (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -101,7 +180,7 @@ CREATE TABLE IF NOT EXISTS public.itinerary_items (
 );
 
 -- ------------------------------------------------------------------------------
--- 7. Bookings Vault Table
+-- 11. Bookings Vault Table
 -- ------------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.bookings (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -109,10 +188,74 @@ CREATE TABLE IF NOT EXISTS public.bookings (
   title TEXT NOT NULL CHECK (char_length(trim(title)) >= 1),
   vendor_name TEXT,
   booking_ref TEXT NOT NULL,
+  category TEXT DEFAULT 'Stay' CHECK (category IN ('Hotel', 'Flight', 'Train', 'Bus', 'Rental', 'Activity', 'Other')),
   amount NUMERIC(12, 2) NOT NULL CHECK (amount >= 0),
+  amount_paise BIGINT NOT NULL DEFAULT 0 CHECK (amount_paise >= 0),
   file_url TEXT,
   status TEXT DEFAULT 'Confirmed' CHECK (status IN ('Confirmed', 'Pending Split', 'Settled')),
   booked_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- ------------------------------------------------------------------------------
+-- 12. Polls Table (Trip Decision Planning)
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.polls (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  trip_id UUID REFERENCES public.trips(id) ON DELETE CASCADE NOT NULL,
+  created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  question TEXT NOT NULL CHECK (char_length(trim(question)) >= 2),
+  is_multiple_choice BOOLEAN DEFAULT false,
+  is_closed BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- ------------------------------------------------------------------------------
+-- 13. Poll Options Table
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.poll_options (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  poll_id UUID REFERENCES public.polls(id) ON DELETE CASCADE NOT NULL,
+  option_text TEXT NOT NULL CHECK (char_length(trim(option_text)) >= 1),
+  order_index INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- ------------------------------------------------------------------------------
+-- 14. Poll Votes Table
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.poll_votes (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  poll_id UUID REFERENCES public.polls(id) ON DELETE CASCADE NOT NULL,
+  option_id UUID REFERENCES public.poll_options(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
+  UNIQUE(poll_id, user_id, option_id)
+);
+
+-- ------------------------------------------------------------------------------
+-- 15. Activity Logs Table
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.activity_logs (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  trip_id UUID REFERENCES public.trips(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  action_type TEXT NOT NULL,
+  description TEXT NOT NULL,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- ------------------------------------------------------------------------------
+-- 16. Notifications Table
+-- ------------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.notifications (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  link TEXT,
+  read BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -140,10 +283,19 @@ $$;
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.trips ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.trip_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.trip_invitations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.expense_splits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vendor_splits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vendor_split_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.settlements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.itinerary_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.polls ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.poll_options ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.poll_votes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
 -- ------------------------------------------------------------------------------
 -- Profiles Policies
@@ -167,7 +319,7 @@ CREATE POLICY "Users can update their own profile"
   USING (auth.uid() = id);
 
 -- ------------------------------------------------------------------------------
--- Trips Policies (Members only)
+-- Trips Policies
 -- ------------------------------------------------------------------------------
 DROP POLICY IF EXISTS "Members can view their trips" ON public.trips;
 CREATE POLICY "Members can view their trips"
@@ -217,6 +369,27 @@ CREATE POLICY "Members can leave or admins can remove"
   ON public.trip_members FOR DELETE
   TO authenticated
   USING (user_id = auth.uid() OR is_trip_member(trip_id));
+
+-- ------------------------------------------------------------------------------
+-- Trip Invitations Policies
+-- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Trip members can view invitations" ON public.trip_invitations;
+CREATE POLICY "Trip members can view invitations"
+  ON public.trip_invitations FOR SELECT
+  TO authenticated
+  USING (is_trip_member(trip_id) OR email = auth.jwt()->>'email');
+
+DROP POLICY IF EXISTS "Trip members can create invitations" ON public.trip_invitations;
+CREATE POLICY "Trip members can create invitations"
+  ON public.trip_invitations FOR INSERT
+  TO authenticated
+  WITH CHECK (is_trip_member(trip_id));
+
+DROP POLICY IF EXISTS "Invited users can update invitation status" ON public.trip_invitations;
+CREATE POLICY "Invited users can update invitation status"
+  ON public.trip_invitations FOR UPDATE
+  TO authenticated
+  USING (is_trip_member(trip_id) OR email = auth.jwt()->>'email');
 
 -- ------------------------------------------------------------------------------
 -- Expenses Policies
@@ -270,8 +443,8 @@ CREATE POLICY "Trip members can insert expense splits"
     )
   );
 
-DROP POLICY IF EXISTS "Users can update their own split status or payer can update" ON public.expense_splits;
-CREATE POLICY "Users can update their own split status or payer can update"
+DROP POLICY IF EXISTS "Users or payers can update expense splits" ON public.expense_splits;
+CREATE POLICY "Users or payers can update expense splits"
   ON public.expense_splits FOR UPDATE
   TO authenticated
   USING (
@@ -281,6 +454,91 @@ CREATE POLICY "Users can update their own split status or payer can update"
       WHERE id = expense_splits.expense_id AND (paid_by = auth.uid() OR is_trip_member(trip_id))
     )
   );
+
+-- ------------------------------------------------------------------------------
+-- Vendor Splits Policies
+-- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Trip members can view vendor splits" ON public.vendor_splits;
+CREATE POLICY "Trip members can view vendor splits"
+  ON public.vendor_splits FOR SELECT
+  TO authenticated
+  USING (is_trip_member(trip_id));
+
+DROP POLICY IF EXISTS "Trip members can create vendor splits" ON public.vendor_splits;
+CREATE POLICY "Trip members can create vendor splits"
+  ON public.vendor_splits FOR INSERT
+  TO authenticated
+  WITH CHECK (is_trip_member(trip_id));
+
+DROP POLICY IF EXISTS "Trip members can update vendor splits" ON public.vendor_splits;
+CREATE POLICY "Trip members can update vendor splits"
+  ON public.vendor_splits FOR UPDATE
+  TO authenticated
+  USING (is_trip_member(trip_id));
+
+DROP POLICY IF EXISTS "Trip creator can delete vendor splits" ON public.vendor_splits;
+CREATE POLICY "Trip creator can delete vendor splits"
+  ON public.vendor_splits FOR DELETE
+  TO authenticated
+  USING (created_by = auth.uid() OR is_trip_member(trip_id));
+
+-- ------------------------------------------------------------------------------
+-- Vendor Split Members Policies
+-- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Trip members can view vendor split members" ON public.vendor_split_members;
+CREATE POLICY "Trip members can view vendor split members"
+  ON public.vendor_split_members FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.vendor_splits
+      WHERE id = vendor_split_members.vendor_split_id AND is_trip_member(trip_id)
+    )
+  );
+
+DROP POLICY IF EXISTS "Trip members can insert vendor split members" ON public.vendor_split_members;
+CREATE POLICY "Trip members can insert vendor split members"
+  ON public.vendor_split_members FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.vendor_splits
+      WHERE id = vendor_split_members.vendor_split_id AND is_trip_member(trip_id)
+    )
+  );
+
+DROP POLICY IF EXISTS "Users can update their share or trip members can confirm" ON public.vendor_split_members;
+CREATE POLICY "Users can update their share or trip members can confirm"
+  ON public.vendor_split_members FOR UPDATE
+  TO authenticated
+  USING (
+    user_id = auth.uid() OR
+    EXISTS (
+      SELECT 1 FROM public.vendor_splits
+      WHERE id = vendor_split_members.vendor_split_id AND is_trip_member(trip_id)
+    )
+  );
+
+-- ------------------------------------------------------------------------------
+-- Settlements Policies
+-- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Trip members can view settlements" ON public.settlements;
+CREATE POLICY "Trip members can view settlements"
+  ON public.settlements FOR SELECT
+  TO authenticated
+  USING (is_trip_member(trip_id));
+
+DROP POLICY IF EXISTS "Trip members can create settlements" ON public.settlements;
+CREATE POLICY "Trip members can create settlements"
+  ON public.settlements FOR INSERT
+  TO authenticated
+  WITH CHECK (is_trip_member(trip_id));
+
+DROP POLICY IF EXISTS "Parties can update settlement status" ON public.settlements;
+CREATE POLICY "Parties can update settlement status"
+  ON public.settlements FOR UPDATE
+  TO authenticated
+  USING (from_user_id = auth.uid() OR to_user_id = auth.uid() OR is_trip_member(trip_id));
 
 -- ------------------------------------------------------------------------------
 -- Itinerary Items Policies
@@ -330,8 +588,130 @@ CREATE POLICY "Trip members can update bookings"
   TO authenticated
   USING (is_trip_member(trip_id));
 
+-- ------------------------------------------------------------------------------
+-- Polls Policies
+-- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Trip members can view polls" ON public.polls;
+CREATE POLICY "Trip members can view polls"
+  ON public.polls FOR SELECT
+  TO authenticated
+  USING (is_trip_member(trip_id));
+
+DROP POLICY IF EXISTS "Trip members can create polls" ON public.polls;
+CREATE POLICY "Trip members can create polls"
+  ON public.polls FOR INSERT
+  TO authenticated
+  WITH CHECK (is_trip_member(trip_id));
+
+DROP POLICY IF EXISTS "Poll creator or trip admin can update polls" ON public.polls;
+CREATE POLICY "Poll creator or trip admin can update polls"
+  ON public.polls FOR UPDATE
+  TO authenticated
+  USING (created_by = auth.uid() OR is_trip_member(trip_id));
+
+-- ------------------------------------------------------------------------------
+-- Poll Options Policies
+-- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Trip members can view poll options" ON public.poll_options;
+CREATE POLICY "Trip members can view poll options"
+  ON public.poll_options FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.polls
+      WHERE id = poll_options.poll_id AND is_trip_member(trip_id)
+    )
+  );
+
+DROP POLICY IF EXISTS "Trip members can add poll options" ON public.poll_options;
+CREATE POLICY "Trip members can add poll options"
+  ON public.poll_options FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.polls
+      WHERE id = poll_options.poll_id AND is_trip_member(trip_id)
+    )
+  );
+
+-- ------------------------------------------------------------------------------
+-- Poll Votes Policies
+-- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Trip members can view poll votes" ON public.poll_votes;
+CREATE POLICY "Trip members can view poll votes"
+  ON public.poll_votes FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.polls
+      WHERE id = poll_votes.poll_id AND is_trip_member(trip_id)
+    )
+  );
+
+DROP POLICY IF EXISTS "Users can cast or remove their own vote" ON public.poll_votes;
+CREATE POLICY "Users can cast or remove their own vote"
+  ON public.poll_votes FOR ALL
+  TO authenticated
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+-- ------------------------------------------------------------------------------
+-- Activity Logs Policies
+-- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Trip members can view activity logs" ON public.activity_logs;
+CREATE POLICY "Trip members can view activity logs"
+  ON public.activity_logs FOR SELECT
+  TO authenticated
+  USING (is_trip_member(trip_id));
+
+DROP POLICY IF EXISTS "Trip members can record activity logs" ON public.activity_logs;
+CREATE POLICY "Trip members can record activity logs"
+  ON public.activity_logs FOR INSERT
+  TO authenticated
+  WITH CHECK (is_trip_member(trip_id));
+
+-- ------------------------------------------------------------------------------
+-- Notifications Policies
+-- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS "Users can view their notifications" ON public.notifications;
+CREATE POLICY "Users can view their notifications"
+  ON public.notifications FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+
+DROP POLICY IF EXISTS "Users can update their notifications" ON public.notifications;
+CREATE POLICY "Users can update their notifications"
+  ON public.notifications FOR UPDATE
+  TO authenticated
+  USING (user_id = auth.uid());
+
 -- ==============================================================================
--- Triggers: Auto-Profile on User Signup
+-- Performance Indexes on Foreign Keys & Query Paths
+-- ==============================================================================
+CREATE INDEX IF NOT EXISTS idx_trip_members_trip ON public.trip_members(trip_id);
+CREATE INDEX IF NOT EXISTS idx_trip_members_user ON public.trip_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_trip_invitations_trip ON public.trip_invitations(trip_id);
+CREATE INDEX IF NOT EXISTS idx_trip_invitations_code ON public.trip_invitations(invite_code);
+CREATE INDEX IF NOT EXISTS idx_expenses_trip ON public.expenses(trip_id);
+CREATE INDEX IF NOT EXISTS idx_expenses_paid_by ON public.expenses(paid_by);
+CREATE INDEX IF NOT EXISTS idx_expense_splits_expense ON public.expense_splits(expense_id);
+CREATE INDEX IF NOT EXISTS idx_expense_splits_user ON public.expense_splits(user_id);
+CREATE INDEX IF NOT EXISTS idx_vendor_splits_trip ON public.vendor_splits(trip_id);
+CREATE INDEX IF NOT EXISTS idx_vendor_split_members_split ON public.vendor_split_members(vendor_split_id);
+CREATE INDEX IF NOT EXISTS idx_vendor_split_members_user ON public.vendor_split_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_settlements_trip ON public.settlements(trip_id);
+CREATE INDEX IF NOT EXISTS idx_settlements_from_user ON public.settlements(from_user_id);
+CREATE INDEX IF NOT EXISTS idx_settlements_to_user ON public.settlements(to_user_id);
+CREATE INDEX IF NOT EXISTS idx_itinerary_trip ON public.itinerary_items(trip_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_trip ON public.bookings(trip_id);
+CREATE INDEX IF NOT EXISTS idx_polls_trip ON public.polls(trip_id);
+CREATE INDEX IF NOT EXISTS idx_poll_options_poll ON public.poll_options(poll_id);
+CREATE INDEX IF NOT EXISTS idx_poll_votes_poll ON public.poll_votes(poll_id);
+CREATE INDEX IF NOT EXISTS idx_activity_logs_trip ON public.activity_logs(trip_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON public.notifications(user_id);
+
+-- ==============================================================================
+-- Triggers: Auto-Profile on User Signup & Auto-Admin on Trip Creation
 -- ==============================================================================
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
@@ -355,7 +735,6 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- Trigger to auto-add trip creator to trip_members as admin
 CREATE OR REPLACE FUNCTION public.handle_new_trip_creator()
 RETURNS TRIGGER AS $$
 BEGIN

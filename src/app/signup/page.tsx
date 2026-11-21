@@ -13,8 +13,9 @@ import {
   EyeOff,
   AlertCircle,
   CheckCircle2,
-  ShieldCheck,
+  ShieldAlert,
   Check,
+  Zap,
 } from 'lucide-react';
 
 function SignupForm() {
@@ -51,22 +52,19 @@ function SignupForm() {
       return;
     }
 
-    if (password !== confirmPassword) {
+    if (!isPasswordsMatch) {
       setError('Passwords do not match.');
       return;
     }
 
-    setIsLoading(true);
-
     if (!isSupabaseConfigured) {
-      // Demo fallback signup
-      setTimeout(() => {
-        setIsLoading(false);
-        setSuccessMsg('Account created! Welcome to TripSplit.');
-        setTimeout(() => router.push('/'), 600);
-      }, 700);
+      setError(
+        'Supabase authentication is not configured in .env.local. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to register live accounts.'
+      );
       return;
     }
+
+    setIsLoading(true);
 
     try {
       const { data, error: signUpError } = await supabase.auth.signUp({
@@ -87,14 +85,12 @@ function SignupForm() {
       }
 
       if (data?.user && data.session) {
-        // Direct login
         setSuccessMsg('Account created successfully! Redirecting...');
         setTimeout(() => {
           router.push('/');
           router.refresh();
         }, 500);
       } else {
-        // Email verification required
         setSuccessMsg(
           'Verification email sent! Please check your inbox to confirm your account.'
         );
@@ -110,7 +106,9 @@ function SignupForm() {
     setError(null);
 
     if (!isSupabaseConfigured) {
-      router.push('/');
+      setError(
+        'Google OAuth requires Supabase authentication setup. Please configure NEXT_PUBLIC_SUPABASE_URL in .env.local.'
+      );
       return;
     }
 
@@ -128,6 +126,13 @@ function SignupForm() {
     } catch {
       setError('Failed to initialize Google signup.');
     }
+  };
+
+  const handlePreviewMode = () => {
+    setIsLoading(true);
+    setTimeout(() => {
+      router.push('/');
+    }, 400);
   };
 
   return (
@@ -161,6 +166,29 @@ function SignupForm() {
             Join your friends, manage outings & split restaurant bills via UPI
           </p>
         </div>
+
+        {/* Missing Supabase Configuration Notice */}
+        {!isSupabaseConfigured && (
+          <div className="mb-4 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 space-y-2">
+            <div className="flex items-center gap-2 font-bold text-amber-300">
+              <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Supabase Authentication Not Configured</span>
+            </div>
+            <p className="text-[11px] text-amber-200/90 leading-relaxed">
+              Environment variables <code className="bg-slate-900 px-1 py-0.5 rounded text-white font-mono">NEXT_PUBLIC_SUPABASE_URL</code> and <code className="bg-slate-900 px-1 py-0.5 rounded text-white font-mono">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> are not configured in .env.local.
+            </p>
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={handlePreviewMode}
+                className="w-full py-2 px-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <Zap className="w-3.5 h-3.5" />
+                <span>Explore in Local Sandbox Preview Mode</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Card */}
         <div className="rounded-3xl bg-[#111827] border border-[#1F2937] p-6 sm:p-8 shadow-2xl relative">
@@ -274,24 +302,6 @@ function SignupForm() {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-
-              {/* Password checks indicator */}
-              <div className="mt-2 flex items-center gap-3 text-[11px]">
-                <span
-                  className={`flex items-center gap-1 ${
-                    isMinLength ? 'text-emerald-400' : 'text-slate-300'
-                  }`}
-                >
-                  <Check className="w-3 h-3" /> 6+ characters
-                </span>
-                <span
-                  className={`flex items-center gap-1 ${
-                    hasNumberOrSpecial ? 'text-emerald-400' : 'text-slate-300'
-                  }`}
-                >
-                  <Check className="w-3 h-3" /> Numbers / Symbols
-                </span>
-              </div>
             </div>
 
             <div>
@@ -303,26 +313,46 @@ function SignupForm() {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
-                  placeholder="Repeat your password"
+                  placeholder="Re-enter password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl pl-10 pr-3.5 py-3 text-xs text-white placeholder-slate-500 focus:outline-none transition-colors"
                 />
               </div>
-              {confirmPassword && (
-                <p
-                  className={`text-[11px] mt-1 ${
-                    isPasswordsMatch ? 'text-emerald-400' : 'text-amber-400'
+            </div>
+
+            <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-1.5 text-[11px] text-slate-400">
+              <div className="flex items-center gap-1.5">
+                <Check
+                  className={`w-3.5 h-3.5 ${
+                    isMinLength ? 'text-emerald-400' : 'text-slate-600'
                   }`}
-                >
-                  {isPasswordsMatch ? '✓ Passwords match' : '✕ Passwords do not match'}
-                </p>
-              )}
+                />
+                <span className={isMinLength ? 'text-slate-200' : ''}>At least 6 characters</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Check
+                  className={`w-3.5 h-3.5 ${
+                    hasNumberOrSpecial ? 'text-emerald-400' : 'text-slate-600'
+                  }`}
+                />
+                <span className={hasNumberOrSpecial ? 'text-slate-200' : ''}>
+                  Contains number or symbol
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Check
+                  className={`w-3.5 h-3.5 ${
+                    isPasswordsMatch ? 'text-emerald-400' : 'text-slate-600'
+                  }`}
+                />
+                <span className={isPasswordsMatch ? 'text-slate-200' : ''}>Passwords match</span>
+              </div>
             </div>
 
             <button
               type="submit"
-              disabled={isLoading || !isMinLength || !isPasswordsMatch}
+              disabled={isLoading}
               className="w-full py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 active:scale-98 transition-all disabled:opacity-50 mt-2"
             >
               {isLoading ? (
@@ -336,22 +366,16 @@ function SignupForm() {
             </button>
           </form>
 
-          {/* Switch to Login */}
+          {/* Footer Navigation */}
           <div className="mt-6 text-center text-xs text-slate-400">
             Already have an account?{' '}
             <Link
               href="/login"
-              className="text-emerald-400 hover:text-emerald-300 font-semibold transition-colors"
+              className="font-bold text-emerald-400 hover:text-emerald-300 transition-colors underline underline-offset-2"
             >
               Sign In
             </Link>
           </div>
-        </div>
-
-        {/* Security Footer */}
-        <div className="mt-6 text-center flex items-center justify-center gap-1.5 text-xs text-slate-300">
-          <ShieldCheck className="w-4 h-4 text-emerald-400" />
-          <span>Secured with Supabase Auth & RLS Protection</span>
         </div>
       </div>
     </div>
@@ -363,7 +387,7 @@ export default function SignupPage() {
     <Suspense
       fallback={
         <div className="min-h-screen bg-[#0B1120] flex items-center justify-center text-slate-400">
-          <span>Loading TripSplit Registration...</span>
+          Loading registration...
         </div>
       }
     >

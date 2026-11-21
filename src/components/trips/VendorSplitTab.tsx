@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
 import {
@@ -11,9 +11,27 @@ import {
   Camera,
   ShieldCheck,
   Check,
+  AlertCircle,
+  Plus,
+  Trash2,
+  Share2,
 } from 'lucide-react';
 import { TripMember, SplitMode } from '../../types/trip';
-import { generateUpiUri, formatInr } from '../../lib/upi';
+import { formatInr } from '../../lib/upi';
+import {
+  calculateEqualSplit,
+  validateAndCalculateExactSplit,
+  calculateItemizedSplit,
+  ItemizedBillItem,
+  toRupees,
+  toPaise,
+} from '../../lib/financial/split-engine';
+import {
+  buildVerifiedUpiUri,
+  PaymentVerificationState,
+  PAYMENT_STATES_CONFIG,
+  UPI_VPA_REGEX,
+} from '../../lib/financial/upi-engine';
 import { toast } from 'sonner';
 
 interface VendorSplitTabProps {
@@ -39,15 +57,41 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
     members.map((m) => m.id)
   );
 
-  // Exact custom amounts mapping
-  const [customAmounts] = useState<{ [id: string]: number }>({});
+  // Exact custom amounts mapping (in Rupees)
+  const [customAmounts, setCustomAmounts] = useState<{ [id: string]: number }>({});
 
-  // Paid state mapping
-  const [paidStatus, setPaidStatus] = useState<{ [id: string]: boolean }>({
-    usr_aarav: true,
-    usr_priya: true,
-    usr_rohan: false,
-    usr_kabir: false,
+  // Itemized bill items
+  const [itemizedList, setItemizedList] = useState<ItemizedBillItem[]>([
+    {
+      id: 'item-1',
+      name: 'Woodfired Truffle Pizza',
+      price: 1200,
+      assignedMemberIds: members.slice(0, 2).map((m) => m.id),
+    },
+    {
+      id: 'item-2',
+      name: 'Grilled Himalayan Trout',
+      price: 1400,
+      assignedMemberIds: members.slice(1, 3).map((m) => m.id),
+    },
+    {
+      id: 'item-3',
+      name: 'Cider & Beverages',
+      price: 1400,
+      assignedMemberIds: members.map((m) => m.id),
+    },
+  ]);
+  const [gstPercent, setGstPercent] = useState<number>(5);
+
+  // Rich payment state mapping: memberId -> { state, transactionRef }
+  const [paymentRecords, setPaymentRecords] = useState<{
+    [memberId: string]: {
+      state: PaymentVerificationState;
+      transactionRef?: string;
+    };
+  }>({
+    [members[0]?.id || 'm1']: { state: 'verified_paid', transactionRef: 'UTR982736152' },
+    [members[1]?.id || 'm2']: { state: 'manually_reported_paid' },
   });
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -57,87 +101,162 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
     if (selectedMemberIds.includes(memberId)) {
       if (selectedMemberIds.length > 1) {
         setSelectedMemberIds(selectedMemberIds.filter((id) => id !== memberId));
+      } else {
+        toast.error('At least one member must be included in the split');
       }
     } else {
       setSelectedMemberIds([...selectedMemberIds, memberId]);
     }
   };
 
-  // Calculate share for a member
-  const getMemberShare = (memberId: string): number => {
-    if (!selectedMemberIds.includes(memberId)) return 0;
-
+  // Compute precise member shares via financial engine
+  const computedShares = useMemo<{ [memberId: string]: number }>(() => {
     if (splitMode === 'EQUAL') {
-      const count = selectedMemberIds.length;
-      return count > 0 ? Math.round(billAmount / count) : 0;
+      try {
+        const splits = calculateEqualSplit({
+          totalAmount: billAmount,
+          memberIds: selectedMemberIds,
+        });
+        const map: { [id: string]: number } = {};
+        splits.forEach((s) => {
+          map[s.memberId] = s.amount;
+        });
+        return map;
+      } catch {
+        return {};
+      }
     }
 
     if (splitMode === 'EXACT') {
-      return customAmounts[memberId] ?? Math.round(billAmount / selectedMemberIds.length);
+      const map: { [id: string]: number } = {};
+      selectedMemberIds.forEach((id) => {
+        map[id] = customAmounts[id] ?? 0;
+      });
+      return map;
     }
 
     if (splitMode === 'ITEMIZED') {
-      // Mock itemized split shares
-      const ratioMap: { [key: string]: number } = {
-        usr_aarav: 0.3,
-        usr_priya: 0.25,
-        usr_rohan: 0.25,
-        usr_kabir: 0.2,
-      };
-      return Math.round(billAmount * (ratioMap[memberId] || 0.25));
+      try {
+        const res = calculateItemizedSplit({
+          items: itemizedList.filter((it) => it.assignedMemberIds.length > 0),
+          gstPercentage: gstPercent,
+        });
+        const map: { [id: string]: number } = {};
+        Object.entries(res.memberShares).forEach(([id, share]) => {
+          map[id] = share.amount;
+        });
+        return map;
+      } catch {
+        return {};
+      }
     }
 
-    return 0;
+    return {};
+  }, [splitMode, billAmount, selectedMemberIds, customAmounts, itemizedList, gstPercent]);
+
+  // Exact split validation stats
+  const exactSplitStats = useMemo(() => {
+    if (splitMode !== 'EXACT') return null;
+    const sharesInput = selectedMemberIds.map((id) => ({
+      memberId: id,
+      amount: customAmounts[id] || 0,
+    }));
+    return validateAndCalculateExactSplit({
+      totalAmount: billAmount,
+      shares: sharesInput,
+    });
+  }, [splitMode, selectedMemberIds, customAmounts, billAmount]);
+
+  const handleCustomAmountChange = (memberId: string, val: number) => {
+    setCustomAmounts((prev) => ({
+      ...prev,
+      [memberId]: Math.max(0, val),
+    }));
   };
 
-  // Toggle paid status
-  const handleTogglePaid = (memberId: string) => {
-    const nextStatus = !paidStatus[memberId];
-    const member = members.find((m) => m.id === memberId);
-    const memberName = member?.name?.split(' ')[0] || 'Member';
-    const share = getMemberShare(memberId);
+  // Cycle / transition payment status
+  const handleAdvanceStatus = (memberId: string) => {
+    const current = paymentRecords[memberId]?.state || 'pending';
+    let nextState: PaymentVerificationState = 'manually_reported_paid';
 
-    setPaidStatus((prev) => ({
+    if (current === 'pending' || current === 'payment_initiated') {
+      nextState = 'manually_reported_paid';
+    } else if (current === 'manually_reported_paid' || current === 'awaiting_confirmation') {
+      nextState = 'verified_paid';
+    } else {
+      nextState = 'pending';
+    }
+
+    setPaymentRecords((prev) => ({
       ...prev,
-      [memberId]: nextStatus,
+      [memberId]: {
+        ...prev[memberId],
+        state: nextState,
+        transactionRef:
+          nextState === 'verified_paid'
+            ? prev[memberId]?.transactionRef || `TXN${Date.now().toString().slice(-6)}`
+            : prev[memberId]?.transactionRef,
+      },
     }));
 
-    if (nextStatus) {
-      toast.success(`${memberName}'s share marked as Paid! ✅`, {
-        description: `${formatInr(share)} settled directly to ${vendorName}.`,
+    const member = members.find((m) => m.id === memberId);
+    const name = member?.name?.split(' ')[0] || 'Member';
+    const meta = PAYMENT_STATES_CONFIG[nextState];
+
+    if (nextState === 'verified_paid') {
+      toast.success(`${name}'s share is Verified Paid! ✅`, {
+        description: `${formatInr(computedShares[memberId] || 0)} settled directly to ${vendorName}.`,
       });
       try {
         confetti({
-          particleCount: 60,
-          spread: 70,
+          particleCount: 50,
+          spread: 60,
           origin: { y: 0.6 },
-          colors: ['#10B981', '#34D399', '#6EE7B7', '#F59E0B'],
+          colors: ['#10B981', '#34D399', '#6EE7B7'],
         });
       } catch {
-        // fallback
+        // confetti fallback
       }
+    } else if (nextState === 'manually_reported_paid') {
+      toast.info(`${name} marked as Paid (Self-Reported) 📝`, {
+        description: 'Waiting for payee/admin acknowledgement.',
+      });
     } else {
-      toast.info(`${memberName}'s share set to Pending ⏳`);
+      toast.info(`${name}'s payment status reset to Pending`);
     }
   };
 
-  // Copy UPI Link
+  // Copy UPI Deep Link
   const handleCopyUri = (uri: string, memberId: string) => {
     navigator.clipboard.writeText(uri);
     setCopiedId(memberId);
     toast.success('UPI Payment Link copied to clipboard! 📋', {
-      description: 'Send in WhatsApp group for instant 1-tap UPI payment.',
+      description: 'Paste into WhatsApp group for instant 1-tap UPI payment.',
     });
     setTimeout(() => setCopiedId(null), 2000);
   };
 
   // Total collected calculation
-  const totalCollected = members.reduce((sum, m) => {
-    return sum + (paidStatus[m.id] ? getMemberShare(m.id) : 0);
-  }, 0);
+  const totalCollectedPaise = useMemo(() => {
+    return members.reduce((sum, m) => {
+      const rec = paymentRecords[m.id];
+      if (rec?.state === 'verified_paid' || rec?.state === 'manually_reported_paid') {
+        return sum + toPaise(computedShares[m.id] || 0);
+      }
+      return sum;
+    }, 0);
+  }, [members, paymentRecords, computedShares]);
+
+  const totalCollected = toRupees(totalCollectedPaise);
+  const targetTotal =
+    splitMode === 'ITEMIZED'
+      ? Object.values(computedShares).reduce((a, b) => a + b, 0)
+      : billAmount;
 
   const collectedPercentage =
-    billAmount > 0 ? Math.min(100, Math.round((totalCollected / billAmount) * 100)) : 0;
+    targetTotal > 0 ? Math.min(100, Math.round((totalCollected / targetTotal) * 100)) : 0;
+
+  const isVpaValid = UPI_VPA_REGEX.test(vendorUpiId.trim());
 
   return (
     <div className="space-y-6">
@@ -159,11 +278,10 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
               Every member pays the merchant directly from their own UPI app.
             </h3>
             <p className="text-xs text-slate-300 max-w-2xl">
-              No single person pays ₹4,000 upfront and chases friends for days. Scan the standee, enter bill total, and each friend scans their custom QR with their exact share.
+              Eliminate awkward peer debts. Generate separate QR codes with exact paise distribution. Each friend scans with GPay, PhonePe, Paytm, or BHIM.
             </p>
           </div>
 
-          {/* AI Bill Scan Quick Trigger */}
           <button
             type="button"
             onClick={onOpenAiScanner}
@@ -186,7 +304,13 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
               </span>
               Merchant UPI ID
             </label>
-            <span className="text-[10px] text-emerald-400 font-mono">Verified VPA</span>
+            <span
+              className={`text-[10px] font-mono flex items-center gap-1 ${
+                isVpaValid ? 'text-emerald-400' : 'text-amber-400'
+              }`}
+            >
+              {isVpaValid ? '✓ Valid VPA' : '⚠ Invalid format'}
+            </span>
           </div>
 
           <div className="space-y-2">
@@ -195,7 +319,9 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
               value={vendorUpiId}
               onChange={(e) => setVendorUpiId(e.target.value)}
               placeholder="e.g. cafe1947@okicici"
-              className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3 py-2 text-xs font-mono text-white placeholder-slate-500 transition-colors"
+              className={`w-full bg-slate-950 border rounded-xl px-3 py-2 text-xs font-mono text-white placeholder-slate-500 transition-colors ${
+                isVpaValid ? 'border-slate-800 focus:border-emerald-500' : 'border-amber-500/50'
+              }`}
             />
             <input
               type="text"
@@ -221,12 +347,12 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
               <span className="absolute left-3 top-2.5 text-slate-500 font-bold text-sm">₹</span>
               <input
                 type="number"
+                min="0"
                 value={billAmount}
                 onChange={(e) => setBillAmount(Number(e.target.value) || 0)}
                 className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl pl-8 pr-3 py-2 text-base font-extrabold text-white num-inr"
               />
             </div>
-            {/* Quick quick-set buttons */}
             {[2000, 4000, 6000].map((amt) => (
               <button
                 key={amt}
@@ -260,7 +386,7 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
           </div>
         </div>
 
-        {/* Step 3 Progress & Quick Stats */}
+        {/* Step 3: Progress & Quick Stats */}
         <div className="lg:col-span-3 flex flex-col justify-between p-3.5 rounded-xl bg-slate-950/70 border border-slate-800">
           <div>
             <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
@@ -275,10 +401,10 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
             </div>
             <div className="flex justify-between text-[11px]">
               <span className="text-emerald-400 font-bold num-inr">
-                {formatInr(totalCollected)} Paid
+                {formatInr(totalCollected)} Settled
               </span>
               <span className="text-amber-400 font-medium num-inr">
-                {formatInr(Math.max(0, billAmount - totalCollected))} Left
+                {formatInr(Math.max(0, targetTotal - totalCollected))} Left
               </span>
             </div>
           </div>
@@ -289,6 +415,126 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
           </div>
         </div>
       </div>
+
+      {/* EXACT CUSTOM INPUT SUB-PANEL */}
+      {splitMode === 'EXACT' && (
+        <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-white uppercase tracking-wider">
+                Specify Exact Shares
+              </span>
+              <span className="text-xs text-slate-400">
+                (Total must match ₹{billAmount})
+              </span>
+            </div>
+            {exactSplitStats && !exactSplitStats.isValid && (
+              <span className="text-xs font-semibold text-rose-400 flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5" />
+                <span>{exactSplitStats.error}</span>
+              </span>
+            )}
+            {exactSplitStats && exactSplitStats.isValid && (
+              <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Exactly Allocated! 100% matched</span>
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {selectedMemberIds.map((memberId) => {
+              const member = members.find((m) => m.id === memberId);
+              return (
+                <div key={memberId} className="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
+                  <p className="text-[11px] font-bold text-slate-300 mb-1 truncate">
+                    {member?.name || memberId}
+                  </p>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-1.5 text-slate-500 text-xs">₹</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={customAmounts[memberId] ?? ''}
+                      onChange={(e) => handleCustomAmountChange(memberId, parseFloat(e.target.value) || 0)}
+                      placeholder="0"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-6 pr-2 py-1 text-xs text-white font-mono"
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ITEMIZED BILL BREAKDOWN SUB-PANEL */}
+      {splitMode === 'ITEMIZED' && (
+        <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-white uppercase tracking-wider">
+              Itemized Line Items & Assigned Consumers
+            </span>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-slate-400">GST %:</span>
+              <input
+                type="number"
+                value={gstPercent}
+                onChange={(e) => setGstPercent(Number(e.target.value) || 0)}
+                className="w-14 bg-slate-950 border border-slate-700 rounded-lg px-2 py-0.5 text-xs text-white font-mono"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {itemizedList.map((item, idx) => (
+              <div
+                key={item.id}
+                className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-bold text-slate-500 w-4">{idx + 1}.</span>
+                  <div>
+                    <p className="text-xs font-bold text-white">{item.name}</p>
+                    <p className="text-xs text-emerald-400 font-mono font-semibold">
+                      ₹{item.price}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {members.map((m) => {
+                    const isAssigned = item.assignedMemberIds.includes(m.id);
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          const nextIds = isAssigned
+                            ? item.assignedMemberIds.filter((id) => id !== m.id)
+                            : [...item.assignedMemberIds, m.id];
+                          if (nextIds.length > 0) {
+                            setItemizedList((prev) =>
+                              prev.map((it) => (it.id === item.id ? { ...it, assignedMemberIds: nextIds } : it))
+                            );
+                          }
+                        }}
+                        className={`text-[10px] px-2 py-1 rounded-lg border font-medium transition-all ${
+                          isAssigned
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                            : 'bg-slate-900 text-slate-500 border-slate-800 opacity-60'
+                        }`}
+                      >
+                        {m.name.split(' ')[0]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Member Selection Pills */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
@@ -320,7 +566,7 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
         })}
       </div>
 
-      {/* STEP 3: SEPARATE MEMBER QR GRID */}
+      {/* STEP 3: DYNAMIC MEMBER QR CARDS */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -334,34 +580,41 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
               ({selectedMemberIds.length} shares generated)
             </span>
           </div>
-          <span className="text-xs text-emerald-400 font-medium">
-            Scan via GPay, PhonePe, Paytm, BHIM, Cred
+          <span className="text-xs text-emerald-400 font-medium hidden sm:inline">
+            Direct Merchant Settlements
           </span>
         </div>
 
         {/* Member QR Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {members.map((member) => {
-            const share = getMemberShare(member.id);
             const isSelected = selectedMemberIds.includes(member.id);
-            const isPaid = paidStatus[member.id];
-
             if (!isSelected) return null;
 
-            // Generate precise UPI payment URI
-            const upiUri = generateUpiUri({
+            const share = computedShares[member.id] || 0;
+            const record = paymentRecords[member.id] || { state: 'pending' };
+            const stateMeta = PAYMENT_STATES_CONFIG[record.state];
+
+            // Generate verified UPI URI with NPCI spec
+            const upiUri = buildVerifiedUpiUri({
               payeeVpa: vendorUpiId,
               payeeName: vendorName,
               amount: share,
               transactionNote: `TripSplit ${member.name.split(' ')[0]} - ${vendorName}`,
             });
 
+            const whatsappShareText = encodeURIComponent(
+              `Hi ${member.name.split(' ')[0]}! Pay your exact ₹${share} share for ${vendorName} directly via UPI:\n${upiUri}`
+            );
+
             return (
               <div
                 key={member.id}
                 className={`relative flex flex-col justify-between rounded-2xl p-4 transition-all duration-200 border ${
-                  isPaid
+                  stateMeta.isConfirmed
                     ? 'bg-[#111827] border-emerald-500/40 shadow-emerald-500/5'
+                    : stateMeta.isSelfReported
+                    ? 'bg-[#111827] border-teal-500/30'
                     : 'bg-[#111827] border-[#1F2937] hover:border-slate-700 shadow-xl'
                 }`}
               >
@@ -381,27 +634,19 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
                     </div>
                   </div>
 
-                  {/* Status Toggle Badge */}
+                  {/* Status Advance Button */}
                   <button
                     type="button"
-                    onClick={() => handleTogglePaid(member.id)}
-                    className={`text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all flex items-center gap-1 active:scale-95 ${
-                      isPaid
-                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                        : 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
-                    }`}
+                    onClick={() => handleAdvanceStatus(member.id)}
+                    className={`text-[10px] font-bold px-2.5 py-1 rounded-full border transition-all flex items-center gap-1 active:scale-95 ${stateMeta.badgeColor}`}
+                    title={stateMeta.description}
                   >
-                    {isPaid ? (
-                      <>
-                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                        <span>Paid ✅</span>
-                      </>
+                    {stateMeta.isConfirmed ? (
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
                     ) : (
-                      <>
-                        <Clock className="w-3 h-3 text-amber-400" />
-                        <span>Pending ⏳</span>
-                      </>
+                      <Clock className="w-3 h-3 text-amber-400" />
                     )}
+                    <span>{stateMeta.label}</span>
                   </button>
                 </div>
 
@@ -413,6 +658,11 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
                   <div className="text-xl font-extrabold text-white num-inr mt-0.5">
                     {formatInr(share)}
                   </div>
+                  {record.transactionRef && (
+                    <span className="text-[9px] font-mono text-emerald-400 block mt-0.5">
+                      Ref: {record.transactionRef}
+                    </span>
+                  )}
                 </div>
 
                 {/* Dynamic QR Code Canvas */}
@@ -431,7 +681,6 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
 
                 {/* Action Buttons */}
                 <div className="space-y-1.5">
-                  {/* Direct Deep link */}
                   <a
                     href={upiUri}
                     className="w-full py-2 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95 transition-all text-center"
@@ -440,24 +689,35 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
                     <span>Pay via UPI App</span>
                   </a>
 
-                  {/* Copy Link Button */}
-                  <button
-                    type="button"
-                    onClick={() => handleCopyUri(upiUri, member.id)}
-                    className="w-full py-1.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-[11px] font-medium flex items-center justify-center gap-1 transition-colors"
-                  >
-                    {copiedId === member.id ? (
-                      <>
-                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                        <span className="text-emerald-400">UPI Link Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3 h-3 text-slate-500" />
-                        <span>Copy UPI Deep Link</span>
-                      </>
-                    )}
-                  </button>
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleCopyUri(upiUri, member.id)}
+                      className="flex-1 py-1.5 px-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-[10px] font-medium flex items-center justify-center gap-1 transition-colors"
+                    >
+                      {copiedId === member.id ? (
+                        <>
+                          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                          <span className="text-emerald-400">Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3 text-slate-400" />
+                          <span>Copy Link</span>
+                        </>
+                      )}
+                    </button>
+
+                    <a
+                      href={`https://wa.me/?text=${whatsappShareText}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="py-1.5 px-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-400 hover:text-emerald-300 text-[10px] font-medium flex items-center justify-center gap-1 transition-colors"
+                      title="Share link on WhatsApp"
+                    >
+                      <Share2 className="w-3 h-3" />
+                    </a>
+                  </div>
                 </div>
               </div>
             );

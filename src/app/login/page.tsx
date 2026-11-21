@@ -12,7 +12,7 @@ import {
   EyeOff,
   AlertCircle,
   CheckCircle2,
-  ShieldCheck,
+  ShieldAlert,
   Zap,
 } from 'lucide-react';
 
@@ -40,16 +40,14 @@ function LoginForm() {
       return;
     }
 
-    setIsLoading(true);
-
     if (!isSupabaseConfigured) {
-      // Demo fallback login
-      setTimeout(() => {
-        setIsLoading(false);
-        router.push(redirectTo);
-      }, 600);
+      setError(
+        'Supabase authentication is not configured in .env.local. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to enable live authentication.'
+      );
       return;
     }
+
+    setIsLoading(true);
 
     try {
       const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -78,8 +76,9 @@ function LoginForm() {
     setError(null);
 
     if (!isSupabaseConfigured) {
-      // Demo login
-      router.push(redirectTo);
+      setError(
+        'Google OAuth requires Supabase authentication setup. Please configure NEXT_PUBLIC_SUPABASE_URL in .env.local.'
+      );
       return;
     }
 
@@ -101,7 +100,7 @@ function LoginForm() {
     }
   };
 
-  const handleDemoLogin = () => {
+  const handlePreviewMode = () => {
     setIsLoading(true);
     setTimeout(() => {
       router.push(redirectTo);
@@ -139,6 +138,29 @@ function LoginForm() {
             Access trip itineraries, bookings vault & live UPI split cards
           </p>
         </div>
+
+        {/* Missing Supabase Configuration Notice */}
+        {!isSupabaseConfigured && (
+          <div className="mb-4 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 space-y-2">
+            <div className="flex items-center gap-2 font-bold text-amber-300">
+              <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Supabase Authentication Not Configured</span>
+            </div>
+            <p className="text-[11px] text-amber-200/90 leading-relaxed">
+              Environment variables <code className="bg-slate-900 px-1 py-0.5 rounded text-white font-mono">NEXT_PUBLIC_SUPABASE_URL</code> and <code className="bg-slate-900 px-1 py-0.5 rounded text-white font-mono">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> are not configured.
+            </p>
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={handlePreviewMode}
+                className="w-full py-2 px-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <Zap className="w-3.5 h-3.5" />
+                <span>Explore in Local Sandbox Preview Mode</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Card */}
         <div className="rounded-3xl bg-[#111827] border border-[#1F2937] p-6 sm:p-8 shadow-2xl relative">
@@ -260,34 +282,16 @@ function LoginForm() {
             </button>
           </form>
 
-          {/* Quick Demo Login Option */}
-          <div className="mt-5 pt-4 border-t border-slate-800/80">
-            <button
-              type="button"
-              onClick={handleDemoLogin}
-              className="w-full py-2.5 px-3 rounded-xl bg-slate-900/80 hover:bg-slate-850 text-slate-300 hover:text-emerald-400 border border-slate-800 text-xs font-medium flex items-center justify-center gap-2 transition-colors"
-            >
-              <Zap className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Instant Guest / Demo Preview (Aarav)</span>
-            </button>
-          </div>
-
-          {/* Switch to Signup */}
+          {/* Footer Navigation */}
           <div className="mt-6 text-center text-xs text-slate-400">
-            Don&apos;t have an account?{' '}
+            Don&apos;t have an account yet?{' '}
             <Link
               href="/signup"
-              className="text-emerald-400 hover:text-emerald-300 font-semibold transition-colors"
+              className="font-bold text-emerald-400 hover:text-emerald-300 transition-colors underline underline-offset-2"
             >
               Create Account
             </Link>
           </div>
-        </div>
-
-        {/* Security Footer */}
-        <div className="mt-6 text-center flex items-center justify-center gap-1.5 text-xs text-slate-300">
-          <ShieldCheck className="w-4 h-4 text-emerald-400" />
-          <span>Encrypted Supabase Auth & JWT Sessions</span>
         </div>
       </div>
     </div>
@@ -299,7 +303,7 @@ export default function LoginPage() {
     <Suspense
       fallback={
         <div className="min-h-screen bg-[#0B1120] flex items-center justify-center text-slate-400">
-          <span>Loading TripSplit Auth...</span>
+          Loading sign in...
         </div>
       }
     >

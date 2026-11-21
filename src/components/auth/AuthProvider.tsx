@@ -33,6 +33,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<DbProfile | null>(() => {
     if (!isSupabaseConfigured) {
+      if (typeof window !== 'undefined' && sessionStorage.getItem('tripsplit_preview_signed_out') === 'true') {
+        return null;
+      }
       return {
         id: mockUser.id,
         display_name: mockUser.name,
@@ -119,6 +122,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     if (isSupabaseConfigured) {
       await supabase.auth.signOut();
+    } else if (typeof window !== 'undefined') {
+      sessionStorage.setItem('tripsplit_preview_signed_out', 'true');
     }
     setUser(null);
     setProfile(null);
