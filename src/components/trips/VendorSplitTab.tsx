@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { TripMember, SplitMode } from '../../types/trip';
 import { generateUpiUri, formatInr } from '../../lib/upi';
+import { toast } from 'sonner';
 
 interface VendorSplitTabProps {
   members: TripMember[];
@@ -92,13 +93,19 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
   // Toggle paid status
   const handleTogglePaid = (memberId: string) => {
     const nextStatus = !paidStatus[memberId];
+    const member = members.find((m) => m.id === memberId);
+    const memberName = member?.name?.split(' ')[0] || 'Member';
+    const share = getMemberShare(memberId);
+
     setPaidStatus((prev) => ({
       ...prev,
       [memberId]: nextStatus,
     }));
 
     if (nextStatus) {
-      // Trigger celebration confetti
+      toast.success(`${memberName}'s share marked as Paid! ✅`, {
+        description: `${formatInr(share)} settled directly to ${vendorName}.`,
+      });
       try {
         confetti({
           particleCount: 60,
@@ -109,6 +116,8 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
       } catch {
         // fallback
       }
+    } else {
+      toast.info(`${memberName}'s share set to Pending ⏳`);
     }
   };
 
@@ -116,6 +125,9 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
   const handleCopyUri = (uri: string, memberId: string) => {
     navigator.clipboard.writeText(uri);
     setCopiedId(memberId);
+    toast.success('UPI Payment Link copied to clipboard! 📋', {
+      description: 'Send in WhatsApp group for instant 1-tap UPI payment.',
+    });
     setTimeout(() => setCopiedId(null), 2000);
   };
 

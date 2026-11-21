@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { Trip } from '../../types/trip';
 import { formatInr } from '../../lib/upi';
+import { ImageWithFallback } from '../ui/ImageWithFallback';
 
 interface TripHeaderProps {
   trip: Trip;
@@ -36,9 +37,10 @@ export const TripHeader: React.FC<TripHeaderProps> = ({
     <div className="relative rounded-3xl bg-[#111827] border border-[#1F2937] overflow-hidden shadow-2xl mb-6">
       {/* Background Banner */}
       <div className="relative h-48 sm:h-64 w-full overflow-hidden">
-        <img
+        <ImageWithFallback
           src={trip.coverImage}
           alt={trip.title}
+          fallbackTitle={trip.destination}
           className="w-full h-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#111827] via-[#111827]/60 to-black/30" />

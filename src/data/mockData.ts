@@ -348,7 +348,7 @@ export const mockTrips: Trip[] = [
     title: 'Jaipur Pink City Heritage Outing',
     tagline: 'Amer Fort sunrise, Nahargarh views & authentic Rajasthani lassi',
     destination: 'Jaipur, Rajasthan',
-    coverImage: 'https://images.unsplash.com/photo-1603262110263-fb010d6e59f4?auto=format&fit=crop&w=1200&q=80',
+    coverImage: 'https://images.unsplash.com/photo-1599661046289-e31897846e41?auto=format&fit=crop&w=1200&q=80',
     startDate: '04 Oct 2026',
     endDate: '06 Oct 2026',
     budget: 15000,

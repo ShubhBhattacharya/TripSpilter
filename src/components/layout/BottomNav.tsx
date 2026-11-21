@@ -16,7 +16,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ onOpenQuickSplit }) => {
   const isTrip = pathname.startsWith('/trips');
 
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0B1120]/95 backdrop-blur-xl border-t border-[#1F2937] px-3 pb-safe pt-2">
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0B1120]/95 backdrop-blur-xl border-t border-[#1F2937] px-3 pb-3 pt-2 shadow-[0_-8px_30px_rgba(0,0,0,0.5)]">
       <div className="flex items-center justify-around relative max-w-md mx-auto">
         {/* Dashboard */}
         <Link

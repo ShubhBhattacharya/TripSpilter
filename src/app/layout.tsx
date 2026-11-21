@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "../components/auth/AuthProvider";
 import { OnboardingModal } from "../components/auth/OnboardingModal";
+import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: "TripSplit — Direct-to-Vendor UPI Bill Splitter & Trip Planner",
@@ -27,6 +28,19 @@ export default function RootLayout({
         <AuthProvider>
           {children}
           <OnboardingModal />
+          <Toaster
+            position="top-right"
+            theme="dark"
+            richColors
+            closeButton
+            toastOptions={{
+              style: {
+                background: '#111827',
+                border: '1px solid #1F2937',
+                color: '#F1F5F9',
+              },
+            }}
+          />
         </AuthProvider>
       </body>
     </html>

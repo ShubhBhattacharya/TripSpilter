@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { MapPin, Calendar, ArrowUpRight } from 'lucide-react';
 import { Trip } from '../../types/trip';
 import { formatInr } from '../../lib/upi';
+import { ImageWithFallback } from '../ui/ImageWithFallback';
 
 interface TripCardProps {
   trip: Trip;
@@ -26,9 +27,10 @@ export const TripCard: React.FC<TripCardProps> = ({ trip }) => {
     >
       {/* Cover Image & Overlays */}
       <div className="relative h-44 w-full overflow-hidden bg-slate-900">
-        <img
+        <ImageWithFallback
           src={trip.coverImage}
           alt={trip.title}
+          fallbackTitle={trip.destination}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-[#111827] via-[#111827]/40 to-transparent" />

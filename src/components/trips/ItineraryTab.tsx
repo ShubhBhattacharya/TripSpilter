@@ -18,6 +18,7 @@ import {
 import { ItineraryItem, GroupPoll, TimelineCategory } from '../../types/trip';
 import { formatInr } from '../../lib/upi';
 import { currentUser } from '../../data/mockData';
+import { toast } from 'sonner';
 
 interface ItineraryTabProps {
   initialItinerary: ItineraryItem[];
@@ -73,6 +74,9 @@ export const ItineraryTab: React.FC<ItineraryTabProps> = ({
   };
 
   const handleVote = (pollId: string, optionId: string) => {
+    toast.success('Vote recorded! 🗳️', {
+      description: 'Poll percentages updated in real-time.',
+    });
     setPolls((prevPolls) =>
       prevPolls.map((poll) => {
         if (poll.id !== pollId) return poll;

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { DebtSettlement, TripMember } from '../../types/trip';
 import { formatInr, generateUpiUri } from '../../lib/upi';
+import { toast } from 'sonner';
 
 interface BalancesTabProps {
   debts: DebtSettlement[];
@@ -34,6 +35,11 @@ export const BalancesTab: React.FC<BalancesTabProps> = ({ debts: initialDebts, m
         const newStatus = d.status === 'SETTLED' ? 'PENDING' : 'SETTLED';
 
         if (newStatus === 'SETTLED') {
+          const from = getMember(d.fromMemberId)?.name?.split(' ')[0] || 'Member';
+          const to = getMember(d.toMemberId)?.name?.split(' ')[0] || 'Member';
+          toast.success('Debt Settled via UPI! 🎉', {
+            description: `${from} paid ${to} ${formatInr(d.amount)}.`,
+          });
           try {
             confetti({
               particleCount: 50,
@@ -44,6 +50,8 @@ export const BalancesTab: React.FC<BalancesTabProps> = ({ debts: initialDebts, m
           } catch {
             // fallback
           }
+        } else {
+          toast.info('Settlement marked back to Pending ⏳');
         }
 
         return {

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { BookingVaultItem } from '../../types/trip';
 import { formatInr } from '../../lib/upi';
+import { toast } from 'sonner';
 
 interface BookingsVaultTabProps {
   bookings: BookingVaultItem[];
@@ -153,7 +154,12 @@ export const BookingsVaultTab: React.FC<BookingsVaultTabProps> = ({
                 {/* ONE-CLICK SPLIT THIS BOOKING BUTTON */}
                 <button
                   type="button"
-                  onClick={() => onSplitBooking(booking)}
+                  onClick={() => {
+                    toast.info(`Loaded into Direct Split! ⚡`, {
+                      description: `${booking.title} (${formatInr(booking.totalAmount)})`,
+                    });
+                    onSplitBooking(booking);
+                  }}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition-all active:scale-95 shadow-sm"
                 >
                   <QrCode className="w-3.5 h-3.5" />
