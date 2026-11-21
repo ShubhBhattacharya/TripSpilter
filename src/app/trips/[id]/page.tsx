@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, Suspense } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { Sidebar } from '../../../components/layout/Sidebar';
 import { BottomNav } from '../../../components/layout/BottomNav';
@@ -12,8 +12,8 @@ import { VendorSplitTab } from '../../../components/trips/VendorSplitTab';
 import { BalancesTab } from '../../../components/trips/BalancesTab';
 import { ScanMerchantQrModal } from '../../../components/modals/ScanMerchantQrModal';
 import { AiBillScanModal } from '../../../components/modals/AiBillScanModal';
-import { mockTrips, defaultMembers } from '../../../data/mockData';
-import { BookingVaultItem, Trip } from '../../../types/trip';
+import { mockTrips } from '../../../data/mockData';
+import { BookingVaultItem } from '../../../types/trip';
 import { Loader2 } from 'lucide-react';
 
 function TripWorkspaceContent() {
@@ -24,8 +24,7 @@ function TripWorkspaceContent() {
   const tripId = (params?.id as string) || 'trip-manali-2026';
   const trip = mockTrips.find((t) => t.id === tripId) || mockTrips[0];
 
-  const initialTab = searchParams.get('tab') || 'itinerary';
-  const [activeTab, setActiveTab] = useState<string>(initialTab);
+  const activeTab = searchParams.get('tab') || 'itinerary';
 
   // Split state overrides (e.g. from booking split or scanner)
   const [splitVendorName, setSplitVendorName] = useState<string>('Cafe 1947 Manali');
@@ -36,16 +35,7 @@ function TripWorkspaceContent() {
   const [isScanMerchantOpen, setIsScanMerchantOpen] = useState(false);
   const [isAiBillScanOpen, setIsAiBillScanOpen] = useState(false);
 
-  // Sync tab with URL search parameter if it changes
-  useEffect(() => {
-    const tabParam = searchParams.get('tab');
-    if (tabParam && tabParam !== activeTab) {
-      setActiveTab(tabParam);
-    }
-  }, [searchParams]);
-
   const handleTabChange = (tab: string) => {
-    setActiveTab(tab);
     router.replace(`/trips/${trip.id}?tab=${tab}`, { scroll: false });
   };
 
@@ -123,6 +113,7 @@ function TripWorkspaceContent() {
 
             {activeTab === 'split' && (
               <VendorSplitTab
+                key={`${splitVendorUpi}-${splitAmount}`}
                 members={trip.members}
                 initialVendorName={splitVendorName}
                 initialVendorUpiId={splitVendorUpi}

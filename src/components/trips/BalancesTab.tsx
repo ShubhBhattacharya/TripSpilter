@@ -7,17 +7,12 @@ import {
   Receipt,
   ArrowRight,
   CheckCircle2,
-  Clock,
-  Sparkles,
   ExternalLink,
-  ShieldCheck,
   X,
   CreditCard,
-  UserCheck,
 } from 'lucide-react';
 import { DebtSettlement, TripMember } from '../../types/trip';
 import { formatInr, generateUpiUri } from '../../lib/upi';
-import { currentUser } from '../../data/mockData';
 
 interface BalancesTabProps {
   debts: DebtSettlement[];
@@ -46,7 +41,7 @@ export const BalancesTab: React.FC<BalancesTabProps> = ({ debts: initialDebts, m
               origin: { y: 0.6 },
               colors: ['#10B981', '#34D399'],
             });
-          } catch (e) {
+          } catch {
             // fallback
           }
         }

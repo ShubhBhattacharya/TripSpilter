@@ -1,16 +1,11 @@
 'use client';
 
 import React from 'react';
-import Link from 'next/link';
 import {
   MapPin,
   Calendar,
   Share2,
   QrCode,
-  Plus,
-  Users,
-  Wallet,
-  CheckCircle2,
 } from 'lucide-react';
 import { Trip } from '../../types/trip';
 import { formatInr } from '../../lib/upi';

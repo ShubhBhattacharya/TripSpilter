@@ -23,8 +23,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
 }) => {
   const [title, setTitle] = useState('');
   const [destination, setDestination] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [dateRange, setDateRange] = useState('');
   const [budget, setBudget] = useState('35000');
 
   if (!isOpen) return null;
@@ -35,8 +34,8 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
     onCreate({
       title,
       destination,
-      startDate: startDate || '10 Dec 2026',
-      endDate: endDate || '15 Dec 2026',
+      startDate: dateRange.split('-')[0]?.trim() || '10 Dec 2026',
+      endDate: dateRange.split('-')[1]?.trim() || '15 Dec 2026',
       budget: Number(budget) || 30000,
     });
     onClose();
@@ -114,8 +113,8 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
                 <input
                   type="text"
                   placeholder="10 Dec - 15 Dec"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  value={dateRange}
+                  onChange={(e) => setDateRange(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
                 />
               </div>

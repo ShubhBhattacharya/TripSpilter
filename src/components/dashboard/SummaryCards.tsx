@@ -6,7 +6,6 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
   TrendingUp,
-  ShieldCheck,
   Sparkles,
 } from 'lucide-react';
 import { formatInr } from '../../lib/upi';

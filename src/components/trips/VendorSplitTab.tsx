@@ -1,24 +1,18 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
 import {
-  QrCode,
-  Sparkles,
   CheckCircle2,
   Clock,
   Copy,
   ExternalLink,
-  Users,
   Camera,
-  RotateCcw,
-  Receipt,
-  ArrowRight,
   ShieldCheck,
   Check,
 } from 'lucide-react';
-import { TripMember, SplitMode, MemberSplitShare } from '../../types/trip';
+import { TripMember, SplitMode } from '../../types/trip';
 import { generateUpiUri, formatInr } from '../../lib/upi';
 
 interface VendorSplitTabProps {
@@ -45,7 +39,7 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
   );
 
   // Exact custom amounts mapping
-  const [customAmounts, setCustomAmounts] = useState<{ [id: string]: number }>({});
+  const [customAmounts] = useState<{ [id: string]: number }>({});
 
   // Paid state mapping
   const [paidStatus, setPaidStatus] = useState<{ [id: string]: boolean }>({
@@ -56,13 +50,6 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
   });
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
-
-  // Sync when initial props change (e.g. from bookings split)
-  useEffect(() => {
-    if (initialVendorName) setVendorName(initialVendorName);
-    if (initialVendorUpiId) setVendorUpiId(initialVendorUpiId);
-    if (initialAmount) setBillAmount(initialAmount);
-  }, [initialVendorName, initialVendorUpiId, initialAmount]);
 
   // Toggle member participation
   const toggleMemberSelection = (memberId: string) => {
@@ -119,7 +106,7 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
           origin: { y: 0.6 },
           colors: ['#10B981', '#34D399', '#6EE7B7', '#F59E0B'],
         });
-      } catch (err) {
+      } catch {
         // fallback
       }
     }

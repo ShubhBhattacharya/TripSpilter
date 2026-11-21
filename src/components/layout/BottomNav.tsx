@@ -14,7 +14,6 @@ export const BottomNav: React.FC<BottomNavProps> = ({ onOpenQuickSplit }) => {
 
   const isHome = pathname === '/';
   const isTrip = pathname.startsWith('/trips');
-  const isQrSplit = pathname === '/qr-split';
 
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0B1120]/95 backdrop-blur-xl border-t border-[#1F2937] px-3 pb-safe pt-2">

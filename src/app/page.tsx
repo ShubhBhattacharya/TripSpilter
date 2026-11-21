@@ -18,7 +18,7 @@ import {
   defaultMembers,
 } from '../data/mockData';
 import { Trip } from '../types/trip';
-import { Sparkles, Compass, ShieldCheck, Zap } from 'lucide-react';
+import { Compass, ShieldCheck, Zap } from 'lucide-react';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -59,7 +59,7 @@ export default function DashboardPage() {
     router.push(`/trips/${newTrip.id}`);
   };
 
-  const handleVendorDetected = (vendor: { name: string; upiId: string; amount?: number }) => {
+  const handleVendorDetected = () => {
     router.push(`/trips/trip-manali-2026?tab=split`);
   };
 

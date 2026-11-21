@@ -5,10 +5,8 @@ import {
   X,
   QrCode,
   Camera,
-  Upload,
   CheckCircle2,
   ArrowRight,
-  Sparkles,
 } from 'lucide-react';
 
 interface ScanMerchantQrModalProps {
@@ -23,7 +21,6 @@ export const ScanMerchantQrModal: React.FC<ScanMerchantQrModalProps> = ({
   onSelectVendor,
 }) => {
   const [manualUpi, setManualUpi] = useState('');
-  const [merchantName, setMerchantName] = useState('');
   const [isScanning, setIsScanning] = useState(false);
   const [scannedSuccess, setScannedSuccess] = useState(false);
 
@@ -53,7 +50,7 @@ export const ScanMerchantQrModal: React.FC<ScanMerchantQrModalProps> = ({
     e.preventDefault();
     if (!manualUpi) return;
     onSelectVendor({
-      name: merchantName || manualUpi.split('@')[0].toUpperCase(),
+      name: manualUpi.split('@')[0].toUpperCase(),
       upiId: manualUpi,
     });
     onClose();

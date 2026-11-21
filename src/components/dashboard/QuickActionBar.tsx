@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import Link from 'next/link';
 import { Plus, QrCode, Sparkles, ArrowRight } from 'lucide-react';
 
 interface QuickActionBarProps {

@@ -4,11 +4,8 @@ import React from 'react';
 import Link from 'next/link';
 import {
   QrCode,
-  Bell,
   ArrowUpRight,
   ArrowDownLeft,
-  Search,
-  Sparkles,
 } from 'lucide-react';
 import { currentUser, userSummaryStats } from '../../data/mockData';
 

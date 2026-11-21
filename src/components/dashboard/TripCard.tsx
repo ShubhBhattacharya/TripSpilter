@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { MapPin, Calendar, Users, ArrowUpRight, CheckCircle2 } from 'lucide-react';
+import { MapPin, Calendar, ArrowUpRight } from 'lucide-react';
 import { Trip } from '../../types/trip';
 import { formatInr } from '../../lib/upi';
 

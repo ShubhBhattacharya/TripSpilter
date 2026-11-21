@@ -7,7 +7,6 @@ import {
   Compass,
   QrCode,
   FolderLock,
-  Wallet,
   Users,
   CheckCircle2,
   Copy,

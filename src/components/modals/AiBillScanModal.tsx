@@ -5,11 +5,9 @@ import {
   X,
   Sparkles,
   Receipt,
-  FileText,
   CheckCircle2,
   ArrowRight,
   Loader2,
-  Percent,
 } from 'lucide-react';
 import { formatInr } from '../../lib/upi';
 

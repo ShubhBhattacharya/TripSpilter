@@ -7,15 +7,12 @@ import {
   Eye,
   QrCode,
   FileText,
-  CheckCircle2,
-  Clock,
   Building2,
   Bus,
   Compass,
   Utensils,
   Plus,
   X,
-  ExternalLink,
 } from 'lucide-react';
 import { BookingVaultItem } from '../../types/trip';
 import { formatInr } from '../../lib/upi';
