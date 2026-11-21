@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0B1120",
+  themeColor: "#173B70",
   width: "device-width",
   initialScale: 1,
 };
@@ -22,21 +22,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark h-full antialiased">
-      <body className="min-h-full flex flex-col bg-[#0B1120] text-slate-100 font-sans selection:bg-emerald-500/30 selection:text-emerald-300">
+    <html lang="en" className="h-full antialiased">
+      <body className="min-h-full flex flex-col bg-[#F4F7FB] text-[#172B4D] font-sans selection:bg-[#1685D4]/20 selection:text-[#173B70]">
         <AuthProvider>
           {children}
           <OnboardingModal />
           <Toaster
             position="top-right"
-            theme="dark"
+            theme="light"
             richColors
             closeButton
             toastOptions={{
               style: {
-                background: '#111827',
-                border: '1px solid #1F2937',
-                color: '#F1F5F9',
+                background: '#FFFFFF',
+                border: '1px solid #E5EAF1',
+                color: '#172B4D',
               },
             }}
           />

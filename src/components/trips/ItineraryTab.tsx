@@ -14,6 +14,7 @@ import {
   Vote,
   Plus,
   Sparkles,
+  X,
 } from 'lucide-react';
 import { ItineraryItem, GroupPoll, TimelineCategory } from '../../types/trip';
 import { formatInr } from '../../lib/upi';
@@ -46,30 +47,30 @@ export const ItineraryTab: React.FC<ItineraryTabProps> = ({
   const getCategoryIcon = (category: TimelineCategory) => {
     switch (category) {
       case 'Transport':
-        return <Bus className="w-4 h-4 text-sky-400" />;
+        return <Bus className="w-3.5 h-3.5 text-[#1685D4]" />;
       case 'Stay':
-        return <Home className="w-4 h-4 text-indigo-400" />;
+        return <Home className="w-3.5 h-3.5 text-indigo-600" />;
       case 'Food':
-        return <Utensils className="w-4 h-4 text-amber-400" />;
+        return <Utensils className="w-3.5 h-3.5 text-amber-600" />;
       case 'Activity':
-        return <Compass className="w-4 h-4 text-emerald-400" />;
+        return <Compass className="w-3.5 h-3.5 text-[#047857]" />;
       case 'Sightseeing':
-        return <Sparkles className="w-4 h-4 text-purple-400" />;
+        return <Sparkles className="w-3.5 h-3.5 text-purple-600" />;
     }
   };
 
   const getCategoryBadge = (category: TimelineCategory) => {
     switch (category) {
       case 'Transport':
-        return 'bg-sky-500/10 text-sky-400 border-sky-500/20';
+        return 'bg-blue-50 text-[#1685D4] border-blue-200/60';
       case 'Stay':
-        return 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20';
+        return 'bg-indigo-50 text-indigo-700 border-indigo-200/60';
       case 'Food':
-        return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+        return 'bg-amber-50 text-amber-700 border-amber-200/60';
       case 'Activity':
-        return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+        return 'bg-emerald-50 text-[#047857] border-emerald-200/60';
       case 'Sightseeing':
-        return 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+        return 'bg-purple-50 text-purple-700 border-purple-200/60';
     }
   };
 
@@ -85,7 +86,6 @@ export const ItineraryTab: React.FC<ItineraryTabProps> = ({
         const updatedOptions = poll.options.map((opt) => {
           const hasVoted = opt.votes.includes(currentUserId);
           if (opt.id === optionId) {
-            // Toggle vote
             return {
               ...opt,
               votes: hasVoted
@@ -93,7 +93,6 @@ export const ItineraryTab: React.FC<ItineraryTabProps> = ({
                 : [...opt.votes, currentUserId],
             };
           } else {
-            // Remove from other options for single-choice poll
             return {
               ...opt,
               votes: opt.votes.filter((id) => id !== currentUserId),
@@ -136,22 +135,23 @@ export const ItineraryTab: React.FC<ItineraryTabProps> = ({
     setItinerary([...itinerary, newItem]);
     setNewItemTitle('');
     setShowAddModal(false);
+    toast.success('Itinerary activity added! 📅');
   };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Left 2 Columns: Vertical Timeline */}
-      <div className="lg:col-span-2 space-y-6">
+      <div className="lg:col-span-2 space-y-5">
         {/* Day Selector & Action */}
-        <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-[#111827] border border-[#1F2937]">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-white border border-[#E5EAF1] shadow-xs">
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
             <button
               type="button"
               onClick={() => setSelectedDay('ALL')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 selectedDay === 'ALL'
-                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
-                  : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                  ? 'bg-[#173B70] text-white shadow-xs'
+                  : 'bg-[#F4F7FB] text-[#64748B] hover:text-[#172B4D]'
               }`}
             >
               All Days ({itinerary.length})
@@ -161,10 +161,10 @@ export const ItineraryTab: React.FC<ItineraryTabProps> = ({
                 key={day}
                 type="button"
                 onClick={() => setSelectedDay(day)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                   selectedDay === day
-                    ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
-                    : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                    ? 'bg-[#173B70] text-white shadow-xs'
+                    : 'bg-[#F4F7FB] text-[#64748B] hover:text-[#172B4D]'
                 }`}
               >
                 Day {day}
@@ -175,15 +175,15 @@ export const ItineraryTab: React.FC<ItineraryTabProps> = ({
           <button
             type="button"
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-semibold transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1685D4] hover:bg-[#126bb0] text-white text-xs font-medium transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>Add Event</span>
+            <span>Add Activity</span>
           </button>
         </div>
 
         {/* Day-by-Day Vertical Timeline */}
-        <div className="relative pl-6 space-y-6 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-gradient-to-b before:from-emerald-500 before:via-slate-700 before:to-slate-800">
+        <div className="relative pl-6 space-y-4 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-[#E5EAF1]">
           {filteredItems.map((item) => (
             <div key={item.id} className="relative group">
               {/* Timeline Node Dot */}
@@ -192,88 +192,86 @@ export const ItineraryTab: React.FC<ItineraryTabProps> = ({
                 onClick={() => toggleItemCompletion(item.id)}
                 className={`absolute -left-6 top-4 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
                   item.isCompleted
-                    ? 'bg-emerald-500 border-emerald-400 text-slate-950'
-                    : 'bg-[#111827] border-slate-700 group-hover:border-emerald-400 text-transparent hover:text-emerald-400'
+                    ? 'bg-[#0A9B78] border-[#0A9B78] text-white'
+                    : 'bg-white border-[#CBD5E1] group-hover:border-[#1685D4] text-transparent hover:text-[#1685D4]'
                 }`}
                 title={item.isCompleted ? 'Mark as Incomplete' : 'Mark as Completed'}
               >
                 <CheckCircle2 className="w-3.5 h-3.5" />
               </button>
 
-              {/* Card */}
+              {/* Activity Card */}
               <div
-                className={`p-4 sm:p-5 rounded-2xl bg-[#111827] border transition-all duration-200 ${
+                className={`p-4 sm:p-5 rounded-xl bg-white border transition-all duration-200 ${
                   item.isCompleted
-                    ? 'border-[#1F2937]/60 opacity-80'
-                    : 'border-[#1F2937] hover:border-slate-700 shadow-xl'
+                    ? 'border-[#E5EAF1] opacity-75'
+                    : 'border-[#E5EAF1] hover:border-[#CBD5E1] shadow-xs'
                 }`}
               >
                 {/* Header Row: Category, Day, Time */}
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                   <div className="flex items-center gap-2">
                     <span
-                      className={`flex items-center gap-1 text-[11px] font-semibold px-2.5 py-0.5 rounded-md border ${getCategoryBadge(
+                      className={`flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded border ${getCategoryBadge(
                         item.category
                       )}`}
                     >
                       {getCategoryIcon(item.category)}
                       {item.category}
                     </span>
-                    <span className="text-[11px] font-semibold text-slate-300">
+                    <span className="text-[11px] font-semibold text-[#64748B]">
                       Day {item.day}
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-1 text-xs text-slate-400 font-medium">
-                    <Clock className="w-3.5 h-3.5 text-slate-500" />
+                  <div className="flex items-center gap-1 text-xs text-[#64748B] font-medium">
+                    <Clock className="w-3.5 h-3.5 text-[#94A3B8]" />
                     <span>{item.time}</span>
                   </div>
                 </div>
 
                 {/* Title & Location */}
                 <h4
-                  className={`text-base font-bold text-white ${
-                    item.isCompleted ? 'line-through text-slate-400' : ''
+                  className={`text-sm sm:text-base font-bold text-[#172B4D] ${
+                    item.isCompleted ? 'line-through text-[#64748B]' : ''
                   }`}
                 >
                   {item.title}
                 </h4>
 
-                <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-1">
-                  <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                <div className="flex items-center gap-1.5 text-xs text-[#64748B] mt-1">
+                  <MapPin className="w-3.5 h-3.5 text-[#94A3B8] shrink-0" />
                   <span>{item.location}</span>
                 </div>
 
                 {item.notes && (
-                  <p className="text-xs text-slate-300 mt-2 bg-slate-950/40 p-2.5 rounded-xl border border-slate-800/70">
+                  <p className="text-xs text-[#64748B] mt-2 bg-[#F4F7FB] p-2.5 rounded-lg border border-[#E5EAF1]">
                     {item.notes}
                   </p>
                 )}
 
                 {/* Footer: Expense Badge & Maps Link */}
-                <div className="mt-4 pt-3 border-t border-[#1F2937] flex flex-wrap items-center justify-between gap-2">
-                  {/* Expense Badge */}
+                <div className="mt-4 pt-3 border-t border-[#E5EAF1] flex flex-wrap items-center justify-between gap-2">
                   {item.estimatedCost !== undefined && (
                     <div className="flex items-center gap-1.5 text-xs">
-                      <Receipt className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-slate-400">Expense:</span>
-                      <span className="font-bold text-emerald-400 num-inr">
+                      <Receipt className="w-3.5 h-3.5 text-[#0A9B78]" />
+                      <span className="text-[#64748B]">Estimated:</span>
+                      <span className="font-bold text-[#172B4D] num-inr">
                         {item.estimatedCost === 0 ? 'Free' : formatInr(item.estimatedCost)}
                       </span>
                       {item.paidBy && (
-                        <span className="text-[10px] text-slate-300 bg-slate-800/80 px-1.5 py-0.5 rounded">
+                        <span className="text-[10px] text-[#64748B] bg-slate-100 px-1.5 py-0.5 rounded">
                           by {item.paidBy}
                         </span>
                       )}
                     </div>
                   )}
 
-                  {/* Maps Button */}
                   <a
                     href={item.mapsUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-xs text-slate-400 hover:text-emerald-400 transition-colors ml-auto"
+                    className="flex items-center gap-1 text-xs text-[#1685D4] hover:text-[#126bb0] transition-colors ml-auto font-medium"
                   >
                     <span>View on Maps</span>
                     <ExternalLink className="w-3.5 h-3.5" />
@@ -285,44 +283,44 @@ export const ItineraryTab: React.FC<ItineraryTabProps> = ({
         </div>
       </div>
 
-      {/* Right Column: Group Polls Widget */}
-      <div className="space-y-6">
-        <div className="p-5 rounded-2xl bg-[#111827] border border-[#1F2937] shadow-xl">
+      {/* Right Column: Group Decisions & Polls */}
+      <div className="space-y-5">
+        <div className="p-5 rounded-xl bg-white border border-[#E5EAF1] shadow-xs">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
                 <Vote className="w-4 h-4" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-white">Group Decisions & Polls</h3>
-                <p className="text-[11px] text-slate-400">Vote on spots & timing</p>
+                <h3 className="text-xs font-bold text-[#172B4D] uppercase tracking-wider">
+                  Group Decisions
+                </h3>
+                <p className="text-[11px] text-[#64748B]">Vote on spots & timing</p>
               </div>
             </div>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-semibold border border-purple-500/30">
+            <span className="text-[10px] px-2 py-0.5 rounded font-semibold bg-purple-50 text-purple-700 border border-purple-200">
               Live
             </span>
           </div>
 
-          {/* List of Polls */}
-          <div className="space-y-6">
+          <div className="space-y-4">
             {polls.map((poll) => {
               const totalVotes = poll.options.reduce((sum, opt) => sum + opt.votes.length, 0);
 
               return (
                 <div
                   key={poll.id}
-                  className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 space-y-3"
+                  className="p-3.5 rounded-xl bg-[#F4F7FB] border border-[#E5EAF1] space-y-3"
                 >
                   <div>
-                    <h4 className="text-xs font-semibold text-white leading-relaxed">
+                    <h4 className="text-xs font-semibold text-[#172B4D] leading-snug">
                       {poll.question}
                     </h4>
-                    <p className="text-[10px] text-slate-300 mt-0.5">
-                      By {poll.createdBy} • {poll.createdAt} • {totalVotes} votes cast
+                    <p className="text-[10px] text-[#64748B] mt-0.5">
+                      By {poll.createdBy} • {totalVotes} votes cast
                     </p>
                   </div>
 
-                  {/* Options */}
                   <div className="space-y-2">
                     {poll.options.map((option) => {
                       const voteCount = option.votes.length;
@@ -335,37 +333,28 @@ export const ItineraryTab: React.FC<ItineraryTabProps> = ({
                           key={option.id}
                           type="button"
                           onClick={() => handleVote(poll.id, option.id)}
-                          className={`w-full relative overflow-hidden text-left p-3 rounded-xl border text-xs transition-all ${
+                          className={`w-full relative overflow-hidden text-left p-2.5 rounded-lg border text-xs transition-all ${
                             isUserVoted
-                              ? 'border-emerald-500/50 bg-emerald-950/20 text-white'
-                              : 'border-slate-800 bg-slate-900/60 text-slate-300 hover:border-slate-700'
+                              ? 'border-[#1685D4] bg-white text-[#172B4D] font-medium shadow-xs'
+                              : 'border-[#E5EAF1] bg-white text-[#64748B] hover:border-[#CBD5E1]'
                           }`}
                         >
-                          {/* Live percentage fill bar */}
                           <div
                             className={`absolute left-0 top-0 bottom-0 transition-all duration-300 ${
-                              isUserVoted ? 'bg-emerald-500/15' : 'bg-slate-800/40'
+                              isUserVoted ? 'bg-[#1685D4]/10' : 'bg-slate-100/60'
                             }`}
                             style={{ width: `${percentage}%` }}
                           />
 
-                          <div className="relative flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center shrink-0 ${
-                                  isUserVoted
-                                    ? 'border-emerald-400 bg-emerald-500'
-                                    : 'border-slate-600'
-                                }`}
-                              >
-                                {isUserVoted && (
-                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-950" />
-                                )}
-                              </span>
-                              <span className="font-medium truncate">{option.text}</span>
-                            </div>
-                            <span className="text-[11px] font-bold num-inr text-slate-300 shrink-0">
-                              {percentage}% ({voteCount})
+                          <div className="relative flex items-center justify-between z-10">
+                            <span className="flex items-center gap-1.5">
+                              {isUserVoted && (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-[#1685D4] shrink-0" />
+                              )}
+                              <span>{option.text}</span>
+                            </span>
+                            <span className="font-semibold num-inr text-[#172B4D]">
+                              {percentage}%
                             </span>
                           </div>
                         </button>
@@ -377,75 +366,81 @@ export const ItineraryTab: React.FC<ItineraryTabProps> = ({
             })}
           </div>
         </div>
-
-        {/* Packing & Weather Tip */}
-        <div className="p-4 rounded-2xl bg-gradient-to-br from-[#111827] to-[#0f172a] border border-[#1F2937] text-xs text-slate-300 space-y-2">
-          <div className="flex items-center gap-1.5 text-emerald-400 font-semibold">
-            <Sparkles className="w-4 h-4" />
-            <span>Manali Weather & Packing</span>
-          </div>
-          <p className="text-slate-400 leading-relaxed text-[11px]">
-            Current Temp: <strong>6°C to -1°C</strong> in Solang Valley. Pack thermal innerwear, windcheaters, gloves, and comfortable grip hiking boots.
-          </p>
-        </div>
       </div>
 
       {/* Add Item Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="w-full max-w-md bg-[#111827] border border-[#1F2937] rounded-2xl p-5 space-y-4">
-            <h4 className="text-base font-bold text-white">Add Itinerary Stop</h4>
-            <form onSubmit={handleAddItem} className="space-y-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-white border border-[#E5EAF1] rounded-xl shadow-xl overflow-hidden">
+            <div className="p-4 border-b border-[#E5EAF1] flex items-center justify-between">
+              <h3 className="text-sm font-bold text-[#172B4D]">Add Itinerary Activity</h3>
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="text-[#64748B] hover:text-[#172B4D]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleAddItem} className="p-4 space-y-3">
               <div>
-                <label className="text-xs text-slate-300 block mb-1">Title *</label>
+                <label className="text-xs font-semibold text-[#172B4D] block mb-1">
+                  Activity Title *
+                </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g., Riverside Maggi & Chai at Nehru Kund"
+                  placeholder="e.g. River Rafting in Solang"
                   value={newItemTitle}
                   onChange={(e) => setNewItemTitle(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
+                  className="w-full bg-[#F4F7FB] border border-[#E5EAF1] rounded-lg px-3 py-2 text-xs text-[#172B4D]"
                 />
               </div>
 
-              <div>
-                <label className="text-xs text-slate-300 block mb-1">Category</label>
-                <select
-                  value={newItemCategory}
-                  onChange={(e) => setNewItemCategory(e.target.value as TimelineCategory)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
-                >
-                  <option value="Food">Food & Dining</option>
-                  <option value="Activity">Adventure / Activity</option>
-                  <option value="Sightseeing">Sightseeing</option>
-                  <option value="Transport">Transport</option>
-                  <option value="Stay">Hotel / Stay</option>
-                </select>
-              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-[#172B4D] block mb-1">
+                    Category
+                  </label>
+                  <select
+                    value={newItemCategory}
+                    onChange={(e) => setNewItemCategory(e.target.value as TimelineCategory)}
+                    className="w-full bg-[#F4F7FB] border border-[#E5EAF1] rounded-lg px-3 py-2 text-xs text-[#172B4D]"
+                  >
+                    <option value="Activity">Activity</option>
+                    <option value="Food">Food / Cafe</option>
+                    <option value="Stay">Stay / Hotel</option>
+                    <option value="Transport">Transport</option>
+                    <option value="Sightseeing">Sightseeing</option>
+                  </select>
+                </div>
 
-              <div>
-                <label className="text-xs text-slate-300 block mb-1">Estimated Expense (₹)</label>
-                <input
-                  type="number"
-                  value={newItemCost}
-                  onChange={(e) => setNewItemCost(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white num-inr"
-                />
+                <div>
+                  <label className="text-xs font-semibold text-[#172B4D] block mb-1">
+                    Estimated Cost (₹)
+                  </label>
+                  <input
+                    type="number"
+                    value={newItemCost}
+                    onChange={(e) => setNewItemCost(e.target.value)}
+                    className="w-full bg-[#F4F7FB] border border-[#E5EAF1] rounded-lg px-3 py-2 text-xs text-[#172B4D] font-mono"
+                  />
+                </div>
               </div>
 
               <div className="pt-2 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-3 py-1.5 rounded-xl border border-slate-800 text-xs text-slate-400"
+                  className="px-3 py-1.5 text-xs text-[#64748B] hover:text-[#172B4D]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-emerald-500 text-slate-950 font-bold rounded-xl text-xs hover:bg-emerald-400"
+                  className="px-4 py-2 rounded-lg bg-[#1685D4] hover:bg-[#126bb0] text-white text-xs font-semibold"
                 >
-                  Add to Timeline
+                  Save Activity
                 </button>
               </div>
             </form>

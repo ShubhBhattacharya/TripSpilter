@@ -5,8 +5,6 @@ import {
   Wallet,
   ArrowUpRight,
   ArrowDownLeft,
-  TrendingUp,
-  Sparkles,
 } from 'lucide-react';
 import { formatInr } from '../../lib/upi';
 
@@ -23,73 +21,58 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({
 }) => {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-      {/* Total Trip Spend */}
-      <div className="relative p-5 rounded-2xl bg-gradient-to-b from-[#111827] to-[#0d1527] border border-[#1F2937] hover:border-slate-700 transition-all shadow-xl group overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-2xl pointer-events-none group-hover:bg-blue-500/10 transition-colors" />
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-            Total Trip Spend
+      {/* 1. Total Trip Expenses */}
+      <div className="p-5 rounded-xl bg-white border border-[#E5EAF1] shadow-xs hover:border-[#CBD5E1] transition-all">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wider">
+            Total Trip Expenses
           </span>
-          <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-[#173B70]/10 text-[#173B70] flex items-center justify-center">
             <Wallet className="w-4 h-4" />
           </div>
         </div>
-        <div className="flex items-baseline gap-2">
-          <span className="text-2xl sm:text-3xl font-extrabold text-white num-inr tracking-tight">
-            {formatInr(totalSpend)}
-          </span>
+        <div className="text-2xl sm:text-3xl font-bold text-[#172B4D] num-inr tracking-tight">
+          {formatInr(totalSpend)}
         </div>
-        <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-400">
-          <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Across all active & upcoming outings</span>
-        </div>
+        <p className="mt-2 text-xs text-[#64748B]">
+          Combined spending across your outings
+        </p>
       </div>
 
-      {/* You Owe */}
-      <div className="relative p-5 rounded-2xl bg-gradient-to-b from-[#111827] to-[#0d1527] border border-[#1F2937] hover:border-amber-500/30 transition-all shadow-xl group overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none group-hover:bg-amber-500/10 transition-colors" />
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-semibold text-amber-400 uppercase tracking-wider">
+      {/* 2. You Owe */}
+      <div className="p-5 rounded-xl bg-white border border-[#E5EAF1] shadow-xs hover:border-amber-200 transition-all">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-semibold text-[#B45309] uppercase tracking-wider">
             You Owe
           </span>
-          <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-amber-50 text-[#B45309] flex items-center justify-center">
             <ArrowUpRight className="w-4 h-4" />
           </div>
         </div>
-        <div className="flex items-baseline gap-2">
-          <span className="text-2xl sm:text-3xl font-extrabold text-amber-300 num-inr tracking-tight">
-            {formatInr(youOwe)}
-          </span>
+        <div className="text-2xl sm:text-3xl font-bold text-[#B45309] num-inr tracking-tight">
+          {formatInr(youOwe)}
         </div>
-        <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
-          <span>Pending settlement</span>
-          <span className="text-amber-400 font-medium">To 1 member</span>
-        </div>
+        <p className="mt-2 text-xs text-[#64748B]">
+          Pending settlements to group members
+        </p>
       </div>
 
-      {/* You Are Owed */}
-      <div className="relative p-5 rounded-2xl bg-gradient-to-b from-[#111827] to-[#0d1527] border border-[#1F2937] hover:border-emerald-500/30 transition-all shadow-xl group overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none group-hover:bg-emerald-500/10 transition-colors" />
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">
+      {/* 3. You Are Owed */}
+      <div className="p-5 rounded-xl bg-white border border-[#E5EAF1] shadow-xs hover:border-emerald-200 transition-all">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-semibold text-[#047857] uppercase tracking-wider">
             You Are Owed
           </span>
-          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-emerald-50 text-[#047857] flex items-center justify-center">
             <ArrowDownLeft className="w-4 h-4" />
           </div>
         </div>
-        <div className="flex items-baseline gap-2">
-          <span className="text-2xl sm:text-3xl font-extrabold text-emerald-400 num-inr tracking-tight">
-            {formatInr(youAreOwed)}
-          </span>
+        <div className="text-2xl sm:text-3xl font-bold text-[#047857] num-inr tracking-tight">
+          {formatInr(youAreOwed)}
         </div>
-        <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
-          <span className="flex items-center gap-1 text-emerald-300">
-            <Sparkles className="w-3 h-3 text-emerald-400" />
-            Direct UPI receivable
-          </span>
-          <span className="text-emerald-400 font-medium">From 2 members</span>
-        </div>
+        <p className="mt-2 text-xs text-[#64748B]">
+          Direct UPI receivables from friends
+        </p>
       </div>
     </div>
   );

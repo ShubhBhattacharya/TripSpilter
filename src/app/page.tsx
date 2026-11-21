@@ -15,7 +15,7 @@ import { AiBillScanModal } from '../components/modals/AiBillScanModal';
 import { TripCardSkeleton } from '../components/ui/Skeleton';
 import { mockTrips, userSummaryStats, defaultMembers } from '../data/mockData';
 import { Trip } from '../types/trip';
-import { Compass, ShieldCheck, Zap, Plus, MapPin } from 'lucide-react';
+import { Compass, Plus, MapPin } from 'lucide-react';
 import { useAuth } from '../components/auth/AuthProvider';
 import { toast } from 'sonner';
 
@@ -41,7 +41,6 @@ export default function DashboardPage() {
         if (res.ok) {
           const data = await res.json();
           if (data.trips && data.trips.length > 0) {
-            // Map db trips to UI Trip shape
             interface DbMember {
               user_id: string;
               role?: string;
@@ -144,7 +143,6 @@ export default function DashboardPage() {
         description: `${tripData.title} is ready for itinerary & splits.`,
       });
 
-      // Also post to backend if configured
       if (isConfigured) {
         fetch('/api/trips', {
           method: 'POST',
@@ -174,7 +172,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0B1120] text-slate-100 flex flex-col lg:flex-row">
+    <div className="min-h-screen bg-[#F4F7FB] text-[#172B4D] flex flex-col lg:flex-row">
       {/* Desktop Sidebar */}
       <Sidebar />
 
@@ -183,113 +181,105 @@ export default function DashboardPage() {
         <TopHeader onScanClick={() => setIsScanMerchantOpen(true)} />
 
         <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto w-full space-y-6">
-          {/* Welcome Banner */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {/* Welcome Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-xl border border-[#E5EAF1] shadow-xs">
             <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1">
-                  <Zap className="w-3.5 h-3.5" />
-                  Direct UPI Architecture
-                </span>
-                <span className="text-[10px] bg-emerald-500/10 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/20 font-medium">
-                  Zero Float
-                </span>
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-                Namaste, {displayName.split(' ')[0]} 👋
+              <h1 className="text-xl sm:text-2xl font-bold text-[#172B4D] tracking-tight">
+                Welcome back, {displayName.split(' ')[0]}
               </h1>
-              <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
-                Manage your group outings, bookings vault & direct-to-vendor UPI bill splits.
+              <p className="text-xs sm:text-sm text-[#64748B] mt-1">
+                Manage your group itineraries, track shared expenses & settle directly via UPI.
               </p>
             </div>
 
-            <div className="flex items-center gap-2 self-start sm:self-auto">
-              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300 shadow-sm">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>Zero Escrow Risk</span>
-              </span>
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsCreateTripOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#173B70] hover:bg-[#1685D4] text-white font-medium text-xs shadow-xs active:scale-95 transition-all self-start sm:self-auto shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create New Trip</span>
+            </button>
           </div>
 
-          {/* Top Summary Cards */}
+          {/* Financial Overview Cards */}
           <SummaryCards
             totalSpend={userSummaryStats.totalSpend}
             youOwe={userSummaryStats.youOwe}
             youAreOwed={userSummaryStats.youAreOwed}
           />
 
-          {/* Quick Action Bar */}
+          {/* Quick Actions Grid */}
           <QuickActionBar
             onCreateTrip={() => setIsCreateTripOpen(true)}
             onScanMerchant={() => setIsScanMerchantOpen(true)}
             onScanBillAi={() => setIsAiBillScanOpen(true)}
           />
 
-          {/* Active Trips & Outings Grid */}
-          <div className="space-y-4 pt-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Compass className="w-5 h-5 text-emerald-400" />
-                  Your Trips & Outings
-                </h2>
-                <p className="text-xs text-slate-400">
-                  Select a trip to access itinerary, bookings vault, and live QR splitting
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setIsCreateTripOpen(true)}
-                className="flex items-center gap-1 text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>New Outing</span>
-              </button>
-            </div>
-
-            {loadingTrips ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                <TripCardSkeleton />
-                <TripCardSkeleton />
-                <TripCardSkeleton />
-              </div>
-            ) : trips.length === 0 ? (
-              /* Empty State */
-              <div className="rounded-3xl bg-[#111827] border border-[#1F2937] p-8 text-center flex flex-col items-center justify-center max-w-md mx-auto my-6 shadow-xl relative overflow-hidden">
-                <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mb-3">
-                  <MapPin className="w-7 h-7" />
+          {/* Active Trips Grid & Recent Activity */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-bold text-[#172B4D] flex items-center gap-2">
+                    <Compass className="w-4 h-4 text-[#1685D4]" />
+                    Your Trips & Outings
+                  </h2>
+                  <p className="text-xs text-[#64748B]">
+                    Active group travel spaces with live splits & bookings
+                  </p>
                 </div>
-                <h3 className="text-base font-bold text-white">No trips yet!</h3>
-                <p className="text-xs text-slate-400 mt-1 max-w-xs mb-4">
-                  Plan your first weekend getaway or outing with friends to start splitting UPI bills directly to vendors.
-                </p>
+
                 <button
                   type="button"
                   onClick={() => setIsCreateTripOpen(true)}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-500/25 active:scale-95 transition-all"
+                  className="flex items-center gap-1 text-xs font-semibold text-[#1685D4] hover:text-[#126bb0] transition-colors"
                 >
-                  <Plus className="w-4 h-4 stroke-[2.5]" />
-                  <span>Create Your First Outing</span>
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>New Outing</span>
                 </button>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {trips.map((trip) => (
-                  <TripCard key={trip.id} trip={trip} />
-                ))}
-              </div>
-            )}
-          </div>
 
-          {/* Real-time Activity Stream */}
-          <div className="pt-2">
-            <RecentActivity />
+              {loadingTrips ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <TripCardSkeleton />
+                  <TripCardSkeleton />
+                </div>
+              ) : trips.length === 0 ? (
+                <div className="rounded-xl bg-white border border-[#E5EAF1] p-8 text-center flex flex-col items-center justify-center my-4 shadow-xs">
+                  <div className="w-12 h-12 rounded-xl bg-slate-100 text-[#64748B] flex items-center justify-center mb-3">
+                    <MapPin className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-sm font-bold text-[#172B4D] mb-1">No outings yet</h3>
+                  <p className="text-xs text-[#64748B] max-w-sm mb-4">
+                    Create your first trip to start splitting bills directly to merchants.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setIsCreateTripOpen(true)}
+                    className="px-4 py-2 rounded-lg bg-[#173B70] hover:bg-[#1685D4] text-white text-xs font-medium transition-colors"
+                  >
+                    Create Your First Outing
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {trips.map((trip) => (
+                    <TripCard key={trip.id} trip={trip} />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Sidebar: Activity Stream */}
+            <div className="lg:col-span-1 space-y-4">
+              <RecentActivity />
+            </div>
           </div>
         </main>
       </div>
 
-      {/* Mobile Sticky Navigation */}
+      {/* Mobile Bottom Navigation */}
       <BottomNav onOpenQuickSplit={() => setIsScanMerchantOpen(true)} />
 
       {/* Modals */}

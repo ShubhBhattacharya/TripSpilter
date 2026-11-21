@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { X, MapPin, Calendar, Plus, Users, Sparkles } from 'lucide-react';
-import { defaultMembers } from '../../data/mockData';
 
 interface CreateTripModalProps {
   isOpen: boolean;
@@ -48,23 +47,23 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-lg bg-[#111827] border border-[#1F2937] rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+      <div className="w-full max-w-lg bg-white border border-[#E5EAF1] rounded-xl shadow-xl overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-[#1F2937] flex items-center justify-between">
+        <div className="p-4 sm:p-5 border-b border-[#E5EAF1] flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-[#173B70]/10 text-[#173B70] flex items-center justify-center">
               <Plus className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-base font-semibold text-white">Create New Outing / Trip</h3>
-              <p className="text-xs text-slate-400">Plan itinerary, invite friends & enable zero-float UPI splitting</p>
+              <h3 className="text-sm font-bold text-[#172B4D]">Create New Trip / Outing</h3>
+              <p className="text-xs text-[#64748B]">Set itinerary dates, budget & invite friends</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-[#64748B] hover:text-[#172B4D] hover:bg-[#F4F7FB] transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -73,7 +72,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">
+            <label className="block text-xs font-semibold text-[#172B4D] mb-1">
               Trip / Outing Name *
             </label>
             <input
@@ -82,123 +81,100 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
               placeholder="e.g., Rishikesh Rafting & Camping Weekend"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+              className="w-full bg-[#F4F7FB] border border-[#E5EAF1] focus:border-[#1685D4] rounded-lg px-3.5 py-2 text-xs text-[#172B4D] placeholder-slate-400 focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">
+            <label className="block text-xs font-semibold text-[#172B4D] mb-1">
               Destination *
             </label>
             <div className="relative">
-              <MapPin className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
+              <MapPin className="w-4 h-4 text-[#94A3B8] absolute left-3 top-2.5" />
               <input
                 type="text"
                 required
                 placeholder="e.g., Rishikesh, Uttarakhand"
                 value={destination}
                 onChange={(e) => setDestination(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                className="w-full bg-[#F4F7FB] border border-[#E5EAF1] focus:border-[#1685D4] rounded-lg pl-9 pr-3.5 py-2 text-xs text-[#172B4D] placeholder-slate-400 focus:outline-none"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
+              <label className="block text-xs font-semibold text-[#172B4D] mb-1">
                 Dates
               </label>
               <div className="relative">
-                <Calendar className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                <Calendar className="w-4 h-4 text-[#94A3B8] absolute left-3 top-2.5" />
                 <input
                   type="text"
                   placeholder="10 Dec - 15 Dec"
                   value={dateRange}
                   onChange={(e) => setDateRange(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-[#F4F7FB] border border-[#E5EAF1] focus:border-[#1685D4] rounded-lg pl-9 pr-3 py-2 text-xs text-[#172B4D] placeholder-slate-400 focus:outline-none"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
+              <label className="block text-xs font-semibold text-[#172B4D] mb-1">
                 Estimated Budget (₹)
               </label>
-              <div className="relative">
-                <span className="text-slate-500 absolute left-3 top-2.5 text-sm font-semibold">₹</span>
-                <input
-                  type="number"
-                  placeholder="35000"
-                  value={budget}
-                  onChange={(e) => setBudget(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 num-inr"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Members Invite preview */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
-                <Users className="w-3.5 h-3.5 text-emerald-400" />
-                Default Group Members
-              </label>
-              <span className="text-[11px] text-emerald-400 font-medium">4 members added</span>
-            </div>
-            <div className="flex items-center gap-2 p-2 rounded-xl bg-slate-950 border border-slate-800">
-              <div className="flex -space-x-2">
-                {defaultMembers.map((m) => (
-                  <img
-                    key={m.id}
-                    src={m.avatar}
-                    alt={m.name}
-                    className="w-7 h-7 rounded-full object-cover ring-2 ring-slate-900"
-                    title={m.name}
-                  />
-                ))}
-              </div>
-              <span className="text-xs text-slate-400 ml-2">Aarav, Priya, Rohan, Kabir</span>
+              <input
+                type="number"
+                placeholder="35000"
+                value={budget}
+                onChange={(e) => setBudget(e.target.value)}
+                className="w-full bg-[#F4F7FB] border border-[#E5EAF1] focus:border-[#1685D4] rounded-lg px-3 py-2 text-xs text-[#172B4D] font-mono focus:outline-none"
+              />
             </div>
           </div>
 
           {/* Quick Suggestions */}
           <div>
-            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-2">
-              Popular Indian Getaways
+            <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider block mb-1.5">
+              Popular Destinations
             </span>
-            <div className="flex flex-wrap gap-1.5">
-              {sampleSuggestions.map((s, idx) => (
+            <div className="space-y-1.5">
+              {sampleSuggestions.map((item) => (
                 <button
-                  key={idx}
+                  key={item.title}
                   type="button"
                   onClick={() => {
-                    setTitle(s.title);
-                    setDestination(s.destination);
-                    setBudget(s.budget.toString());
+                    setTitle(item.title);
+                    setDestination(item.destination);
+                    setBudget(String(item.budget));
                   }}
-                  className="text-[11px] px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:border-emerald-500/30 hover:text-emerald-400 transition-colors"
+                  className="w-full p-2.5 rounded-lg bg-[#F4F7FB] hover:bg-slate-100 border border-[#E5EAF1] text-left transition-colors flex items-center justify-between"
                 >
-                  {s.title}
+                  <div>
+                    <p className="text-xs font-semibold text-[#172B4D]">{item.title}</p>
+                    <p className="text-[11px] text-[#64748B]">{item.destination}</p>
+                  </div>
+                  <span className="text-xs text-[#0A9B78] font-bold num-inr">
+                    ₹{item.budget.toLocaleString('en-IN')}
+                  </span>
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="pt-2 flex justify-end gap-2">
+          <div className="pt-2 flex justify-end gap-2 border-t border-[#E5EAF1]">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl border border-slate-800 text-slate-400 hover:text-white text-xs font-medium"
+              className="px-4 py-2 text-xs font-medium text-[#64748B] hover:text-[#172B4D]"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
+              className="px-5 py-2.5 rounded-lg bg-[#173B70] hover:bg-[#1685D4] text-white font-medium text-xs shadow-xs transition-colors"
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Create Outing</span>
+              Create Trip
             </button>
           </div>
         </form>

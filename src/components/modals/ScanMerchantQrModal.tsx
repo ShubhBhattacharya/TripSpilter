@@ -123,7 +123,7 @@ export const ScanMerchantQrModal: React.FC<ScanMerchantQrModalProps> = ({
     setIsScanning(true);
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera access is not supported in this browser environment.');
+        throw new Error('Camera access is not supported in this browser.');
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -144,10 +144,9 @@ export const ScanMerchantQrModal: React.FC<ScanMerchantQrModalProps> = ({
       }
     } catch (err: unknown) {
       const error = err as Error;
-      console.warn('Camera access denied or unavailable:', error);
       setCameraError(
         error.name === 'NotAllowedError'
-          ? 'Camera permission denied. Please enable camera access in your browser or upload an image.'
+          ? 'Camera permission denied. Please enable camera access in your browser or upload a photo.'
           : error.message || 'Unable to start camera preview.'
       );
       setIsScanning(false);
@@ -185,8 +184,8 @@ export const ScanMerchantQrModal: React.FC<ScanMerchantQrModalProps> = ({
         if (code && code.data) {
           handleQrDetected(code.data);
         } else {
-          toast.error('No UPI QR Code found in the uploaded image', {
-            description: 'Ensure the QR code is clearly visible and well lit.',
+          toast.error('No UPI QR Code found in image', {
+            description: 'Ensure the QR code is clearly visible and well-lit.',
           });
         }
       };
@@ -218,40 +217,40 @@ export const ScanMerchantQrModal: React.FC<ScanMerchantQrModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-lg bg-[#111827] border border-[#1F2937] rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+      <div className="w-full max-w-lg bg-white border border-[#E5EAF1] rounded-xl shadow-xl overflow-hidden flex flex-col">
         {/* Modal Header */}
-        <div className="p-4 sm:p-5 border-b border-[#1F2937] flex items-center justify-between">
+        <div className="p-4 sm:p-5 border-b border-[#E5EAF1] flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-[#173B70]/10 text-[#173B70] flex items-center justify-center">
               <QrCode className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-base font-semibold text-white">Merchant UPI Scanner</h3>
-              <p className="text-xs text-slate-400">Scan standee or counter QR for direct split</p>
+              <h3 className="text-sm font-bold text-[#172B4D]">Merchant UPI Scanner</h3>
+              <p className="text-xs text-[#64748B]">Scan counter standee or UPI QR code</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-[#64748B] hover:text-[#172B4D] hover:bg-[#F4F7FB] transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Mode Selector Tabs */}
-        <div className="flex border-b border-[#1F2937] bg-slate-950/60 p-1">
+        <div className="flex border-b border-[#E5EAF1] bg-[#F4F7FB] p-1">
           <button
             type="button"
             onClick={() => {
               setActiveMode('camera');
               setCameraError(null);
             }}
-            className={`flex-1 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-md flex items-center justify-center gap-1.5 transition-all ${
               activeMode === 'camera'
-                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-white text-[#173B70] shadow-xs'
+                : 'text-[#64748B] hover:text-[#172B4D]'
             }`}
           >
             <Camera className="w-3.5 h-3.5" />
@@ -263,10 +262,10 @@ export const ScanMerchantQrModal: React.FC<ScanMerchantQrModalProps> = ({
               setActiveMode('upload');
               stopCamera();
             }}
-            className={`flex-1 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-md flex items-center justify-center gap-1.5 transition-all ${
               activeMode === 'upload'
-                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-white text-[#173B70] shadow-xs'
+                : 'text-[#64748B] hover:text-[#172B4D]'
             }`}
           >
             <Upload className="w-3.5 h-3.5" />
@@ -278,10 +277,10 @@ export const ScanMerchantQrModal: React.FC<ScanMerchantQrModalProps> = ({
               setActiveMode('manual');
               stopCamera();
             }}
-            className={`flex-1 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-all ${
+            className={`flex-1 py-1.5 text-xs font-semibold rounded-md flex items-center justify-center gap-1.5 transition-all ${
               activeMode === 'manual'
-                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-white text-[#173B70] shadow-xs'
+                : 'text-[#64748B] hover:text-[#172B4D]'
             }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
@@ -289,26 +288,19 @@ export const ScanMerchantQrModal: React.FC<ScanMerchantQrModalProps> = ({
           </button>
         </div>
 
-        {/* Hidden Canvas for QR Extraction */}
         <canvas ref={canvasRef} className="hidden" />
 
         {/* Viewport Area */}
         <div className="p-5 flex flex-col items-center">
           {activeMode === 'camera' && (
             <div className="w-full flex flex-col items-center">
-              <div className="relative w-64 h-64 sm:w-72 sm:h-72 rounded-2xl bg-black border-2 border-slate-700 overflow-hidden flex items-center justify-center shadow-inner">
-                {/* Corner reticle markers */}
-                <div className="absolute top-2 left-2 w-6 h-6 border-t-2 border-l-2 border-emerald-400 rounded-tl z-20" />
-                <div className="absolute top-2 right-2 w-6 h-6 border-t-2 border-r-2 border-emerald-400 rounded-tr z-20" />
-                <div className="absolute bottom-2 left-2 w-6 h-6 border-b-2 border-l-2 border-emerald-400 rounded-bl z-20" />
-                <div className="absolute bottom-2 right-2 w-6 h-6 border-b-2 border-r-2 border-emerald-400 rounded-br z-20" />
+              <div className="relative w-64 h-64 sm:w-72 sm:h-72 rounded-xl bg-slate-900 border border-[#E5EAF1] overflow-hidden flex items-center justify-center shadow-inner">
+                {/* Corner markers */}
+                <div className="absolute top-2 left-2 w-5 h-5 border-t-2 border-l-2 border-white rounded-tl z-20" />
+                <div className="absolute top-2 right-2 w-5 h-5 border-t-2 border-r-2 border-white rounded-tr z-20" />
+                <div className="absolute bottom-2 left-2 w-5 h-5 border-b-2 border-l-2 border-white rounded-bl z-20" />
+                <div className="absolute bottom-2 right-2 w-5 h-5 border-b-2 border-r-2 border-white rounded-br z-20" />
 
-                {/* Laser scan line animation */}
-                {isScanning && !cameraError && !scannedSuccess && (
-                  <div className="absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent animate-pulse shadow-md shadow-emerald-400/80 z-20 top-1/2 -translate-y-1/2" />
-                )}
-
-                {/* Camera Video Stream */}
                 <video
                   ref={videoRef}
                   muted
@@ -316,25 +308,23 @@ export const ScanMerchantQrModal: React.FC<ScanMerchantQrModalProps> = ({
                   className="w-full h-full object-cover"
                 />
 
-                {/* Scanned Success Overlay */}
                 {scannedSuccess && (
-                  <div className="absolute inset-0 bg-slate-950/90 z-30 flex flex-col items-center justify-center p-4">
-                    <CheckCircle2 className="w-12 h-12 text-emerald-400 animate-bounce mb-2" />
-                    <span className="text-sm font-bold text-white">Merchant QR Detected!</span>
-                    <span className="text-xs text-emerald-300">Applying merchant details...</span>
+                  <div className="absolute inset-0 bg-white/95 z-30 flex flex-col items-center justify-center p-4">
+                    <CheckCircle2 className="w-10 h-10 text-[#0A9B78] animate-bounce mb-2" />
+                    <span className="text-sm font-bold text-[#172B4D]">Merchant Detected!</span>
+                    <span className="text-xs text-[#64748B]">Applying details...</span>
                   </div>
                 )}
 
-                {/* Camera Error Overlay */}
                 {cameraError && (
-                  <div className="absolute inset-0 bg-slate-950/95 z-30 flex flex-col items-center justify-center p-4 text-center">
-                    <AlertCircle className="w-10 h-10 text-amber-400 mb-2" />
-                    <p className="text-xs text-slate-300 font-medium mb-3">{cameraError}</p>
+                  <div className="absolute inset-0 bg-white/95 z-30 flex flex-col items-center justify-center p-4 text-center">
+                    <AlertCircle className="w-8 h-8 text-amber-500 mb-2" />
+                    <p className="text-xs text-[#172B4D] font-medium mb-3">{cameraError}</p>
                     <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={startCamera}
-                        className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-white font-medium flex items-center gap-1.5"
+                        className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs text-[#172B4D] font-medium flex items-center gap-1.5"
                       >
                         <RefreshCw className="w-3.5 h-3.5" />
                         <span>Retry</span>
@@ -342,7 +332,7 @@ export const ScanMerchantQrModal: React.FC<ScanMerchantQrModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setActiveMode('upload')}
-                        className="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold"
+                        className="px-3 py-1.5 rounded-lg bg-[#1685D4] text-white text-xs font-semibold"
                       >
                         Upload Photo
                       </button>
@@ -350,8 +340,8 @@ export const ScanMerchantQrModal: React.FC<ScanMerchantQrModalProps> = ({
                   </div>
                 )}
               </div>
-              <p className="text-[11px] text-slate-400 mt-3 text-center">
-                Point at any Indian UPI standee (BharatPe, Paytm, PhonePe, Google Pay)
+              <p className="text-[11px] text-[#64748B] mt-3 text-center">
+                Point at any Indian UPI QR standee (BharatPe, Paytm, PhonePe, Google Pay)
               </p>
             </div>
           )}
@@ -367,15 +357,15 @@ export const ScanMerchantQrModal: React.FC<ScanMerchantQrModalProps> = ({
               />
               <div
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full max-w-sm h-52 border-2 border-dashed border-slate-700 hover:border-emerald-500/60 rounded-2xl flex flex-col items-center justify-center p-6 cursor-pointer bg-slate-950/50 hover:bg-slate-900/50 transition-all text-center group"
+                className="w-full max-w-sm h-48 border-2 border-dashed border-[#CBD5E1] hover:border-[#1685D4] rounded-xl flex flex-col items-center justify-center p-6 cursor-pointer bg-[#F4F7FB] hover:bg-slate-100 transition-all text-center group"
               >
-                <div className="w-12 h-12 rounded-xl bg-slate-800 group-hover:bg-emerald-500/20 text-slate-400 group-hover:text-emerald-400 flex items-center justify-center transition-colors mb-3">
-                  <Upload className="w-6 h-6" />
+                <div className="w-10 h-10 rounded-xl bg-white border border-[#E5EAF1] text-[#1685D4] flex items-center justify-center mb-2">
+                  <Upload className="w-5 h-5" />
                 </div>
-                <p className="text-sm font-semibold text-white group-hover:text-emerald-300 transition-colors">
-                  Click to select merchant QR screenshot
+                <p className="text-xs font-semibold text-[#172B4D]">
+                  Click to select QR photo or screenshot
                 </p>
-                <p className="text-xs text-slate-400 mt-1">PNG, JPG, or WebP photo of standee</p>
+                <p className="text-[11px] text-[#64748B] mt-1">PNG, JPG, or WebP</p>
               </div>
             </div>
           )}
@@ -383,7 +373,7 @@ export const ScanMerchantQrModal: React.FC<ScanMerchantQrModalProps> = ({
           {activeMode === 'manual' && (
             <form onSubmit={handleManualSubmit} className="w-full space-y-3">
               <div>
-                <label className="text-xs font-medium text-slate-300 block mb-1">
+                <label className="text-xs font-semibold text-[#172B4D] block mb-1">
                   Merchant UPI ID (VPA) *
                 </label>
                 <input
@@ -394,11 +384,11 @@ export const ScanMerchantQrModal: React.FC<ScanMerchantQrModalProps> = ({
                     setManualError(null);
                   }}
                   placeholder="e.g. cafe1947@okicici or zostel@hdfcbank"
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3 py-2 text-xs font-mono text-white placeholder-slate-500"
+                  className="w-full bg-[#F4F7FB] border border-[#E5EAF1] focus:border-[#1685D4] rounded-lg px-3 py-2 text-xs font-mono text-[#172B4D] placeholder-slate-400"
                   required
                 />
                 {manualError && (
-                  <p className="text-[11px] text-rose-400 mt-1 flex items-center gap-1">
+                  <p className="text-[11px] text-[#DC3545] mt-1 flex items-center gap-1">
                     <AlertCircle className="w-3 h-3" />
                     <span>{manualError}</span>
                   </p>
@@ -406,7 +396,7 @@ export const ScanMerchantQrModal: React.FC<ScanMerchantQrModalProps> = ({
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-300 block mb-1">
+                <label className="text-xs font-semibold text-[#172B4D] block mb-1">
                   Merchant / Shop Name (Optional)
                 </label>
                 <input
@@ -414,12 +404,12 @@ export const ScanMerchantQrModal: React.FC<ScanMerchantQrModalProps> = ({
                   value={manualName}
                   onChange={(e) => setManualName(e.target.value)}
                   placeholder="e.g. Cafe 1947 Riverside"
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500"
+                  className="w-full bg-[#F4F7FB] border border-[#E5EAF1] focus:border-[#1685D4] rounded-lg px-3 py-2 text-xs text-[#172B4D] placeholder-slate-400"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-300 block mb-1">
+                <label className="text-xs font-semibold text-[#172B4D] block mb-1">
                   Bill Amount in ₹ (Optional)
                 </label>
                 <input
@@ -427,13 +417,13 @@ export const ScanMerchantQrModal: React.FC<ScanMerchantQrModalProps> = ({
                   value={manualAmount}
                   onChange={(e) => setManualAmount(e.target.value)}
                   placeholder="e.g. 4000"
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500"
+                  className="w-full bg-[#F4F7FB] border border-[#E5EAF1] focus:border-[#1685D4] rounded-lg px-3 py-2 text-xs text-[#172B4D] placeholder-slate-400 font-mono"
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-colors shadow-lg shadow-emerald-500/20"
+                className="w-full py-2.5 rounded-lg bg-[#173B70] hover:bg-[#1685D4] text-white font-medium text-xs transition-colors shadow-xs"
               >
                 Apply Merchant Details
               </button>

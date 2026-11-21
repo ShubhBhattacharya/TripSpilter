@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Plus, QrCode, Sparkles, ArrowRight } from 'lucide-react';
+import Link from 'next/link';
+import { Plus, QrCode, Sparkles, ArrowRight, Receipt, PlusCircle } from 'lucide-react';
 
 interface QuickActionBarProps {
   onCreateTrip: () => void;
@@ -15,72 +16,85 @@ export const QuickActionBar: React.FC<QuickActionBarProps> = ({
   onScanBillAi,
 }) => {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-      {/* 1. Create New Outing */}
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* 1. Create New Trip */}
       <button
         type="button"
         onClick={onCreateTrip}
-        className="flex items-center justify-between p-4 rounded-2xl bg-[#111827] border border-[#1F2937] hover:border-emerald-500/50 hover:bg-[#131d30] transition-all group text-left shadow-lg"
+        className="flex items-center justify-between p-4 rounded-xl bg-white border border-[#E5EAF1] hover:border-[#1685D4] hover:shadow-xs transition-all group text-left"
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center group-hover:scale-105 group-hover:bg-emerald-500/20 transition-all">
-            <Plus className="w-5 h-5 stroke-[2.2]" />
+          <div className="w-10 h-10 rounded-lg bg-[#1685D4]/10 text-[#1685D4] flex items-center justify-center font-bold">
+            <Plus className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="text-sm font-bold text-white group-hover:text-emerald-300 transition-colors">
-              Create New Outing
+            <h4 className="text-xs font-bold text-[#172B4D] group-hover:text-[#1685D4] transition-colors">
+              Create New Trip
             </h4>
-            <p className="text-xs text-slate-400">Plan itinerary & add friends</p>
+            <p className="text-[11px] text-[#64748B]">Set itinerary & invite friends</p>
           </div>
         </div>
-        <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-emerald-400 group-hover:translate-x-1 transition-all" />
+        <ArrowRight className="w-4 h-4 text-[#CBD5E1] group-hover:text-[#1685D4] group-hover:translate-x-0.5 transition-all" />
       </button>
 
-      {/* 2. Scan Merchant QR (Direct UPI) */}
+      {/* 2. Scan Merchant QR */}
       <button
         type="button"
         onClick={onScanMerchant}
-        className="flex items-center justify-between p-4 rounded-2xl bg-gradient-to-r from-emerald-950/40 to-[#111827] border border-emerald-500/30 hover:border-emerald-500/60 transition-all group text-left shadow-lg relative overflow-hidden"
+        className="flex items-center justify-between p-4 rounded-xl bg-white border border-[#E5EAF1] hover:border-[#0A9B78] hover:shadow-xs transition-all group text-left"
       >
-        <div className="absolute -top-12 -right-12 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl pointer-events-none" />
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center font-bold shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-all">
-            <QrCode className="w-5 h-5 stroke-[2.2]" />
+          <div className="w-10 h-10 rounded-lg bg-[#0A9B78]/10 text-[#0A9B78] flex items-center justify-center font-bold">
+            <QrCode className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center gap-1.5">
-              <h4 className="text-sm font-bold text-white group-hover:text-emerald-300 transition-colors">
-                Scan Merchant QR
-              </h4>
-              <span className="text-[9px] uppercase px-1 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
-                USP
-              </span>
-            </div>
-            <p className="text-xs text-slate-400">Split & pay vendor directly</p>
+            <h4 className="text-xs font-bold text-[#172B4D] group-hover:text-[#0A9B78] transition-colors">
+              Scan Merchant QR
+            </h4>
+            <p className="text-[11px] text-[#64748B]">Instant zero-float standee split</p>
           </div>
         </div>
-        <ArrowRight className="w-4 h-4 text-emerald-400 group-hover:translate-x-1 transition-all" />
+        <ArrowRight className="w-4 h-4 text-[#CBD5E1] group-hover:text-[#0A9B78] group-hover:translate-x-0.5 transition-all" />
       </button>
 
-      {/* 3. Scan Bill (AI OCR) */}
+      {/* 3. Upload Bill (OCR) */}
       <button
         type="button"
         onClick={onScanBillAi}
-        className="flex items-center justify-between p-4 rounded-2xl bg-[#111827] border border-[#1F2937] hover:border-teal-500/50 hover:bg-[#131d30] transition-all group text-left shadow-lg"
+        className="flex items-center justify-between p-4 rounded-xl bg-white border border-[#E5EAF1] hover:border-[#173B70] hover:shadow-xs transition-all group text-left"
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-teal-500/10 border border-teal-500/30 text-teal-400 flex items-center justify-center group-hover:scale-105 group-hover:bg-teal-500/20 transition-all">
-            <Sparkles className="w-5 h-5 stroke-[2.2]" />
+          <div className="w-10 h-10 rounded-lg bg-[#173B70]/10 text-[#173B70] flex items-center justify-center font-bold">
+            <Sparkles className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="text-sm font-bold text-white group-hover:text-teal-300 transition-colors">
-              Scan Bill (AI OCR)
+            <h4 className="text-xs font-bold text-[#172B4D] group-hover:text-[#173B70] transition-colors">
+              Upload Bill Photo
             </h4>
-            <p className="text-xs text-slate-400">Auto-parse dishes & taxes</p>
+            <p className="text-[11px] text-[#64748B]">Parse line items & GST</p>
           </div>
         </div>
-        <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-teal-400 group-hover:translate-x-1 transition-all" />
+        <ArrowRight className="w-4 h-4 text-[#CBD5E1] group-hover:text-[#173B70] group-hover:translate-x-0.5 transition-all" />
       </button>
+
+      {/* 4. Direct QR Split */}
+      <Link
+        href="/qr-split"
+        className="flex items-center justify-between p-4 rounded-xl bg-white border border-[#E5EAF1] hover:border-[#1685D4] hover:shadow-xs transition-all group text-left"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-slate-100 text-[#172B4D] flex items-center justify-center font-bold">
+            <Receipt className="w-5 h-5" />
+          </div>
+          <div>
+            <h4 className="text-xs font-bold text-[#172B4D] group-hover:text-[#1685D4] transition-colors">
+              Quick QR Split
+            </h4>
+            <p className="text-[11px] text-[#64748B]">Generate separate member QRs</p>
+          </div>
+        </div>
+        <ArrowRight className="w-4 h-4 text-[#CBD5E1] group-hover:text-[#1685D4] group-hover:translate-x-0.5 transition-all" />
+      </Link>
     </div>
   );
 };

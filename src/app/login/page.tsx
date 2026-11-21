@@ -108,73 +108,69 @@ function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0B1120] text-slate-100 flex flex-col justify-center items-center p-4 relative overflow-hidden">
-      {/* Ambient background glows */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-10 right-10 w-80 h-80 bg-teal-500/5 rounded-full blur-3xl pointer-events-none" />
-
+    <div className="min-h-screen bg-[#F4F7FB] text-[#172B4D] flex flex-col justify-center items-center p-4">
       {/* Main Container */}
-      <div className="w-full max-w-md relative z-10">
+      <div className="w-full max-w-md">
         {/* Brand Header */}
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-3 group mb-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-xl shadow-emerald-500/25 group-hover:scale-105 transition-transform duration-200">
-              <span className="text-2xl font-black text-slate-950">₹</span>
+        <div className="text-center mb-6">
+          <Link href="/" className="inline-flex items-center gap-2.5 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-[#173B70] flex items-center justify-center text-white font-bold text-lg shadow-sm">
+              ₹
             </div>
             <div className="text-left">
               <div className="flex items-center gap-1.5">
-                <span className="font-extrabold text-2xl tracking-tight text-white group-hover:text-emerald-400 transition-colors">
+                <span className="font-extrabold text-xl tracking-tight text-[#173B70]">
                   TripSplit
                 </span>
-                <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  Auth
+                <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase rounded bg-[#1685D4]/10 text-[#1685D4]">
+                  Secure
                 </span>
               </div>
-              <p className="text-xs text-slate-400 font-medium">Direct-to-Vendor UPI Bill Splitter</p>
+              <p className="text-[11px] text-[#64748B]">Direct-to-Vendor UPI Bill Splitter</p>
             </div>
           </Link>
-          <h2 className="text-xl font-bold text-white tracking-tight">Sign in to your account</h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Access trip itineraries, bookings vault & live UPI split cards
+          <h2 className="text-lg font-bold text-[#172B4D]">Sign in to your account</h2>
+          <p className="text-xs text-[#64748B] mt-0.5">
+            Manage trips, group itineraries & instant UPI split settlements
           </p>
         </div>
 
         {/* Missing Supabase Configuration Notice */}
         {!isSupabaseConfigured && (
-          <div className="mb-4 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 space-y-2">
-            <div className="flex items-center gap-2 font-bold text-amber-300">
-              <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+          <div className="mb-4 p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-2">
+            <div className="flex items-center gap-2 font-bold text-amber-800">
+              <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
               <span>Supabase Authentication Not Configured</span>
             </div>
-            <p className="text-[11px] text-amber-200/90 leading-relaxed">
-              Environment variables <code className="bg-slate-900 px-1 py-0.5 rounded text-white font-mono">NEXT_PUBLIC_SUPABASE_URL</code> and <code className="bg-slate-900 px-1 py-0.5 rounded text-white font-mono">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> are not configured.
+            <p className="text-[11px] text-amber-800/90 leading-relaxed">
+              Environment variables <code className="bg-amber-100/80 px-1 py-0.5 rounded text-amber-950 font-mono">NEXT_PUBLIC_SUPABASE_URL</code> and <code className="bg-amber-100/80 px-1 py-0.5 rounded text-amber-950 font-mono">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> are not configured.
             </p>
             <div className="pt-1">
               <button
                 type="button"
                 onClick={handlePreviewMode}
-                className="w-full py-2 px-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors"
+                className="w-full py-2 px-3 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-xs"
               >
                 <Zap className="w-3.5 h-3.5" />
-                <span>Explore in Local Sandbox Preview Mode</span>
+                <span>Explore in Local Preview Mode</span>
               </button>
             </div>
           </div>
         )}
 
         {/* Card */}
-        <div className="rounded-3xl bg-[#111827] border border-[#1F2937] p-6 sm:p-8 shadow-2xl relative">
+        <div className="rounded-2xl bg-white border border-[#E5EAF1] p-6 sm:p-7 shadow-sm">
           {/* Status Alert */}
           {error && (
-            <div className="mb-5 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-2.5 text-xs text-rose-300 animate-in fade-in">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
+            <div className="mb-4 p-3 rounded-lg bg-rose-50 border border-rose-200 flex items-start gap-2.5 text-xs text-rose-700 animate-in fade-in">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-500" />
               <span>{error}</span>
             </div>
           )}
 
           {successMsg && (
-            <div className="mb-5 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-start gap-2.5 text-xs text-emerald-300 animate-in fade-in">
-              <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-400" />
+            <div className="mb-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200 flex items-start gap-2.5 text-xs text-emerald-800 animate-in fade-in">
+              <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
               <span>{successMsg}</span>
             </div>
           )}
@@ -183,7 +179,7 @@ function LoginForm() {
           <button
             type="button"
             onClick={handleGoogleLogin}
-            className="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-850 text-white border border-slate-700 hover:border-slate-600 text-xs font-semibold flex items-center justify-center gap-3 transition-all active:scale-98 shadow-md"
+            className="w-full py-2.5 px-4 rounded-xl bg-white hover:bg-slate-50 text-[#172B4D] border border-[#E5EAF1] text-xs font-semibold flex items-center justify-center gap-2.5 transition-colors shadow-xs"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path
@@ -207,59 +203,59 @@ function LoginForm() {
           </button>
 
           {/* Divider */}
-          <div className="relative my-6">
+          <div className="relative my-5">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-800" />
+              <div className="w-full border-t border-[#E5EAF1]" />
             </div>
             <div className="relative flex justify-center text-[11px] uppercase">
-              <span className="bg-[#111827] px-3 text-slate-300 font-semibold tracking-wider">
+              <span className="bg-white px-3 text-[#64748B] font-medium tracking-wider">
                 Or sign in with email
               </span>
             </div>
           </div>
 
           {/* Email / Password Form */}
-          <form onSubmit={handleEmailLogin} className="space-y-4">
+          <form onSubmit={handleEmailLogin} className="space-y-3.5">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-semibold text-[#172B4D] mb-1">
                 Email Address
               </label>
               <div className="relative">
-                <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
+                <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                 <input
                   type="email"
                   required
                   placeholder="name@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl pl-10 pr-3.5 py-3 text-xs text-white placeholder-slate-500 focus:outline-none transition-colors"
+                  className="w-full bg-white border border-[#E5EAF1] focus:border-[#1685D4] focus:ring-2 focus:ring-[#1685D4]/15 rounded-xl pl-9 pr-3 py-2 text-xs text-[#172B4D] placeholder-slate-400 focus:outline-none transition-colors"
                 />
               </div>
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-[#172B4D]">
                   Password
                 </label>
-                <span className="text-[11px] text-emerald-400 hover:text-emerald-300 cursor-pointer">
+                <span className="text-[11px] text-[#1685D4] hover:underline cursor-pointer">
                   Forgot?
                 </span>
               </div>
               <div className="relative">
-                <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5" />
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl pl-10 pr-10 py-3 text-xs text-white placeholder-slate-500 focus:outline-none transition-colors"
+                  className="w-full bg-white border border-[#E5EAF1] focus:border-[#1685D4] focus:ring-2 focus:ring-[#1685D4]/15 rounded-xl pl-9 pr-9 py-2 text-xs text-[#172B4D] placeholder-slate-400 focus:outline-none transition-colors"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-3.5 text-slate-500 hover:text-slate-300 transition-colors"
+                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 transition-colors"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -269,7 +265,7 @@ function LoginForm() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 active:scale-98 transition-all disabled:opacity-50 mt-2"
+              className="w-full py-2.5 px-4 rounded-xl bg-[#1685D4] hover:bg-[#1272B7] text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-xs transition-colors disabled:opacity-50 mt-1"
             >
               {isLoading ? (
                 <span>Signing In...</span>
@@ -283,11 +279,11 @@ function LoginForm() {
           </form>
 
           {/* Footer Navigation */}
-          <div className="mt-6 text-center text-xs text-slate-400">
+          <div className="mt-5 pt-4 border-t border-[#E5EAF1] text-center text-xs text-[#64748B]">
             Don&apos;t have an account yet?{' '}
             <Link
               href="/signup"
-              className="font-bold text-emerald-400 hover:text-emerald-300 transition-colors underline underline-offset-2"
+              className="font-semibold text-[#1685D4] hover:text-[#1272B7] transition-colors hover:underline"
             >
               Create Account
             </Link>
@@ -302,7 +298,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-[#0B1120] flex items-center justify-center text-slate-400">
+        <div className="min-h-screen bg-[#F4F7FB] flex items-center justify-center text-[#64748B]">
           Loading sign in...
         </div>
       }

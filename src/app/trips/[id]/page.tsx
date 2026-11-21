@@ -208,9 +208,9 @@ function TripWorkspaceContent() {
 
   if (isDbLoading) {
     return (
-      <div className="min-h-screen bg-[#0B1120] text-slate-100 flex flex-col items-center justify-center">
-        <Loader2 className="w-8 h-8 text-emerald-400 animate-spin mb-3" />
-        <p className="text-sm font-semibold text-slate-300">Loading Trip Details...</p>
+      <div className="min-h-screen bg-[#F4F7FB] text-[#172B4D] flex flex-col items-center justify-center">
+        <Loader2 className="w-8 h-8 text-[#1685D4] animate-spin mb-3" />
+        <p className="text-sm font-semibold text-[#64748B]">Loading Trip Details...</p>
       </div>
     );
   }
@@ -218,27 +218,27 @@ function TripWorkspaceContent() {
   // Explicit 404 State when Trip Not Found (No Silent Fallback to mockTrips[0])
   if (!trip) {
     return (
-      <div className="min-h-screen bg-[#0B1120] text-slate-100 flex flex-col lg:flex-row">
+      <div className="min-h-screen bg-[#F4F7FB] text-[#172B4D] flex flex-col lg:flex-row">
         <Sidebar />
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 text-rose-400 flex items-center justify-center mb-4 shadow-xl">
+          <div className="w-16 h-16 rounded-xl bg-white border border-[#E5EAF1] text-[#DC3545] flex items-center justify-center mb-4 shadow-xs">
             <MapPinOff className="w-8 h-8" />
           </div>
-          <h2 className="text-xl sm:text-2xl font-black text-white mb-2">Trip Not Found</h2>
-          <p className="text-xs sm:text-sm text-slate-400 max-w-md mb-6 leading-relaxed">
-            We couldn&apos;t find a trip matching ID <code className="text-emerald-400 font-mono bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">&ldquo;{tripId}&rdquo;</code>. It may have been removed, or you might need to be invited by the trip organizer.
+          <h2 className="text-xl sm:text-2xl font-bold text-[#172B4D] mb-2">Trip Not Found</h2>
+          <p className="text-xs sm:text-sm text-[#64748B] max-w-md mb-6 leading-relaxed">
+            We couldn&apos;t find a trip matching ID <code className="text-[#173B70] font-mono bg-white px-1.5 py-0.5 rounded border border-[#E5EAF1]">&ldquo;{tripId}&rdquo;</code>. It may have been removed, or you might need to be invited by the trip organizer.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <Link
               href="/"
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#173B70] hover:bg-[#1685D4] text-white font-medium text-xs shadow-xs transition-all"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>Back to Dashboard</span>
             </Link>
             <Link
               href="/trips/trip-manali-2026"
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 font-semibold text-xs transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-white hover:bg-slate-50 text-[#172B4D] border border-[#E5EAF1] font-medium text-xs transition-colors shadow-xs"
             >
               <span>Explore Manali Demo Trip</span>
             </Link>
@@ -249,7 +249,7 @@ function TripWorkspaceContent() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0B1120] text-slate-100 flex flex-col lg:flex-row">
+    <div className="min-h-screen bg-[#F4F7FB] text-[#172B4D] flex flex-col lg:flex-row">
       <Sidebar />
 
       <div className="flex-1 flex flex-col min-w-0 pb-20 lg:pb-12">
@@ -323,9 +323,9 @@ export default function TripWorkspacePage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-[#0B1120] flex items-center justify-center text-slate-400">
+        <div className="min-h-screen bg-[#F4F7FB] flex items-center justify-center text-[#64748B]">
           <div className="flex items-center gap-2">
-            <Loader2 className="w-5 h-5 animate-spin text-emerald-400" />
+            <Loader2 className="w-5 h-5 animate-spin text-[#1685D4]" />
             <span className="text-sm font-medium">Loading TripSplit Workspace...</span>
           </div>
         </div>

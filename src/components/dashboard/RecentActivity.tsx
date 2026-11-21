@@ -8,25 +8,25 @@ export const RecentActivity: React.FC = () => {
   const getIcon = (type: string) => {
     switch (type) {
       case 'poll':
-        return <Vote className="w-3.5 h-3.5 text-purple-400" />;
+        return <Vote className="w-3.5 h-3.5 text-purple-600" />;
       case 'split':
-        return <QrCode className="w-3.5 h-3.5 text-emerald-400" />;
+        return <QrCode className="w-3.5 h-3.5 text-[#0A9B78]" />;
       case 'booking':
-        return <FileText className="w-3.5 h-3.5 text-blue-400" />;
+        return <FileText className="w-3.5 h-3.5 text-[#1685D4]" />;
       case 'payment':
-        return <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />;
+        return <CheckCircle2 className="w-3.5 h-3.5 text-[#0A9B78]" />;
       default:
-        return <Clock className="w-3.5 h-3.5 text-slate-400" />;
+        return <Clock className="w-3.5 h-3.5 text-[#64748B]" />;
     }
   };
 
   return (
-    <div className="rounded-2xl bg-[#111827] border border-[#1F2937] p-5 shadow-xl">
+    <div className="rounded-xl bg-white border border-[#E5EAF1] p-5 shadow-xs">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-          Trip Activity Stream
+        <h3 className="text-xs font-bold text-[#172B4D] uppercase tracking-wider">
+          Recent Trip Activity
         </h3>
-        <span className="text-[11px] text-slate-300 font-medium">Real-time sync</span>
+        <span className="text-[11px] text-[#64748B]">Live sync</span>
       </div>
 
       <div className="space-y-3.5">
@@ -35,15 +35,15 @@ export const RecentActivity: React.FC = () => {
             <img
               src={act.avatar}
               alt={act.user}
-              className="w-7 h-7 rounded-full object-cover ring-1 ring-slate-800 shrink-0 mt-0.5"
+              className="w-7 h-7 rounded-full object-cover ring-1 ring-[#E5EAF1] shrink-0 mt-0.5"
             />
             <div className="flex-1 min-w-0">
-              <p className="text-slate-300 leading-snug">
-                <strong className="text-white font-semibold">{act.user}</strong>{' '}
+              <p className="text-[#172B4D] leading-snug">
+                <strong className="font-semibold">{act.user}</strong>{' '}
                 {act.action}{' '}
-                <span className="text-emerald-400 font-medium">{act.target}</span>
+                <span className="text-[#1685D4] font-medium">{act.target}</span>
               </p>
-              <div className="flex items-center gap-1.5 text-[10px] text-slate-300 mt-1">
+              <div className="flex items-center gap-1.5 text-[10px] text-[#64748B] mt-0.5">
                 {getIcon(act.type)}
                 <span>{act.time}</span>
               </div>

@@ -61,7 +61,7 @@ export const OnboardingModal: React.FC = () => {
           particleCount: 80,
           spread: 80,
           origin: { y: 0.6 },
-          colors: ['#10B981', '#34D399', '#6EE7B7', '#F59E0B'],
+          colors: ['#1685D4', '#0A9B78', '#173B70', '#F59E0B'],
         });
       } catch {
         // ignore
@@ -73,17 +73,15 @@ export const OnboardingModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-md bg-[#111827] border border-[#1F2937] rounded-3xl shadow-2xl overflow-hidden flex flex-col relative">
-        <div className="absolute top-0 right-0 w-36 h-36 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
-
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="w-full max-w-md bg-white border border-[#E5EAF1] rounded-2xl shadow-xl overflow-hidden flex flex-col">
         {/* Modal Header */}
-        <div className="p-6 border-b border-[#1F2937] text-center relative">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 text-slate-950 font-bold mx-auto flex items-center justify-center mb-3 shadow-lg shadow-emerald-500/25">
-            <Sparkles className="w-6 h-6 stroke-[2.2]" />
+        <div className="p-6 border-b border-[#E5EAF1] text-center bg-[#F4F7FB]/50">
+          <div className="w-10 h-10 rounded-xl bg-[#173B70] text-white mx-auto flex items-center justify-center mb-2.5 shadow-xs">
+            <Sparkles className="w-5 h-5 text-white stroke-[2]" />
           </div>
-          <h3 className="text-xl font-extrabold text-white">Welcome to TripSplit! 🇮🇳</h3>
-          <p className="text-xs text-slate-400 mt-1">
+          <h3 className="text-lg font-bold text-[#172B4D]">Welcome to TripSplit! 🇮🇳</h3>
+          <p className="text-xs text-[#64748B] mt-1 max-w-xs mx-auto">
             Complete your profile to receive zero-float direct UPI settlements from your trip buddies.
           </p>
         </div>
@@ -91,80 +89,80 @@ export const OnboardingModal: React.FC = () => {
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {error && (
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-2 text-xs text-rose-300">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
+            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 flex items-start gap-2 text-xs text-rose-700">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-500" />
               <span>{error}</span>
             </div>
           )}
 
           {/* Display Name */}
           <div>
-            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-semibold text-[#172B4D] mb-1">
               Display Name *
             </label>
             <div className="relative">
-              <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
+              <User className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               <input
                 type="text"
                 required
                 placeholder="e.g. Aarav Sharma"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none transition-colors"
+                className="w-full bg-white border border-[#E5EAF1] focus:border-[#1685D4] focus:ring-2 focus:ring-[#1685D4]/15 rounded-xl pl-9 pr-3 py-2 text-xs text-[#172B4D] placeholder-slate-400 focus:outline-none transition-colors"
               />
             </div>
           </div>
 
           {/* UPI ID */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-semibold text-[#172B4D]">
                 Your Primary UPI ID *
               </label>
-              <span className="text-[10px] text-emerald-400 font-medium flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3" />
+              <span className="text-[11px] text-[#0A9B78] font-medium flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5" />
                 Never share PIN
               </span>
             </div>
             <div className="relative">
-              <CreditCard className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
+              <CreditCard className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               <input
                 type="text"
                 required
                 placeholder="username@okhdfcbank"
                 value={upiId}
                 onChange={(e) => setUpiId(e.target.value.toLowerCase())}
-                className={`w-full bg-slate-950 border rounded-xl pl-10 pr-10 py-2.5 text-sm font-mono text-white placeholder-slate-500 focus:outline-none transition-colors ${
+                className={`w-full bg-white border rounded-xl pl-9 pr-9 py-2 text-xs font-mono text-[#172B4D] placeholder-slate-400 focus:outline-none transition-colors ${
                   upiId
                     ? isValidUpi
-                      ? 'border-emerald-500/60 focus:border-emerald-400'
-                      : 'border-amber-500/60 focus:border-amber-400'
-                    : 'border-slate-800 focus:border-emerald-500'
+                      ? 'border-[#0A9B78] focus:border-[#0A9B78] focus:ring-2 focus:ring-[#0A9B78]/15'
+                      : 'border-amber-400 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/15'
+                    : 'border-[#E5EAF1] focus:border-[#1685D4] focus:ring-2 focus:ring-[#1685D4]/15'
                 }`}
               />
               {upiId && (
-                <div className="absolute right-3.5 top-3">
+                <div className="absolute right-3 top-2.5">
                   {isValidUpi ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <CheckCircle2 className="w-4 h-4 text-[#0A9B78]" />
                   ) : (
-                    <AlertCircle className="w-4 h-4 text-amber-400" />
+                    <AlertCircle className="w-4 h-4 text-amber-500" />
                   )}
                 </div>
               )}
             </div>
-            <p className="text-[11px] text-slate-300 mt-1">
+            <p className="text-[11px] text-[#64748B] mt-1">
               Used when group members settle debts directly to your bank account.
             </p>
 
             {/* Quick Bank Suffix Suggestions */}
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <span className="text-[10px] text-slate-300">Quick handles:</span>
+              <span className="text-[10px] text-[#64748B]">Quick handles:</span>
               {['@okhdfcbank', '@oksbi', '@paytm', '@ybl', '@icici'].map((suffix) => (
                 <button
                   key={suffix}
                   type="button"
                   onClick={() => handleBankSuffix(suffix)}
-                  className="text-[10px] px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-emerald-400 hover:border-emerald-500/40 transition-colors font-mono"
+                  className="text-[10px] px-2 py-0.5 rounded-md bg-[#F4F7FB] border border-[#E5EAF1] text-[#64748B] hover:text-[#1685D4] hover:border-[#1685D4]/40 transition-colors font-mono"
                 >
                   {suffix}
                 </button>
@@ -176,7 +174,7 @@ export const OnboardingModal: React.FC = () => {
             <button
               type="submit"
               disabled={isSubmitting || !displayName || !isValidUpi}
-              className="w-full py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 active:scale-98 transition-all"
+              className="w-full py-2.5 px-4 rounded-xl bg-[#1685D4] hover:bg-[#1272B7] disabled:opacity-50 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-xs transition-colors"
             >
               {isSubmitting ? (
                 <span>Saving Profile...</span>
