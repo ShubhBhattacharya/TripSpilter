@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { AuthProvider } from "../components/auth/AuthProvider";
+import { OnboardingModal } from "../components/auth/OnboardingModal";
 
 export const metadata: Metadata = {
   title: "TripSplit — Direct-to-Vendor UPI Bill Splitter & Trip Planner",
@@ -22,7 +24,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark h-full antialiased">
       <body className="min-h-full flex flex-col bg-[#0B1120] text-slate-100 font-sans selection:bg-emerald-500/30 selection:text-emerald-300">
-        {children}
+        <AuthProvider>
+          {children}
+          <OnboardingModal />
+        </AuthProvider>
       </body>
     </html>
   );

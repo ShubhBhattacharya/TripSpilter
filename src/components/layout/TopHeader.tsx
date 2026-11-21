@@ -8,6 +8,7 @@ import {
   ArrowDownLeft,
 } from 'lucide-react';
 import { currentUser, userSummaryStats } from '../../data/mockData';
+import { useAuth } from '../auth/AuthProvider';
 
 interface TopHeaderProps {
   onScanClick?: () => void;
@@ -15,6 +16,10 @@ interface TopHeaderProps {
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({ onScanClick, title }) => {
+  const { profile, user, signOut } = useAuth();
+  const activeAvatar =
+    profile?.avatar_url || user?.user_metadata?.avatar_url || currentUser.avatar;
+  const activeName = profile?.display_name || user?.user_metadata?.full_name || currentUser.name;
   return (
     <header className="sticky top-0 z-40 bg-[#0B1120]/90 backdrop-blur-md border-b border-[#1F2937] px-4 lg:px-8 py-3 transition-colors">
       <div className="flex items-center justify-between gap-4 max-w-7xl mx-auto">
@@ -66,11 +71,21 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onScanClick, title }) => {
 
           {/* User profile avatar thumbnail */}
           <div className="flex items-center pl-1 sm:pl-2">
-            <img
-              src={currentUser.avatar}
-              alt={currentUser.name}
-              className="w-8 h-8 rounded-full object-cover ring-2 ring-emerald-500/30"
-            />
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('Do you want to sign out of TripSplit?')) {
+                  signOut();
+                }
+              }}
+              title={`${activeName} (Click to Sign Out)`}
+            >
+              <img
+                src={activeAvatar}
+                alt={activeName}
+                className="w-8 h-8 rounded-full object-cover ring-2 ring-emerald-500/30 hover:ring-emerald-400 transition-all cursor-pointer"
+              />
+            </button>
           </div>
         </div>
       </div>

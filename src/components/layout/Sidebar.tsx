@@ -12,15 +12,24 @@ import {
   Copy,
   Receipt,
   Sparkles,
+  LogOut,
+  Settings,
 } from 'lucide-react';
-import { currentUser } from '../../data/mockData';
+import { currentUser as defaultMockUser } from '../../data/mockData';
+import { useAuth } from '../auth/AuthProvider';
 
 export const Sidebar: React.FC = () => {
   const pathname = usePathname();
+  const { user, profile, signOut, setShowOnboarding } = useAuth();
   const [copiedUpi, setCopiedUpi] = useState(false);
 
+  const activeName = profile?.display_name || user?.user_metadata?.full_name || defaultMockUser.name;
+  const activeUpi = profile?.upi_id || defaultMockUser.upiId;
+  const activeAvatar =
+    profile?.avatar_url || user?.user_metadata?.avatar_url || defaultMockUser.avatar;
+
   const handleCopyUpi = () => {
-    navigator.clipboard.writeText(currentUser.upiId);
+    navigator.clipboard.writeText(activeUpi);
     setCopiedUpi(true);
     setTimeout(() => setCopiedUpi(false), 2000);
   };
@@ -159,15 +168,15 @@ export const Sidebar: React.FC = () => {
         </div>
       </nav>
 
-      {/* User Profile & Saved UPI ID */}
+      {/* User Profile, Saved UPI ID & Sign Out */}
       <div className="p-3 border-t border-[#1F2937] bg-[#0E1526]/70">
         <div className="p-2.5 rounded-xl bg-[#111827] border border-[#1F2937] hover:border-slate-700 transition-colors">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             {/* Avatar */}
             <div className="relative">
               <img
-                src={currentUser.avatar}
-                alt={currentUser.name}
+                src={activeAvatar}
+                alt={activeName}
                 className="w-9 h-9 rounded-full object-cover ring-2 ring-emerald-500/40"
               />
               <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-[#111827]" />
@@ -175,14 +184,14 @@ export const Sidebar: React.FC = () => {
 
             {/* Name & UPI ID */}
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-white truncate">{currentUser.name}</p>
+              <p className="text-xs font-semibold text-white truncate">{activeName}</p>
               <button
                 type="button"
                 onClick={handleCopyUpi}
                 className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-emerald-400 transition-colors mt-0.5"
                 title="Click to copy UPI ID"
               >
-                <span className="truncate font-mono">{currentUser.upiId}</span>
+                <span className="truncate font-mono">{activeUpi}</span>
                 {copiedUpi ? (
                   <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
                 ) : (
@@ -190,9 +199,29 @@ export const Sidebar: React.FC = () => {
                 )}
               </button>
             </div>
+
+            {/* Profile Settings & Sign Out Actions */}
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setShowOnboarding(true)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                title="Edit UPI ID / Profile"
+              >
+                <Settings className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => signOut()}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                title="Sign Out"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
           {copiedUpi && (
-            <div className="mt-1 text-[10px] text-emerald-400 text-center font-medium bg-emerald-500/10 py-0.5 rounded">
+            <div className="mt-1.5 text-[10px] text-emerald-400 text-center font-medium bg-emerald-500/10 py-0.5 rounded">
               UPI ID copied!
             </div>
           )}

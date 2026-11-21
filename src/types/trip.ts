@@ -1,5 +1,14 @@
 export type Currency = 'INR';
 
+export interface DbProfile {
+  id: string;
+  display_name: string | null;
+  upi_id: string | null;
+  avatar_url: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
