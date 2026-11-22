@@ -2,78 +2,85 @@ import { NextResponse } from 'next/server';
 import { createClient } from '../../../lib/supabase/server';
 import { isSupabaseConfigured } from '../../../lib/supabase/client';
 import { createTripSchema } from '../../../lib/validations/api';
-import { checkRateLimit, getClientIp } from '../../../lib/rate-limit';
+import {
+  checkRateLimit,
+  getClientIdentifier,
+  applyRateLimitHeaders,
+} from '../../../lib/rate-limit';
+import {
+  requireAuthenticatedUser,
+  UnauthorizedError,
+  ForbiddenError,
+} from '../../../lib/security/auth-guards';
 import { mockTrips } from '../../../data/mockData';
 
-export async function GET() {
+export async function GET(request: Request) {
   if (!isSupabaseConfigured) {
     return NextResponse.json({ trips: mockTrips, isDemo: true });
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  try {
+    const supabase = await createClient();
+    const user = await requireAuthenticatedUser(supabase);
 
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+    const rateLimitId = getClientIdentifier('get_trips', request, user.id);
+    const rateLimit = await checkRateLimit(rateLimitId, 60, 60000);
 
-  // Fetch trips where user is a member
-  const { data: memberRows, error: memberError } = await supabase
-    .from('trip_members')
-    .select('trip_id')
-    .eq('user_id', user.id);
+    const headers = new Headers();
+    applyRateLimitHeaders(headers, rateLimit);
 
-  if (memberError) {
-    return NextResponse.json({ error: memberError.message }, { status: 500 });
-  }
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: `Too many requests. Please wait ${rateLimit.reset}s.` },
+        { status: 429, headers }
+      );
+    }
 
-  const tripIds = memberRows.map((r) => r.trip_id);
+    // Fetch trips where user is explicitly a member or creator
+    const { data: memberRows, error: memberError } = await supabase
+      .from('trip_members')
+      .select('trip_id')
+      .eq('user_id', user.id);
 
-  const { data: trips, error: tripsError } = await supabase
-    .from('trips')
-    .select(`
-      *,
-      trip_members (
-        user_id,
-        role,
-        profiles (
-          id,
-          display_name,
-          upi_id,
-          avatar_url
+    if (memberError) {
+      return NextResponse.json({ error: memberError.message }, { status: 500, headers });
+    }
+
+    const tripIds = memberRows ? memberRows.map((r) => r.trip_id) : [];
+
+    // Also include trips created by user even if member row was delayed
+    const { data: trips, error: tripsError } = await supabase
+      .from('trips')
+      .select(`
+        *,
+        trip_members (
+          user_id,
+          role,
+          profiles (
+            id,
+            display_name,
+            upi_id,
+            avatar_url
+          )
         )
-      )
-    `)
-    .in('id', tripIds)
-    .order('created_at', { ascending: false });
+      `)
+      .or(`id.in.(${tripIds.length > 0 ? tripIds.join(',') : '00000000-0000-0000-0000-000000000000'}),created_by.eq.${user.id}`)
+      .order('created_at', { ascending: false });
 
-  if (tripsError) {
-    return NextResponse.json({ error: tripsError.message }, { status: 500 });
+    if (tripsError) {
+      return NextResponse.json({ error: tripsError.message }, { status: 500, headers });
+    }
+
+    return NextResponse.json({ trips: trips || [] }, { headers });
+  } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      return NextResponse.json({ error: err.message }, { status: 401 });
+    }
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-
-  return NextResponse.json({ trips });
 }
 
 export async function POST(request: Request) {
-  const clientIp = getClientIp(request);
-  const rateLimit = checkRateLimit(`create_trip_${clientIp}`, 15, 60000);
-
-  if (!rateLimit.success) {
-    return NextResponse.json(
-      { error: `Too many trip creation requests. Please try again in ${rateLimit.reset}s.` },
-      {
-        status: 429,
-        headers: {
-          'Retry-After': String(rateLimit.reset),
-          'X-RateLimit-Limit': String(rateLimit.limit),
-          'X-RateLimit-Remaining': String(rateLimit.remaining),
-        },
-      }
-    );
-  }
-
   try {
     const rawBody = await request.json();
     const validation = createTripSchema.safeParse(rawBody);
@@ -91,7 +98,6 @@ export async function POST(request: Request) {
     const { title, destination, startDate, endDate, budget, coverImage } = validation.data;
 
     if (!isSupabaseConfigured) {
-      // Demo simulated response
       return NextResponse.json(
         {
           message: 'Trip created in demo mode',
@@ -111,14 +117,23 @@ export async function POST(request: Request) {
     }
 
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const user = await requireAuthenticatedUser(supabase);
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Rate limit per authenticated user
+    const rateLimitId = getClientIdentifier('create_trip', request, user.id);
+    const rateLimit = await checkRateLimit(rateLimitId, 15, 60000);
+
+    const headers = new Headers();
+    applyRateLimitHeaders(headers, rateLimit);
+
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: `Too many trip creation requests. Please try again in ${rateLimit.reset}s.` },
+        { status: 429, headers }
+      );
     }
 
+    // 1. Insert new trip record
     const { data: newTrip, error: insertError } = await supabase
       .from('trips')
       .insert({
@@ -134,11 +149,26 @@ export async function POST(request: Request) {
       .single();
 
     if (insertError) {
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
+      return NextResponse.json({ error: insertError.message }, { status: 500, headers });
     }
 
-    return NextResponse.json({ trip: newTrip }, { status: 201 });
-  } catch {
+    // 2. Ensure creator is recorded in trip_members with 'admin' role
+    await supabase
+      .from('trip_members')
+      .upsert(
+        {
+          trip_id: newTrip.id,
+          user_id: user.id,
+          role: 'admin',
+        },
+        { onConflict: 'trip_id,user_id' }
+      );
+
+    return NextResponse.json({ trip: newTrip }, { status: 201, headers });
+  } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      return NextResponse.json({ error: err.message }, { status: 401 });
+    }
     return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 }

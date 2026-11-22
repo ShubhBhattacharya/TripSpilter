@@ -23,6 +23,11 @@ export interface SplitResultShare {
   amountPaise: number; // in Paise
 }
 
+export function hasSubPaiseFractions(rupees: number): boolean {
+  const paise = rupees * 100;
+  return Math.abs(paise - Math.round(paise)) > 1e-6;
+}
+
 /**
  * Calculates equal split distributing remainder paise to ensure
  * Sum of shares === totalAmount EXACTLY.
@@ -33,8 +38,8 @@ export function calculateEqualSplit(input: EqualSplitInput): SplitResultShare[] 
   if (!memberIds || memberIds.length === 0) {
     throw new Error('Cannot split among zero members');
   }
-  if (totalAmount < 0) {
-    throw new Error('Total amount cannot be negative');
+  if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+    throw new Error('Total amount cannot be negative or zero; must be a positive number');
   }
 
   const totalPaise = toPaise(totalAmount);
@@ -60,6 +65,7 @@ export interface ExactSplitInput {
 
 /**
  * Validates and normalizes exact custom shares, checking for over or under-allocation.
+ * Enforces zero tolerance (must match in integer paise exactly).
  */
 export function validateAndCalculateExactSplit(input: ExactSplitInput): {
   isValid: boolean;
@@ -67,18 +73,35 @@ export function validateAndCalculateExactSplit(input: ExactSplitInput): {
   shares: SplitResultShare[];
   error?: string;
 } {
+  if (!Number.isFinite(input.totalAmount) || input.totalAmount <= 0) {
+    return {
+      isValid: false,
+      difference: 0,
+      shares: [],
+      error: 'Total amount must be greater than zero',
+    };
+  }
+
   const totalPaise = toPaise(input.totalAmount);
   let allocatedPaise = 0;
 
   const shares: SplitResultShare[] = [];
 
   for (const s of input.shares) {
-    if (s.amount < 0) {
+    if (!Number.isFinite(s.amount) || s.amount < 0) {
       return {
         isValid: false,
         difference: 0,
         shares: [],
         error: `Negative share not allowed for member ${s.memberId}`,
+      };
+    }
+    if (hasSubPaiseFractions(s.amount)) {
+      return {
+        isValid: false,
+        difference: 0,
+        shares: [],
+        error: `Share for member ${s.memberId} has invalid sub-paise fraction: ₹${s.amount}`,
       };
     }
     const sharePaise = toPaise(s.amount);
@@ -244,12 +267,13 @@ export function calculateNetBalances(params: {
   expenses: RawExpense[];
   splits: RawSplit[];
   settlements: RawSettlement[];
+  includeUnverifiedClaims?: boolean;
 }): {
   balances: { [userId: string]: MemberNetBalance };
   isZeroSum: boolean;
   totalTripSpend: number;
 } {
-  const { memberIds, expenses, splits, settlements } = params;
+  const { memberIds, expenses, splits, settlements, includeUnverifiedClaims = false } = params;
 
   const paidPaise: { [uid: string]: number } = {};
   const sharePaise: { [uid: string]: number } = {};
@@ -278,9 +302,13 @@ export function calculateNetBalances(params: {
     sharePaise[sp.userId] = (sharePaise[sp.userId] || 0) + amtPaise;
   }
 
-  // Add settlements (only consider settled / verified / reported paid)
+  // Add settlements (only consider verified settled funds unless unverified claims are explicitly requested)
+  const allowedStatuses = includeUnverifiedClaims
+    ? ['verified_paid', 'manually_reported_paid', 'SETTLED', 'settled']
+    : ['verified_paid', 'SETTLED', 'settled'];
+
   for (const st of settlements) {
-    if (['verified_paid', 'manually_reported_paid', 'SETTLED', 'settled'].includes(st.status)) {
+    if (allowedStatuses.includes(st.status)) {
       const amtPaise = toPaise(st.amount);
       settPaidPaise[st.fromUserId] = (settPaidPaise[st.fromUserId] || 0) + amtPaise;
       settRecvPaise[st.toUserId] = (settRecvPaise[st.toUserId] || 0) + amtPaise;
