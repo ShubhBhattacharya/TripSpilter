@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Compass, Users, QrCode, FolderLock, Receipt } from 'lucide-react';
+import { Compass, Users, QrCode, Globe, User } from 'lucide-react';
 
 interface BottomNavProps {
   onOpenQuickSplit?: () => void;
@@ -14,7 +14,6 @@ export const BottomNav: React.FC<BottomNavProps> = ({ onOpenQuickSplit, onScanCl
   const pathname = usePathname();
 
   const isHome = pathname === '/';
-  const isTrip = pathname.startsWith('/trips');
 
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-[#E5EAF1] px-3 pb-3 pt-2 shadow-md">
@@ -32,15 +31,15 @@ export const BottomNav: React.FC<BottomNavProps> = ({ onOpenQuickSplit, onScanCl
 
         {/* Trips */}
         <Link
-          href="/trips/trip-manali-2026"
+          href="/trips"
           className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg transition-colors ${
-            isTrip && !pathname.includes('tab=balances') && !pathname.includes('tab=bookings')
+            pathname.startsWith('/trips')
               ? 'text-[#1685D4] font-semibold'
               : 'text-[#64748B] hover:text-[#172B4D]'
           }`}
         >
           <Users className="w-5 h-5" />
-          <span className="text-[10px]">My Trip</span>
+          <span className="text-[10px]">My Trips</span>
         </Link>
 
         {/* CENTER FLOATING ACTION BUTTON "+ Split" */}
@@ -55,30 +54,30 @@ export const BottomNav: React.FC<BottomNavProps> = ({ onOpenQuickSplit, onScanCl
           </button>
         </div>
 
-        {/* Vault / Bookings */}
+        {/* Explore */}
         <Link
-          href="/trips/trip-manali-2026?tab=bookings"
+          href="/explore"
           className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg transition-colors ${
-            pathname.includes('tab=bookings')
+            pathname.startsWith('/explore')
               ? 'text-[#1685D4] font-semibold'
               : 'text-[#64748B] hover:text-[#172B4D]'
           }`}
         >
-          <FolderLock className="w-5 h-5" />
-          <span className="text-[10px]">Vault</span>
+          <Globe className="w-5 h-5" />
+          <span className="text-[10px]">Explore</span>
         </Link>
 
-        {/* Balances / Settle */}
+        {/* Profile */}
         <Link
-          href="/trips/trip-manali-2026?tab=balances"
+          href="/profile"
           className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg transition-colors ${
-            pathname.includes('tab=balances')
+            pathname.startsWith('/profile')
               ? 'text-[#1685D4] font-semibold'
               : 'text-[#64748B] hover:text-[#172B4D]'
           }`}
         >
-          <Receipt className="w-5 h-5" />
-          <span className="text-[10px]">Settle</span>
+          <User className="w-5 h-5" />
+          <span className="text-[10px]">Profile</span>
         </Link>
       </div>
     </nav>

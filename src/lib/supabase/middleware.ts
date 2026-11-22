@@ -65,7 +65,10 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isAuthRoute = pathname === '/login' || pathname === '/signup';
   const isProtectedRoute =
-    pathname === '/' || pathname.startsWith('/trips') || pathname.startsWith('/qr-split');
+    pathname.startsWith('/trips') ||
+    pathname.startsWith('/qr-split') ||
+    pathname.startsWith('/profile') ||
+    pathname.startsWith('/settings');
 
   // If user is logged in and visits login/signup, redirect to dashboard
   if (user && isAuthRoute) {

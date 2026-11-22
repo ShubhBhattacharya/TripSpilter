@@ -14,6 +14,8 @@ import {
   LogOut,
   Settings,
   ShieldCheck,
+  Globe,
+  Bell,
 } from 'lucide-react';
 import { currentUser as defaultMockUser } from '../../data/mockData';
 import { useAuth } from '../auth/AuthProvider';
@@ -45,8 +47,13 @@ export const Sidebar: React.FC = () => {
     },
     {
       name: 'My Trips',
-      href: '/trips/trip-manali-2026',
+      href: '/trips',
       icon: Users,
+    },
+    {
+      name: 'Explore Places',
+      href: '/explore',
+      icon: Globe,
     },
     {
       name: 'Direct QR Split',
@@ -62,6 +69,16 @@ export const Sidebar: React.FC = () => {
       name: 'Balances & Settle',
       href: '/trips/trip-manali-2026?tab=balances',
       icon: Receipt,
+    },
+    {
+      name: 'Notifications',
+      href: '/notifications',
+      icon: Bell,
+    },
+    {
+      name: 'Profile & Privacy',
+      href: '/profile',
+      icon: Settings,
     },
   ];
 
