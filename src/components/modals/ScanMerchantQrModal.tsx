@@ -56,7 +56,9 @@ export const ScanMerchantQrModal: React.FC<ScanMerchantQrModalProps> = ({
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
-    setIsScanning(false);
+    setTimeout(() => {
+      setIsScanning(false);
+    }, 0);
   }, []);
 
   const handleQrDetected = useCallback(
@@ -91,31 +93,35 @@ export const ScanMerchantQrModal: React.FC<ScanMerchantQrModalProps> = ({
   );
 
   const scanFrame = useCallback(() => {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
-      animationFrameRef.current = requestAnimationFrame(scanFrame);
-      return;
+    function step() {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
+        animationFrameRef.current = requestAnimationFrame(step);
+        return;
+      }
+
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return;
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: 'dontInvert',
+      });
+
+      if (code && code.data) {
+        handleQrDetected(code.data);
+        return;
+      }
+
+      animationFrameRef.current = requestAnimationFrame(step);
     }
 
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) return;
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const code = jsQR(imageData.data, imageData.width, imageData.height, {
-      inversionAttempts: 'dontInvert',
-    });
-
-    if (code && code.data) {
-      handleQrDetected(code.data);
-      return;
-    }
-
-    animationFrameRef.current = requestAnimationFrame(scanFrame);
+    step();
   }, [handleQrDetected]);
 
   const startCamera = useCallback(async () => {
@@ -140,7 +146,7 @@ export const ScanMerchantQrModal: React.FC<ScanMerchantQrModalProps> = ({
         videoRef.current.srcObject = stream;
         videoRef.current.setAttribute('playsinline', 'true');
         await videoRef.current.play();
-        animationFrameRef.current = requestAnimationFrame(scanFrame);
+        scanFrame();
       }
     } catch (err: unknown) {
       const error = err as Error;
@@ -154,13 +160,20 @@ export const ScanMerchantQrModal: React.FC<ScanMerchantQrModalProps> = ({
   }, [scanFrame]);
 
   useEffect(() => {
+    let isActive = true;
     if (isOpen && activeMode === 'camera') {
-      startCamera();
+      const init = async () => {
+        if (isActive) {
+          await startCamera();
+        }
+      };
+      void init();
     } else {
       stopCamera();
     }
 
     return () => {
+      isActive = false;
       stopCamera();
     };
   }, [isOpen, activeMode, startCamera, stopCamera]);
@@ -307,6 +320,10 @@ export const ScanMerchantQrModal: React.FC<ScanMerchantQrModalProps> = ({
                   playsInline
                   className="w-full h-full object-cover"
                 />
+
+                {isScanning && !cameraError && !scannedSuccess && (
+                  <div className="absolute inset-x-0 top-0 h-0.5 bg-[#1685D4] animate-pulse z-10" />
+                )}
 
                 {scannedSuccess && (
                   <div className="absolute inset-0 bg-white/95 z-30 flex flex-col items-center justify-center p-4">

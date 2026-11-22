@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, MapPin, Calendar, Plus, Users, Sparkles } from 'lucide-react';
+import { X, MapPin, Calendar, Plus } from 'lucide-react';
 
 interface CreateTripModalProps {
   isOpen: boolean;

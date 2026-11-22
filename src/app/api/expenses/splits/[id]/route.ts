@@ -101,10 +101,25 @@ export async function PATCH(
       );
     }
 
-    const parentExpense = (splitRecord as any).expenses;
+    interface SplitDbRecord {
+      id: string;
+      user_id: string;
+      amount_owed: number;
+      amount_owed_paise: number;
+      status: string;
+      transaction_ref: string | null;
+      expenses: {
+        id: string;
+        trip_id: string;
+        paid_by: string;
+      };
+    }
+
+    const typedRecord = splitRecord as unknown as SplitDbRecord;
+    const parentExpense = typedRecord.expenses;
     const tripId = parentExpense.trip_id;
     const creditorId = parentExpense.paid_by;
-    const debtorId = splitRecord.user_id;
+    const debtorId = typedRecord.user_id;
 
     // 2. Determine User's Role for this payment
     const isDebtor = user.id === debtorId;

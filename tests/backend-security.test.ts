@@ -1,21 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import {
   validatePaymentStateTransition,
-  VALID_PAYMENT_STATES,
+  PaymentVerificationState,
 } from '../src/lib/financial/payment-state-machine';
 import {
   sanitizeRedirectUrl,
 } from '../src/lib/security/auth-guards';
 import {
   createExpenseSchema,
-  createTripSchema,
-  updateSplitStatusSchema,
-  generateUpiLinkSchema,
   ocrUploadSchema,
-  MAX_OCR_IMAGE_BYTES,
 } from '../src/lib/validations/api';
 import {
-  toPaise,
   toRupees,
   calculateEqualSplit,
   validateAndCalculateExactSplit,
@@ -132,7 +127,7 @@ describe('Payment Status Security & Anti-Tampering (Task 2)', () => {
   it('rejects invalid state values', () => {
     const result = validatePaymentStateTransition({
       currentStatus: 'pending',
-      targetStatus: 'arbitrary_fake_status' as any,
+      targetStatus: 'arbitrary_fake_status' as unknown as PaymentVerificationState,
       isDebtor: true,
       isCreditor: false,
       isAdmin: false,

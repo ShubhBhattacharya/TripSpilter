@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { MapPin, Calendar, Users, ArrowRight } from 'lucide-react';
+import { MapPin, Calendar, ArrowRight } from 'lucide-react';
 import { Trip } from '../../types/trip';
 import { formatInr } from '../../lib/upi';
 import { ImageWithFallback } from '../ui/ImageWithFallback';

@@ -49,7 +49,7 @@ export function isValidPaymentState(state: string): state is PaymentVerification
 export function validatePaymentStateTransition(
   context: StateTransitionContext
 ): TransitionValidationResult {
-  const { currentStatus, targetStatus, isDebtor, isCreditor, isAdmin, transactionRef } = context;
+  const { currentStatus, targetStatus, isDebtor, isCreditor, isAdmin, transactionRef: _transactionRef } = context;
 
   // 1. Normalize and validate state values
   if (!isValidPaymentState(currentStatus)) {

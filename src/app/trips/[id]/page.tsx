@@ -15,7 +15,7 @@ import { ScanMerchantQrModal } from '../../../components/modals/ScanMerchantQrMo
 import { AiBillScanModal } from '../../../components/modals/AiBillScanModal';
 import { mockTrips, defaultMembers } from '../../../data/mockData';
 import { BookingVaultItem, Trip } from '../../../types/trip';
-import { Loader2, MapPinOff, ArrowLeft, PlusCircle } from 'lucide-react';
+import { Loader2, MapPinOff, ArrowLeft } from 'lucide-react';
 import { createClient, isSupabaseConfigured } from '../../../lib/supabase/client';
 
 function TripWorkspaceContent() {
@@ -94,7 +94,39 @@ function TripWorkspaceContent() {
             .single();
 
           if (dbTrip && !error) {
-            const mappedMembers = (dbTrip.trip_members || []).map((m: any) => ({
+            interface DbTripMember {
+              profiles?: {
+                id?: string;
+                display_name?: string;
+                full_name?: string;
+                upi_id?: string;
+                avatar_url?: string;
+              };
+            }
+
+            interface DbItineraryItem {
+              id: string;
+              day_number: number;
+              time: string;
+              title: string;
+              type?: string;
+              location_url?: string;
+              estimated_cost?: number;
+              is_completed?: boolean;
+            }
+
+            interface DbBooking {
+              id: string;
+              title: string;
+              category?: string;
+              vendor_name?: string;
+              booking_ref: string;
+              amount?: number;
+              status?: string;
+            }
+
+            const rawMembers = (dbTrip.trip_members || []) as unknown as DbTripMember[];
+            const mappedMembers = rawMembers.map((m) => ({
               id: m.profiles?.id || 'usr_unknown',
               name: m.profiles?.display_name || m.profiles?.full_name || 'Member',
               upiId: m.profiles?.upi_id || 'member@upi',
@@ -102,6 +134,9 @@ function TripWorkspaceContent() {
                 m.profiles?.avatar_url ||
                 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
             }));
+
+            const rawItinerary = (dbTrip.itinerary_items || []) as unknown as DbItineraryItem[];
+            const rawBookings = (dbTrip.bookings || []) as unknown as DbBooking[];
 
             const mappedTrip: Trip = {
               id: dbTrip.id,
@@ -117,28 +152,28 @@ function TripWorkspaceContent() {
               totalSpend: 0,
               status: dbTrip.status || 'ACTIVE',
               members: mappedMembers.length > 0 ? mappedMembers : defaultMembers,
-              itinerary: (dbTrip.itinerary_items || []).map((it: any) => ({
+              itinerary: rawItinerary.map((it) => ({
                 id: it.id,
                 day: it.day_number,
                 time: it.time,
                 title: it.title,
                 location: dbTrip.destination,
-                category: it.type || 'Activity',
+                category: (it.type as 'Transport' | 'Stay' | 'Food' | 'Activity' | 'Sightseeing') || 'Activity',
                 mapsUrl: it.location_url || 'https://maps.google.com',
                 estimatedCost: Number(it.estimated_cost) || 0,
-                isCompleted: it.is_completed,
+                isCompleted: it.is_completed || false,
               })),
               polls: [],
-              bookings: (dbTrip.bookings || []).map((b: any) => ({
+              bookings: rawBookings.map((b) => ({
                 id: b.id,
                 title: b.title,
-                category: b.category || 'Hotel',
+                category: (b.category as BookingVaultItem['category']) || 'Hotel',
                 vendorName: b.vendor_name || 'Vendor',
                 bookingRef: b.booking_ref,
                 date: dbTrip.start_date,
                 totalAmount: Number(b.amount) || 0,
                 bookedBy: 'Admin',
-                status: b.status || 'Confirmed',
+                status: (b.status as BookingVaultItem['status']) || 'Confirmed',
                 documentType: 'PDF',
               })),
               vendorSplits: [],

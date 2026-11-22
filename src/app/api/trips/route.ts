@@ -10,7 +10,6 @@ import {
 import {
   requireAuthenticatedUser,
   UnauthorizedError,
-  ForbiddenError,
 } from '../../../lib/security/auth-guards';
 import { mockTrips } from '../../../data/mockData';
 

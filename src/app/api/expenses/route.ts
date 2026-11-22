@@ -118,7 +118,7 @@ export async function POST(request: Request) {
       splitType,
       notes,
       splits,
-      idempotencyKey,
+      idempotencyKey: _idempotencyKey,
     } = validation.data;
 
     if (!isSupabaseConfigured) {

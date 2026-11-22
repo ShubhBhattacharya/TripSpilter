@@ -60,7 +60,7 @@ export async function requireTripMembership(
   }
 
   // 1. Check trip_members table
-  const { data: member, error: memberError } = await supabase
+  const { data: member } = await supabase
     .from('trip_members')
     .select('role')
     .eq('trip_id', tripId)
@@ -78,7 +78,7 @@ export async function requireTripMembership(
   }
 
   // 2. Fallback check: Is user the original trip creator?
-  const { data: trip, error: tripError } = await supabase
+  const { data: trip } = await supabase
     .from('trips')
     .select('created_by')
     .eq('id', tripId)

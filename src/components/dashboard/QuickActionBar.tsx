@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Plus, QrCode, Sparkles, ArrowRight, Receipt, PlusCircle } from 'lucide-react';
+import { Plus, QrCode, Sparkles, ArrowRight, Receipt } from 'lucide-react';
 
 interface QuickActionBarProps {
   onCreateTrip: () => void;

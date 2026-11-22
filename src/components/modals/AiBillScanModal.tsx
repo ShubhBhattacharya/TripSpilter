@@ -4,7 +4,6 @@ import React, { useState, useRef } from 'react';
 import {
   X,
   Sparkles,
-  Receipt,
   CheckCircle2,
   AlertCircle,
   Loader2,
