@@ -14,25 +14,30 @@ import {
 import { formatInr } from '../../lib/upi';
 import { toast } from 'sonner';
 
-interface BillItem {
+export interface BillItem {
   name: string;
   price: number;
 }
 
-interface AiBillScanModalProps {
+export interface BillData {
+  merchantName: string;
+  totalAmount: number;
+  items: BillItem[];
+}
+
+export interface AiBillScanModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onApplyBill: (billData: {
-    merchantName: string;
-    totalAmount: number;
-    items: BillItem[];
-  }) => void;
+  onApplyBill?: (billData: BillData) => void;
+  onApplySplit?: (billData: BillData) => void;
+  tripMembers?: unknown[];
 }
 
 export const AiBillScanModal: React.FC<AiBillScanModalProps> = ({
   isOpen,
   onClose,
   onApplyBill,
+  onApplySplit,
 }) => {
   const [scanning, setScanning] = useState(false);
   const [ocrWarning, setOcrWarning] = useState<string | null>(null);
@@ -128,11 +133,13 @@ export const AiBillScanModal: React.FC<AiBillScanModalProps> = ({
       return;
     }
 
-    onApplyBill({
+    const payload: BillData = {
       merchantName: merchantName.trim() || 'Merchant Bill',
       totalAmount,
       items: items.filter((it) => it.name.trim() && it.price > 0),
-    });
+    };
+    if (onApplyBill) onApplyBill(payload);
+    if (onApplySplit) onApplySplit(payload);
     toast.success(`Applied ${items.length} bill items totaling ${formatInr(totalAmount)}!`);
     onClose();
   };

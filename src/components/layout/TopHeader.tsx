@@ -7,19 +7,20 @@ import {
   ArrowUpRight,
   ArrowDownLeft,
 } from 'lucide-react';
-import { currentUser, userSummaryStats } from '../../data/mockData';
 import { useAuth } from '../auth/AuthProvider';
 
 interface TopHeaderProps {
   onScanClick?: () => void;
   title?: string;
+  youOwe?: number;
+  youAreOwed?: number;
 }
 
-export const TopHeader: React.FC<TopHeaderProps> = ({ onScanClick, title }) => {
+export const TopHeader: React.FC<TopHeaderProps> = ({ onScanClick, title, youOwe, youAreOwed }) => {
   const { profile, user, signOut } = useAuth();
   const activeAvatar =
-    profile?.avatar_url || user?.user_metadata?.avatar_url || currentUser.avatar;
-  const activeName = profile?.display_name || user?.user_metadata?.full_name || currentUser.name;
+    profile?.avatar_url || user?.user_metadata?.avatar_url || '';
+  const activeName = profile?.display_name || user?.user_metadata?.full_name || (user ? 'Account' : 'Traveler');
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-[#E5EAF1] px-4 lg:px-8 py-3 transition-colors shadow-xs">
@@ -44,19 +45,23 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onScanClick, title }) => {
 
         {/* Right: Quick UPI Balances & Scan Action */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Quick Balance Pills (Desktop) */}
+          {/* Quick Balance Pills (Desktop) — Only displayed when live receivables/payables exist */}
           <div className="hidden md:flex items-center gap-2 text-xs">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200/60 text-[#B45309]">
-              <ArrowUpRight className="w-3.5 h-3.5 text-amber-600" />
-              <span className="font-medium">You Owe:</span>
-              <strong className="num-inr font-bold">₹{userSummaryStats.youOwe.toLocaleString('en-IN')}</strong>
-            </div>
+            {youOwe !== undefined && youOwe > 0 && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200/60 text-[#B45309]">
+                <ArrowUpRight className="w-3.5 h-3.5 text-amber-600" />
+                <span className="font-medium">You Owe:</span>
+                <strong className="num-inr font-bold">₹{youOwe.toLocaleString('en-IN')}</strong>
+              </div>
+            )}
 
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200/60 text-[#047857]">
-              <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="font-medium">You Are Owed:</span>
-              <strong className="num-inr font-bold">₹{userSummaryStats.youAreOwed.toLocaleString('en-IN')}</strong>
-            </div>
+            {youAreOwed !== undefined && youAreOwed > 0 && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200/60 text-[#047857]">
+                <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="font-medium">You Are Owed:</span>
+                <strong className="num-inr font-bold">₹{youAreOwed.toLocaleString('en-IN')}</strong>
+              </div>
+            )}
           </div>
 
           {/* Quick Direct Scan Button */}

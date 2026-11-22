@@ -7,9 +7,10 @@ import { Compass, Users, QrCode, FolderLock, Receipt } from 'lucide-react';
 
 interface BottomNavProps {
   onOpenQuickSplit?: () => void;
+  onScanClick?: () => void;
 }
 
-export const BottomNav: React.FC<BottomNavProps> = ({ onOpenQuickSplit }) => {
+export const BottomNav: React.FC<BottomNavProps> = ({ onOpenQuickSplit, onScanClick }) => {
   const pathname = usePathname();
 
   const isHome = pathname === '/';
@@ -44,14 +45,14 @@ export const BottomNav: React.FC<BottomNavProps> = ({ onOpenQuickSplit }) => {
 
         {/* CENTER FLOATING ACTION BUTTON "+ Split" */}
         <div className="relative -top-4">
-          <Link
-            href="/qr-split"
-            onClick={onOpenQuickSplit}
+          <button
+            type="button"
+            onClick={onScanClick || onOpenQuickSplit}
             className="flex flex-col items-center justify-center w-13 h-13 rounded-full bg-[#173B70] text-white font-bold shadow-md hover:bg-[#1685D4] active:scale-95 transition-all ring-4 ring-white"
             aria-label="Direct UPI Split"
           >
             <QrCode className="w-6 h-6" />
-          </Link>
+          </button>
         </div>
 
         {/* Vault / Bookings */}

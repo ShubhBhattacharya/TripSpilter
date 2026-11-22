@@ -13,7 +13,7 @@ import { VendorSplitTab } from '../../../components/trips/VendorSplitTab';
 import { BalancesTab } from '../../../components/trips/BalancesTab';
 import { ScanMerchantQrModal } from '../../../components/modals/ScanMerchantQrModal';
 import { AiBillScanModal } from '../../../components/modals/AiBillScanModal';
-import { mockTrips, defaultMembers } from '../../../data/mockData';
+import { defaultMembers } from '../../../data/mockData';
 import { BookingVaultItem, Trip } from '../../../types/trip';
 import { Loader2, MapPinOff, ArrowLeft } from 'lucide-react';
 import { createClient, isSupabaseConfigured } from '../../../lib/supabase/client';
@@ -51,31 +51,7 @@ function TripWorkspaceContent() {
         return;
       }
 
-      // 1. Check local mock trips and user-created custom trips first
-      const foundMock = mockTrips.find((t) => t.id === tripId);
-      if (foundMock) {
-        if (isMounted) {
-          setTrip(foundMock);
-          setIsDbLoading(false);
-        }
-        return;
-      }
-
-      try {
-        const storedCustom: Trip[] = JSON.parse(localStorage.getItem('tripsplit_custom_trips') || '[]');
-        const foundCustom = storedCustom.find((t) => t.id === tripId);
-        if (foundCustom) {
-          if (isMounted) {
-            setTrip(foundCustom);
-            setIsDbLoading(false);
-          }
-          return;
-        }
-      } catch {
-        // storage fallback
-      }
-
-      // 2. Query Supabase database if configured
+      // In production with Supabase configured, query the database first
       if (isSupabaseConfigured) {
         try {
           const supabase = createClient();
@@ -91,7 +67,7 @@ function TripWorkspaceContent() {
               bookings (*)
             `)
             .eq('id', tripId)
-            .single();
+            .maybeSingle();
 
           if (dbTrip && !error) {
             interface DbTripMember {

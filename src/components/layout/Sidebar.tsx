@@ -23,8 +23,11 @@ export const Sidebar: React.FC = () => {
   const { user, profile, signOut, setShowOnboarding } = useAuth();
   const [copiedUpi, setCopiedUpi] = useState(false);
 
-  const activeName = profile?.display_name || user?.user_metadata?.full_name || defaultMockUser.name;
-  const activeUpi = profile?.upi_id || defaultMockUser.upiId;
+  const activeName =
+    profile?.display_name ||
+    user?.user_metadata?.full_name ||
+    (user?.email ? user.email.split('@')[0] : defaultMockUser.name);
+  const activeUpi = profile?.upi_id || (user ? 'Setup UPI ID' : defaultMockUser.upiId);
   const activeAvatar =
     profile?.avatar_url || user?.user_metadata?.avatar_url || defaultMockUser.avatar;
 

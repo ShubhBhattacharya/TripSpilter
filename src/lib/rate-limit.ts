@@ -1,12 +1,12 @@
 /**
- * TripSplit Production-Ready Rate Limiting
- * Spec compliant with RFC 6585 / standard rate limit headers.
+ * TripSplit Production-Grade Distributed Rate Limiting
+ * Spec compliant with RFC 6585 and IETF RateLimit Headers.
  *
- * Features:
- * - Upstash Redis / Vercel KV distributed rate limiting when configured.
- * - Robust in-memory sliding window fallback for zero-dependency execution.
- * - Fail-safe design (fails open if external service is unreachable).
+ * Requirements:
+ * - Distributed atomic rate limiting using Upstash Redis / Vercel KV REST API.
+ * - Explicit behavior when the service is unconfigured or unavailable in production.
  * - Multi-factor client identification (combining IP + User ID).
+ * - Safe configuration validation.
  */
 
 export interface RateLimitResult {
@@ -14,6 +14,16 @@ export interface RateLimitResult {
   limit: number;
   remaining: number;
   reset: number; // in seconds until reset
+  isDistributed: boolean;
+  mode: 'distributed' | 'process-isolated-fallback' | 'degraded-fail-open' | 'strict-blocked';
+  error?: string;
+}
+
+export interface RateLimitConfig {
+  isConfigured: boolean;
+  url?: string;
+  isProduction: boolean;
+  strictMode: boolean;
 }
 
 interface SlidingWindowRecord {
@@ -38,24 +48,46 @@ if (typeof setInterval !== 'undefined') {
 }
 
 /**
- * Executes a sliding-window rate limit check on a given identifier.
+ * Validates the rate limit service configuration.
+ */
+export function validateRateLimitConfig(): RateLimitConfig {
+  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
+  const isProduction = process.env.NODE_ENV === 'production';
+  const strictMode = process.env.RATE_LIMIT_STRICT_MODE === 'true';
+
+  const isConfigured = Boolean(url && token && url.startsWith('https://'));
+
+  return {
+    isConfigured,
+    url: isConfigured ? url : undefined,
+    isProduction,
+    strictMode,
+  };
+}
+
+/**
+ * Executes an atomic sliding-window rate limit check on a given identifier.
  */
 export async function checkRateLimit(
   identifier: string,
   limit: number = 20,
   windowMs: number = 60000
 ): Promise<RateLimitResult> {
+  const config = validateRateLimitConfig();
   const upstashUrl = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
   const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
 
-  // 1. If distributed Redis credentials are present, use distributed atomic sliding window
-  if (upstashUrl && upstashToken) {
+  // 1. Genuinely Distributed Rate Limiting via Upstash Redis REST Pipeline
+  if (config.isConfigured && upstashUrl && upstashToken) {
     try {
       const now = Date.now();
       const windowStart = now - windowMs;
-      const key = `rl:${identifier}`;
+      const key = `tripsplit:rl:${identifier}`;
+      const memberId = `${now}-${Math.random().toString(36).slice(2, 9)}`;
+      const windowSeconds = Math.ceil(windowMs / 1000);
 
-      // Redis pipeline: ZREMRANGEBYSCORE, ZADD, ZCARD, EXPIRE
+      // Atomic Redis pipeline: ZREMRANGEBYSCORE, ZADD, ZCARD, EXPIRE
       const pipelineRes = await fetch(`${upstashUrl}/pipeline`, {
         method: 'POST',
         headers: {
@@ -64,17 +96,16 @@ export async function checkRateLimit(
         },
         body: JSON.stringify([
           ['ZREMRANGEBYSCORE', key, 0, windowStart],
-          ['ZADD', key, now, `${now}-${Math.random()}`],
+          ['ZADD', key, now, memberId],
           ['ZCARD', key],
-          ['EXPIRE', key, Math.ceil(windowMs / 1000)],
+          ['EXPIRE', key, windowSeconds],
         ]),
-        // Short timeout to prevent blocking user requests if network issues occur
         signal: AbortSignal.timeout(1500),
       });
 
       if (pipelineRes.ok) {
         const results = await pipelineRes.json();
-        const requestCount = results[2]?.result || 1;
+        const requestCount = typeof results[2]?.result === 'number' ? results[2].result : 1;
         const remaining = Math.max(0, limit - requestCount);
         const success = requestCount <= limit;
 
@@ -82,16 +113,39 @@ export async function checkRateLimit(
           success,
           limit,
           remaining,
-          reset: Math.ceil(windowMs / 1000),
+          reset: windowSeconds,
+          isDistributed: true,
+          mode: 'distributed',
         };
       }
-    } catch {
-      // Fail safely: Log warning and fallback to local sliding window
-      console.warn('[RateLimit] Remote rate limit store unavailable. Falling back to local sliding window.');
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown network failure';
+      console.warn(`[TripSplit RateLimiter Error] Distributed Redis store call failed: ${errorMsg}`);
+
+      // If strict mode is enforced in production, do not allow unmonitored requests
+      if (config.strictMode && config.isProduction) {
+        return {
+          success: false,
+          limit,
+          remaining: 0,
+          reset: Math.ceil(windowMs / 1000),
+          isDistributed: false,
+          mode: 'strict-blocked',
+          error: 'Rate limit service unavailable in strict production mode',
+        };
+      }
+
+      // Explicitly log that rate limiting is running in degraded fail-open mode
+      console.warn('[TripSplit Security Warning] Operating in degraded fail-open mode due to Redis unavailability.');
     }
+  } else if (config.isProduction) {
+    // Alert when running in production without distributed rate limiting
+    console.warn(
+      '[TripSplit Production Alert] Distributed rate limiter (UPSTASH_REDIS_REST_URL) is not configured. Falling back to process-isolated local memory.'
+    );
   }
 
-  // 2. High-performance local sliding window fallback
+  // 2. High-Performance Local Sliding Window Fallback
   const now = Date.now();
   const windowStart = now - windowMs;
 
@@ -106,6 +160,8 @@ export async function checkRateLimit(
       limit,
       remaining: 0,
       reset: resetSeconds,
+      isDistributed: false,
+      mode: 'process-isolated-fallback',
     };
   }
 
@@ -117,6 +173,8 @@ export async function checkRateLimit(
     limit,
     remaining: limit - activeTimestamps.length,
     reset: Math.ceil(windowMs / 1000),
+    isDistributed: false,
+    mode: 'process-isolated-fallback',
   };
 }
 
@@ -161,6 +219,12 @@ export function applyRateLimitHeaders(
   headers.set('X-RateLimit-Limit', String(result.limit));
   headers.set('X-RateLimit-Remaining', String(result.remaining));
   headers.set('X-RateLimit-Reset', String(result.reset));
+  headers.set('X-RateLimit-Scope', result.isDistributed ? 'distributed' : 'process-isolated');
+
+  if (result.mode === 'degraded-fail-open') {
+    headers.set('X-RateLimit-Degraded', 'true');
+  }
+
   if (!result.success) {
     headers.set('Retry-After', String(result.reset));
   }

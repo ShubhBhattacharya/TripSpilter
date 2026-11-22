@@ -27,6 +27,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       message: 'Demo mode expenses',
       expenses: [],
+      isDemo: true,
     });
   }
 
@@ -97,6 +98,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const headerIdempotencyKey = request.headers.get('idempotency-key')?.trim();
     const rawBody = await request.json();
     const validation = createExpenseSchema.safeParse(rawBody);
 
@@ -118,8 +120,10 @@ export async function POST(request: Request) {
       splitType,
       notes,
       splits,
-      idempotencyKey: _idempotencyKey,
+      idempotencyKey: bodyIdempotencyKey,
     } = validation.data;
+
+    const idempotencyKey = headerIdempotencyKey || bodyIdempotencyKey;
 
     if (!isSupabaseConfigured) {
       return NextResponse.json(
@@ -149,7 +153,7 @@ export async function POST(request: Request) {
 
     // 2. Rate limit per authenticated user
     const rateLimitId = getClientIdentifier('expense_create', request, user.id);
-    const rateLimit = await checkRateLimit(rateLimitId, 25, 60000);
+    const rateLimit = await checkRateLimit(rateLimitId, 30, 60000);
 
     const headers = new Headers();
     applyRateLimitHeaders(headers, rateLimit);
@@ -161,7 +165,26 @@ export async function POST(request: Request) {
       );
     }
 
-    // 3. Verify all participants in splits are registered members of this trip
+    // 3. Persistent Idempotency Check: Return original result for retries
+    if (idempotencyKey) {
+      const { data: cachedKey } = await supabase
+        .from('idempotency_keys')
+        .select('response_status, response_body')
+        .eq('user_id', user.id)
+        .eq('endpoint', 'POST /api/expenses')
+        .eq('key', idempotencyKey)
+        .maybeSingle();
+
+      if (cachedKey) {
+        headers.set('X-Idempotent-Replay', 'true');
+        return NextResponse.json(cachedKey.response_body, {
+          status: cachedKey.response_status,
+          headers,
+        });
+      }
+    }
+
+    // 4. Verify all participants in splits are registered members of this trip
     const { data: tripMembers, error: membersQueryError } = await supabase
       .from('trip_members')
       .select('user_id')
@@ -185,29 +208,41 @@ export async function POST(request: Request) {
 
     const totalAmountPaise = toPaise(totalAmount);
 
-    // 4. Duplicate Expense Prevention (Idempotency check within a 15-second window)
-    const fifteenSecondsAgo = new Date(Date.now() - 15000).toISOString();
-    const { data: recentDuplicates } = await supabase
-      .from('expenses')
-      .select('id, created_at')
-      .eq('trip_id', tripId)
-      .eq('paid_by', user.id)
-      .eq('total_amount_paise', totalAmountPaise)
-      .eq('vendor_name', vendorName)
-      .gte('created_at', fifteenSecondsAgo);
+    // 5. Atomic Transactional Execution via Database RPC
+    const formattedSplits = splits.map((s) => ({
+      userId: s.userId,
+      amountOwed: s.amountOwed,
+      amountOwedPaise: toPaise(s.amountOwed),
+    }));
 
-    if (recentDuplicates && recentDuplicates.length > 0) {
+    const { data: rpcResult, error: rpcError } = await supabase.rpc('create_expense_with_splits', {
+      p_trip_id: tripId,
+      p_vendor_name: vendorName,
+      p_vendor_upi_id: vendorUpiId,
+      p_total_amount: totalAmount,
+      p_total_amount_paise: totalAmountPaise,
+      p_split_type: splitType,
+      p_notes: notes || null,
+      p_splits: formattedSplits,
+      p_idempotency_key: idempotencyKey || null,
+    });
+
+    if (!rpcError && rpcResult) {
+      const isReplay = rpcResult.isIdempotentReplay;
+      if (isReplay) {
+        headers.set('X-Idempotent-Replay', 'true');
+      }
       return NextResponse.json(
         {
-          error:
-            'A duplicate expense with identical amount, vendor, and payer was submitted within the last 15 seconds. If this was intentional, please wait a moment before resubmitting.',
-          duplicateExpenseId: recentDuplicates[0].id,
+          message: 'Expense and member splits created successfully',
+          expense: rpcResult.expense,
+          splits: rpcResult.splits,
         },
-        { status: 409, headers }
+        { status: isReplay ? 200 : 201, headers }
       );
     }
 
-    // 5. Create main expense record with integer paise
+    // Fallback: Transactional execution with cleanup if RPC is pending migration
     const { data: expenseRecord, error: expenseError } = await supabase
       .from('expenses')
       .insert({
@@ -227,7 +262,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: expenseError.message }, { status: 500, headers });
     }
 
-    // 6. Batch insert splits with integer paise and strict initial statuses
+    // Insert splits; if failed, immediately roll back expense record
     const splitsToInsert = splits.map((s) => {
       const sharePaise = toPaise(s.amountOwed);
       const isPayer = s.userId === user.id;
@@ -236,29 +271,47 @@ export async function POST(request: Request) {
         user_id: s.userId,
         amount_owed: s.amountOwed,
         amount_owed_paise: sharePaise,
-        // The person who paid out-of-pocket has already fulfilled their share
         status: isPayer ? 'verified_paid' : 'pending',
         paid_at: isPayer ? new Date().toISOString() : null,
       };
     });
 
-    const { error: splitsError } = await supabase
+    const { data: insertedSplits, error: splitsError } = await supabase
       .from('expense_splits')
-      .insert(splitsToInsert);
+      .insert(splitsToInsert)
+      .select();
 
     if (splitsError) {
-      // Clean up orphaned parent record if splits insertion fails
+      // Rollback orphaned parent expense
       await supabase.from('expenses').delete().eq('id', expenseRecord.id);
-      return NextResponse.json({ error: splitsError.message }, { status: 500, headers });
+      return NextResponse.json(
+        { error: `Failed to insert splits. Transaction rolled back: ${splitsError.message}` },
+        { status: 500, headers }
+      );
     }
 
-    return NextResponse.json(
-      {
-        message: 'Expense and member splits created successfully',
-        expense: expenseRecord,
-      },
-      { status: 201, headers }
-    );
+    const responsePayload = {
+      message: 'Expense and member splits created successfully',
+      expense: expenseRecord,
+      splits: insertedSplits,
+    };
+
+    // Persist idempotency record
+    if (idempotencyKey) {
+      await supabase
+        .from('idempotency_keys')
+        .insert({
+          user_id: user.id,
+          endpoint: 'POST /api/expenses',
+          key: idempotencyKey,
+          response_status: 201,
+          response_body: responsePayload,
+        })
+        .select()
+        .maybeSingle();
+    }
+
+    return NextResponse.json(responsePayload, { status: 201, headers });
   } catch (err) {
     if (err instanceof UnauthorizedError) {
       return NextResponse.json({ error: err.message }, { status: 401 });

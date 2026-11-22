@@ -3,36 +3,41 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from '../components/layout/Sidebar';
-import { BottomNav } from '../components/layout/BottomNav';
 import { TopHeader } from '../components/layout/TopHeader';
+import { BottomNav } from '../components/layout/BottomNav';
 import { SummaryCards } from '../components/dashboard/SummaryCards';
 import { QuickActionBar } from '../components/dashboard/QuickActionBar';
 import { TripCard } from '../components/dashboard/TripCard';
 import { RecentActivity } from '../components/dashboard/RecentActivity';
 import { CreateTripModal } from '../components/modals/CreateTripModal';
 import { ScanMerchantQrModal } from '../components/modals/ScanMerchantQrModal';
-import { AiBillScanModal } from '../components/modals/AiBillScanModal';
+import { AiBillScanModal, BillData } from '../components/modals/AiBillScanModal';
 import { TripCardSkeleton } from '../components/ui/Skeleton';
-import { mockTrips, userSummaryStats, defaultMembers } from '../data/mockData';
+import { defaultMembers, mockTrips } from '../data/mockData';
 import { Trip } from '../types/trip';
-import { Compass, Plus, MapPin } from 'lucide-react';
+import { Compass, Plus, MapPin, AlertCircle } from 'lucide-react';
 import { useAuth } from '../components/auth/AuthProvider';
 import { toast } from 'sonner';
 
 export default function DashboardPage() {
   const router = useRouter();
   const { profile, user, isConfigured } = useAuth();
-  const [trips, setTrips] = useState<Trip[]>(mockTrips);
-  const [loadingTrips, setLoadingTrips] = useState(false);
+
+  // In production, never silently load mock data. Only load mock data if explicitly in demo mode.
+  const isDemoMode = !isConfigured || process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+  const [trips, setTrips] = useState<Trip[]>(() => (isDemoMode && !isConfigured ? mockTrips : []));
+  const [loadingTrips, setLoadingTrips] = useState<boolean>(isConfigured);
   const [isCreateTripOpen, setIsCreateTripOpen] = useState(false);
   const [isScanMerchantOpen, setIsScanMerchantOpen] = useState(false);
   const [isAiBillScanOpen, setIsAiBillScanOpen] = useState(false);
 
-  const displayName = profile?.display_name || user?.user_metadata?.full_name || 'Aarav';
+  const displayName = profile?.display_name || user?.user_metadata?.full_name || (isConfigured ? 'Traveler' : 'Aarav');
 
   // Fetch real user trips if Supabase is active
   useEffect(() => {
-    if (!isConfigured) return;
+    if (!isConfigured) {
+      return;
+    }
 
     async function loadTrips() {
       try {
@@ -40,28 +45,29 @@ export default function DashboardPage() {
         const res = await fetch('/api/trips');
         if (res.ok) {
           const data = await res.json();
-          if (data.trips && data.trips.length > 0) {
-            interface DbMember {
-              user_id: string;
-              role?: string;
-              profiles?: {
-                id: string;
-                display_name?: string | null;
-                upi_id?: string | null;
-                avatar_url?: string | null;
-              } | null;
-            }
-            interface DbTrip {
+          interface DbMember {
+            user_id: string;
+            role?: string;
+            profiles?: {
               id: string;
-              title: string;
-              destination: string;
-              start_date: string;
-              end_date: string;
-              budget: number;
-              cover_image?: string | null;
-              status: 'ACTIVE' | 'UPCOMING' | 'COMPLETED';
-              trip_members?: DbMember[];
-            }
+              display_name?: string | null;
+              upi_id?: string | null;
+              avatar_url?: string | null;
+            } | null;
+          }
+          interface DbTrip {
+            id: string;
+            title: string;
+            destination: string;
+            start_date: string;
+            end_date: string;
+            budget: number;
+            cover_image?: string | null;
+            status: 'ACTIVE' | 'UPCOMING' | 'COMPLETED';
+            trip_members?: DbMember[];
+          }
+
+          if (Array.isArray(data.trips)) {
             const mapped: Trip[] = data.trips.map((dt: DbTrip) => ({
               id: dt.id,
               title: dt.title,
@@ -72,9 +78,9 @@ export default function DashboardPage() {
                 'https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?auto=format&fit=crop&w=1200&q=80',
               startDate: dt.start_date,
               endDate: dt.end_date,
-              budget: Number(dt.budget),
+              budget: Number(dt.budget) || 0,
               totalSpend: 0,
-              status: dt.status,
+              status: dt.status || 'ACTIVE',
               members: dt.trip_members?.map((tm: DbMember) => ({
                 id: tm.user_id,
                 name: tm.profiles?.display_name || 'Trip Member',
@@ -90,10 +96,15 @@ export default function DashboardPage() {
               debts: [],
             }));
             setTrips(mapped);
+          } else {
+            setTrips([]);
           }
+        } else {
+          setTrips([]);
         }
       } catch (err) {
-        console.warn('Using demo trips fallback:', err);
+        console.warn('Failed to load trips from API:', err);
+        setTrips([]);
       } finally {
         setLoadingTrips(false);
       }
@@ -131,45 +142,62 @@ export default function DashboardPage() {
         debts: [],
       };
 
-      try {
-        const stored = JSON.parse(localStorage.getItem('tripsplit_custom_trips') || '[]');
-        localStorage.setItem('tripsplit_custom_trips', JSON.stringify([newTrip, ...stored]));
-      } catch {
-        // storage fallback
+      if (!isConfigured) {
+        setTrips((prev) => [newTrip, ...prev]);
+        try {
+          const stored = JSON.parse(localStorage.getItem('tripsplit_custom_trips') || '[]');
+          localStorage.setItem('tripsplit_custom_trips', JSON.stringify([newTrip, ...stored]));
+        } catch {
+          // ignore storage error
+        }
+        toast.success(`Trip "${tripData.title}" created! 🚀`);
+        return;
       }
 
-      setTrips([newTrip, ...trips]);
-      toast.success('Trip created successfully! 🎉', {
-        description: `${tripData.title} is ready for itinerary & splits.`,
+      // Live Supabase API call
+      const res = await fetch('/api/trips', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: tripData.title,
+          destination: tripData.destination,
+          startDate: tripData.startDate,
+          endDate: tripData.endDate,
+          budget: tripData.budget,
+          coverImage: newTrip.coverImage,
+        }),
       });
 
-      if (isConfigured) {
-        fetch('/api/trips', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(tripData),
-        }).catch(() => {});
+      if (res.ok) {
+        const created = await res.json();
+        const savedTrip: Trip = {
+          ...newTrip,
+          id: created.trip?.id || newTrip.id,
+        };
+        setTrips((prev) => [savedTrip, ...prev]);
+        toast.success(`Trip "${tripData.title}" saved to Supabase! 🚀`);
+      } else {
+        const errData = await res.json();
+        toast.error(errData.error || 'Failed to save trip to database.');
       }
-
-      router.push(`/trips/${newTrip.id}`);
     } catch {
-      toast.error('Failed to create trip. Please try again.');
+      toast.error('An error occurred creating the trip.');
     }
   };
 
-  const handleVendorDetected = () => {
-    toast.info('Merchant Standee Detected!', {
-      description: 'Opening direct UPI split console...',
-    });
-    router.push(`/trips/trip-manali-2026?tab=split`);
+  const handleSelectVendor = (vendor: { name: string; upiId: string; amount?: number }) => {
+    sessionStorage.setItem('scanned_vendor', JSON.stringify(vendor));
+    if (trips.length > 0) {
+      router.push(`/trips/${trips[0].id}?tab=split&vendor=${encodeURIComponent(vendor.name)}&upi=${encodeURIComponent(vendor.upiId)}&am=${vendor.amount || ''}`);
+    } else {
+      router.push(`/qr-split?vendor=${encodeURIComponent(vendor.name)}&upi=${encodeURIComponent(vendor.upiId)}&am=${vendor.amount || ''}`);
+    }
   };
 
-  const handleAiBillApplied = () => {
-    toast.success('Bill Scanned via AI OCR! 🧾', {
-      description: 'Extracted dishes, GST & subtotal applied to split.',
-    });
-    router.push(`/trips/trip-manali-2026?tab=split`);
-  };
+  // Compute live financial totals from user's actual trips
+  const calculatedTotalSpend = trips.reduce((acc, t) => acc + (t.totalSpend || 0), 0);
+  const calculatedBudget = trips.reduce((acc, t) => acc + (t.budget || 0), 0);
+  const displaySpend = calculatedTotalSpend > 0 ? calculatedTotalSpend : calculatedBudget;
 
   return (
     <div className="min-h-screen bg-[#F4F7FB] text-[#172B4D] flex flex-col lg:flex-row">
@@ -181,6 +209,18 @@ export default function DashboardPage() {
         <TopHeader onScanClick={() => setIsScanMerchantOpen(true)} />
 
         <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto w-full space-y-6">
+          {/* Unconfigured Demo Mode Notice Banner */}
+          {!isConfigured && (
+            <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>
+                  <strong>Local Sandbox Preview Mode:</strong> Connect Supabase credentials in <code className="bg-amber-100 px-1 py-0.5 rounded font-mono text-amber-950">.env.local</code> to save real outings and sync live UPI splits.
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Welcome Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-xl border border-[#E5EAF1] shadow-xs">
             <div>
@@ -202,11 +242,11 @@ export default function DashboardPage() {
             </button>
           </div>
 
-          {/* Financial Overview Cards */}
+          {/* Financial Overview Cards with live calculations */}
           <SummaryCards
-            totalSpend={userSummaryStats.totalSpend}
-            youOwe={userSummaryStats.youOwe}
-            youAreOwed={userSummaryStats.youAreOwed}
+            totalSpend={displaySpend}
+            youOwe={0}
+            youAreOwed={0}
           />
 
           {/* Quick Actions Grid */}
@@ -280,7 +320,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <BottomNav onOpenQuickSplit={() => setIsScanMerchantOpen(true)} />
+      <BottomNav onScanClick={() => setIsScanMerchantOpen(true)} />
 
       {/* Modals */}
       <CreateTripModal
@@ -292,13 +332,20 @@ export default function DashboardPage() {
       <ScanMerchantQrModal
         isOpen={isScanMerchantOpen}
         onClose={() => setIsScanMerchantOpen(false)}
-        onSelectVendor={handleVendorDetected}
+        onSelectVendor={handleSelectVendor}
       />
 
       <AiBillScanModal
         isOpen={isAiBillScanOpen}
         onClose={() => setIsAiBillScanOpen(false)}
-        onApplyBill={handleAiBillApplied}
+        tripMembers={trips[0]?.members || defaultMembers}
+        onApplySplit={(bill: BillData) => {
+          toast.success(`OCR Extracted: ₹${bill.totalAmount} from ${bill.merchantName || 'Merchant'}!`);
+          setIsAiBillScanOpen(false);
+          if (trips.length > 0) {
+            router.push(`/trips/${trips[0].id}?tab=split&vendor=${encodeURIComponent(bill.merchantName || 'Merchant')}&am=${bill.totalAmount}`);
+          }
+        }}
       />
     </div>
   );

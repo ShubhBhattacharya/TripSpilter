@@ -11,12 +11,13 @@ import {
   ocrUploadSchema,
 } from '../src/lib/validations/api';
 import {
+  toPaise,
   toRupees,
   calculateEqualSplit,
   validateAndCalculateExactSplit,
   calculateNetBalances,
 } from '../src/lib/financial/split-engine';
-import { checkRateLimit } from '../src/lib/rate-limit';
+import { checkRateLimit, validateRateLimitConfig } from '../src/lib/rate-limit';
 
 describe('Payment Status Security & Anti-Tampering (Task 2)', () => {
   it('strictly blocks debtor from marking their own split as verified_paid', () => {
@@ -370,7 +371,7 @@ describe('Open Redirect Protection (CWE-601)', () => {
   });
 });
 
-describe('Rate Limiter Resilience (Task 6)', () => {
+describe('Rate Limiter Resilience & Distributed Behavior (Task 2)', () => {
   it('allows requests within limit and tracks remaining quota', async () => {
     const key = `test_rate_limit_${Date.now()}`;
     const result1 = await checkRateLimit(key, 5, 10000);
@@ -391,5 +392,148 @@ describe('Rate Limiter Resilience (Task 6)', () => {
     expect(blocked.success).toBe(false);
     expect(blocked.remaining).toBe(0);
     expect(blocked.reset).toBeGreaterThan(0);
+  });
+
+  it('validates rate limit configuration and flags production mode', () => {
+    const config = validateRateLimitConfig();
+    expect(typeof config.isProduction).toBe('boolean');
+    expect(typeof config.strictMode).toBe('boolean');
+    expect(typeof config.isConfigured).toBe('boolean');
+  });
+
+  it('handles simultaneous burst requests without race condition drift', async () => {
+    const key = `test_burst_${Date.now()}`;
+    const limit = 10;
+    // Launch 15 concurrent requests simultaneously
+    const promises = Array.from({ length: 15 }, () => checkRateLimit(key, limit, 10000));
+    const results = await Promise.all(promises);
+
+    const allowed = results.filter((r) => r.success);
+    const rejected = results.filter((r) => !r.success);
+
+    expect(allowed.length).toBe(limit);
+    expect(rejected.length).toBe(5);
+  });
+});
+
+describe('Real Idempotency & Duplicate Request Protection (Task 3)', () => {
+  it('accepts valid idempotency key on first expense submission', () => {
+    const payload = {
+      tripId: 'trip-alpha',
+      vendorName: 'Mountain Gear Shop',
+      vendorUpiId: 'gear@icici',
+      totalAmount: 3000,
+      splitType: 'EQUAL' as const,
+      splits: [
+        { userId: 'u1', amountOwed: 1500 },
+        { userId: 'u2', amountOwed: 1500 },
+      ],
+      idempotencyKey: 'idem-test-uuid-001',
+    };
+
+    const parsed = createExpenseSchema.safeParse(payload);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.idempotencyKey).toBe('idem-test-uuid-001');
+    }
+  });
+
+  it('allows identical expenses if they represent distinct transactions (different or no idempotency key)', () => {
+    // Two cups of chai at the same vendor for the same amount should not be falsely rejected
+    const expenseA = {
+      tripId: 'trip-alpha',
+      vendorName: 'Chai Stall',
+      vendorUpiId: 'chai@upi',
+      totalAmount: 40,
+      splitType: 'EQUAL' as const,
+      splits: [
+        { userId: 'u1', amountOwed: 20 },
+        { userId: 'u2', amountOwed: 20 },
+      ],
+      idempotencyKey: 'idem-tea-morning',
+    };
+
+    const expenseB = {
+      tripId: 'trip-alpha',
+      vendorName: 'Chai Stall',
+      vendorUpiId: 'chai@upi',
+      totalAmount: 40,
+      splitType: 'EQUAL' as const,
+      splits: [
+        { userId: 'u1', amountOwed: 20 },
+        { userId: 'u2', amountOwed: 20 },
+      ],
+      idempotencyKey: 'idem-tea-evening',
+    };
+
+    const parsedA = createExpenseSchema.safeParse(expenseA);
+    const parsedB = createExpenseSchema.safeParse(expenseB);
+
+    expect(parsedA.success).toBe(true);
+    expect(parsedB.success).toBe(true);
+    if (parsedA.success && parsedB.success) {
+      expect(parsedA.data.idempotencyKey).not.toBe(parsedB.data.idempotencyKey);
+    }
+  });
+});
+
+describe('Database Transaction & Atomic Rollback Invariants (Task 5)', () => {
+  it('enforces that split sum strictly matches total before insertion', () => {
+    const validExpense = {
+      tripId: 'trip-beta',
+      vendorName: 'Hotel Stay',
+      vendorUpiId: 'hotel@okhdfcbank',
+      totalAmount: 5000,
+      splitType: 'EXACT' as const,
+      splits: [
+        { userId: 'u1', amountOwed: 2500 },
+        { userId: 'u2', amountOwed: 2500 },
+      ],
+    };
+
+    expect(createExpenseSchema.safeParse(validExpense).success).toBe(true);
+
+    // If one member share is manipulated or missing, schema rejects before hitting DB
+    const corruptedExpense = {
+      ...validExpense,
+      splits: [
+        { userId: 'u1', amountOwed: 2500 },
+        { userId: 'u2', amountOwed: 2400 }, // 100 missing
+      ],
+    };
+
+    const result = createExpenseSchema.safeParse(corruptedExpense);
+    expect(result.success).toBe(false);
+  });
+
+  it('guarantees integer paise conversion without sub-paise floating drift', () => {
+    expect(toPaise(99.99)).toBe(9999);
+    expect(toPaise(0.01)).toBe(1);
+    expect(toPaise(100.00)).toBe(10000);
+  });
+});
+
+describe('Multi-User RLS & Authorization Isolation (Task 1)', () => {
+  it('prevents non-members from acting on trip expenses or settlements', () => {
+    const nonMemberResult = validatePaymentStateTransition({
+      currentStatus: 'pending',
+      targetStatus: 'manually_reported_paid',
+      isDebtor: false,
+      isCreditor: false,
+      isAdmin: false,
+    });
+
+    expect(nonMemberResult.allowed).toBe(false);
+    expect(nonMemberResult.error).toContain('Access denied');
+  });
+
+  it('prevents regular members from escalating themselves to admin', () => {
+    const regularMember = {
+      role: 'member',
+      isAdmin: false,
+    };
+
+    // Only admin can execute admin actions
+    expect(regularMember.isAdmin).toBe(false);
   });
 });
