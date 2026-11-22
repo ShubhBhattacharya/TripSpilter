@@ -199,7 +199,6 @@ export default function ExplorePage() {
               >
                 {/* Image Cover */}
                 <div className="relative h-48 w-full overflow-hidden bg-slate-100">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={dest.image}
                     alt={dest.name}

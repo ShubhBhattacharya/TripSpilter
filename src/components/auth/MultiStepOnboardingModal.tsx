@@ -227,7 +227,6 @@ export const MultiStepOnboardingModal: React.FC<MultiStepOnboardingModalProps> =
                           : 'border-transparent opacity-70 hover:opacity-100'
                       }`}
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={url} alt={`Avatar ${idx}`} className="w-full h-full object-cover" />
                       {selectedAvatar === url && (
                         <div className="absolute inset-0 bg-[#1685D4]/20 flex items-center justify-center">

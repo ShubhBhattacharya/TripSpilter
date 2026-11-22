@@ -74,7 +74,6 @@ export default function ProfileSettingsPage() {
           <div className="bg-white p-6 rounded-2xl border border-[#E5EAF1] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <div className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={
                     profile?.avatar_url ||
