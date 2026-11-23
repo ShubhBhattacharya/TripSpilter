@@ -123,9 +123,9 @@ export const WelcomeLandingPage: React.FC<WelcomeLandingPageProps> = ({
                 </div>
 
                 <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.1]">
-                  Discover New Places, <br />
+                  Travel Together. <br />
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-sky-300">
-                    Split Smarter Together.
+                    Split Smarter.
                   </span>
                 </h1>
 
