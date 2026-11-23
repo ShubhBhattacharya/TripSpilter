@@ -18,14 +18,27 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirectTo') || '/';
+  const urlError = searchParams.get('error');
+  const urlMessage = searchParams.get('message');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() => {
+    if (urlError) {
+      if (urlError === 'auth-code-error') return 'Authentication code expired or invalid. Please sign in again.';
+      if (urlError === 'invalid-auth-request') return 'Invalid authentication session. Please try again.';
+      return decodeURIComponent(urlError);
+    }
+    return null;
+  });
+  const [successMsg, setSuccessMsg] = useState<string | null>(() => {
+    if (urlMessage === 'password-updated') return 'Password updated successfully! You can now sign in with your new password.';
+    if (urlMessage === 'email-verified') return 'Email verified successfully! Please enter your credentials to continue.';
+    return null;
+  });
 
   const supabase = createClient();
 
@@ -73,6 +86,7 @@ function LoginForm() {
 
   const handleGoogleLogin = async () => {
     setError(null);
+    setSuccessMsg(null);
 
     if (!isSupabaseConfigured) {
       setError(
@@ -88,6 +102,10 @@ function LoginForm() {
           redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(
             redirectTo
           )}`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         },
       });
 
@@ -188,9 +206,12 @@ function LoginForm() {
         <div>
           <div className="flex items-center justify-between mb-1">
             <label className="text-xs font-semibold text-[#172B4D]">Password</label>
-            <span className="text-[11px] text-[#1685D4] hover:underline cursor-pointer">
+            <Link
+              href="/forgot-password"
+              className="text-[11px] font-semibold text-[#1685D4] hover:underline"
+            >
               Forgot Password?
-            </span>
+            </Link>
           </div>
           <div className="relative">
             <Lock className="w-4 h-4 text-[#64748B] absolute left-3 top-1/2 -translate-y-1/2" />
