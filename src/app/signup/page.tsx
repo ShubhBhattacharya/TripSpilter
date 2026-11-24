@@ -4,6 +4,7 @@ import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient, isSupabaseConfigured } from '../../lib/supabase/client';
+import { useAuth } from '../../components/auth/AuthProvider';
 import {
   Lock,
   Mail,
@@ -15,10 +16,13 @@ import {
   AlertCircle,
   CheckCircle2,
   Check,
+  Sparkles,
+  Info,
 } from 'lucide-react';
 
 function SignupForm() {
   const router = useRouter();
+  const { signInAsDemo } = useAuth();
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -41,13 +45,53 @@ function SignupForm() {
   // Strength score: 0 to 3
   const strengthScore = (isMinLength ? 1 : 0) + (password.length >= 8 ? 1 : 0) + (hasNumberOrSpecial ? 1 : 0);
 
+  const handleDemoSignup = () => {
+    setError(null);
+    signInAsDemo({
+      name: 'Aarav Sharma',
+      email: 'aarav.sharma@example.com',
+      upiId: 'aarav@okhdfcbank',
+    });
+    setSuccessMsg('Account created as Demo Traveler! Redirecting to TripSplit...');
+    setTimeout(() => {
+      router.push('/');
+      router.refresh();
+    }, 400);
+  };
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccessMsg(null);
 
-    if (!fullName.trim() || !email.trim() || !password) {
-      setError('Please fill in all required fields.');
+    if (!fullName.trim() || !email.trim()) {
+      setError('Please fill in your name and email address.');
+      return;
+    }
+
+    if (!agreedToTerms) {
+      setError('Please accept the Terms of Service & Privacy Policy.');
+      return;
+    }
+
+    // Graceful fallback when Supabase is not yet configured in .env.local
+    if (!isSupabaseConfigured) {
+      const cleanName = fullName.trim();
+      signInAsDemo({
+        name: cleanName,
+        email: email.trim(),
+        upiId: `${cleanName.toLowerCase().replace(/\s+/g, '')}@okhdfcbank`,
+      });
+      setSuccessMsg('Account registered in Demo Mode! Redirecting to TripSplit...');
+      setTimeout(() => {
+        router.push('/');
+        router.refresh();
+      }, 500);
+      return;
+    }
+
+    if (!password) {
+      setError('Please provide a password.');
       return;
     }
 
@@ -58,18 +102,6 @@ function SignupForm() {
 
     if (!isPasswordsMatch) {
       setError('Passwords do not match.');
-      return;
-    }
-
-    if (!agreedToTerms) {
-      setError('Please accept the Terms of Service & Privacy Policy.');
-      return;
-    }
-
-    if (!isSupabaseConfigured) {
-      setError(
-        'Supabase authentication is not configured in .env.local. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to register live accounts.'
-      );
       return;
     }
 
@@ -115,10 +147,18 @@ function SignupForm() {
   const handleGoogleSignup = async () => {
     setError(null);
 
+    // Graceful fallback when Supabase is not configured
     if (!isSupabaseConfigured) {
-      setError(
-        'Google OAuth requires Supabase authentication setup in .env.local.'
-      );
+      signInAsDemo({
+        name: 'Google Demo Traveler',
+        email: 'traveler.google@example.com',
+        upiId: 'traveler@okhdfcbank',
+      });
+      setSuccessMsg('Signed up with Google Demo Account! Redirecting...');
+      setTimeout(() => {
+        router.push('/');
+        router.refresh();
+      }, 400);
       return;
     }
 
@@ -158,11 +198,24 @@ function SignupForm() {
         </p>
       </div>
 
+      {/* Non-blocking Demo Mode Notification when Supabase is not configured */}
+      {!isSupabaseConfigured && (
+        <div className="mb-4 p-3 rounded-xl bg-sky-50 border border-sky-200 flex items-start gap-2.5 text-xs text-sky-900">
+          <Info className="w-4 h-4 shrink-0 mt-0.5 text-sky-600" />
+          <div className="text-left">
+            <p className="font-bold text-sky-950">Demo & Preview Mode Active</p>
+            <p className="text-[11px] text-sky-800 mt-0.5 leading-relaxed">
+              Supabase cloud credentials are not set in <code className="bg-sky-100/80 px-1 py-0.5 rounded font-mono text-[10px]">.env.local</code>. You can register with any credentials or click the Guest button below to test without interruption.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Google OAuth Option */}
       <button
         type="button"
         onClick={handleGoogleSignup}
-        className="w-full py-2.5 px-4 rounded-xl border border-[#E5EAF1] bg-[#F4F7FB]/50 hover:bg-[#F4F7FB] text-xs font-semibold text-[#172B4D] flex items-center justify-center gap-2.5 transition-all shadow-2xs hover:shadow-xs active:scale-[0.99] mb-4"
+        className="w-full py-2.5 px-4 rounded-xl border border-[#E5EAF1] bg-[#F4F7FB]/50 hover:bg-[#F4F7FB] text-xs font-semibold text-[#172B4D] flex items-center justify-center gap-2.5 transition-all shadow-2xs hover:shadow-xs active:scale-[0.99] mb-3 cursor-pointer"
       >
         <svg className="w-4 h-4" viewBox="0 0 24 24">
           <path
@@ -183,6 +236,16 @@ function SignupForm() {
           />
         </svg>
         <span>Continue with Google</span>
+      </button>
+
+      {/* Seamless Demo / Guest Traveler Button */}
+      <button
+        type="button"
+        onClick={handleDemoSignup}
+        className="w-full py-2.5 px-4 rounded-xl border border-dashed border-[#1685D4] bg-[#F0F7FF] hover:bg-[#E0EFFF] text-xs font-bold text-[#1685D4] flex items-center justify-center gap-2 transition-all active:scale-[0.99] mb-4 cursor-pointer shadow-2xs"
+      >
+        <Sparkles className="w-4 h-4 text-[#1685D4]" />
+        <span>Continue as Demo / Guest Traveler</span>
       </button>
 
       {/* Divider */}
@@ -258,10 +321,10 @@ function SignupForm() {
               <Phone className="w-4 h-4 text-[#64748B] absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="tel"
-                maxLength={10}
                 value={phone}
-                onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                onChange={(e) => setPhone(e.target.value)}
                 placeholder="98765 43210"
+                maxLength={10}
                 className="w-full pl-9 pr-3 py-2 rounded-xl border border-[#E5EAF1] bg-[#F4F7FB] text-xs font-medium text-[#172B4D] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1685D4]/20 focus:border-[#1685D4] transition-all"
               />
             </div>
@@ -277,10 +340,10 @@ function SignupForm() {
             <Lock className="w-4 h-4 text-[#64748B] absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type={showPassword ? 'text' : 'password'}
-              required
+              required={isSupabaseConfigured}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 6 characters"
+              placeholder={isSupabaseConfigured ? 'Create a secure password' : 'Create password (optional in demo)'}
               className="w-full pl-9 pr-9 py-2 rounded-xl border border-[#E5EAF1] bg-[#F4F7FB] text-xs font-medium text-[#172B4D] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1685D4]/20 focus:border-[#1685D4] transition-all"
             />
             <button
@@ -291,34 +354,6 @@ function SignupForm() {
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
-
-          {/* Password Strength Indicator */}
-          {password.length > 0 && (
-            <div className="mt-1.5 space-y-1">
-              <div className="flex gap-1 h-1">
-                <div
-                  className={`flex-1 rounded-full ${
-                    strengthScore >= 1 ? 'bg-amber-400' : 'bg-slate-200'
-                  }`}
-                />
-                <div
-                  className={`flex-1 rounded-full ${
-                    strengthScore >= 2 ? 'bg-sky-400' : 'bg-slate-200'
-                  }`}
-                />
-                <div
-                  className={`flex-1 rounded-full ${
-                    strengthScore >= 3 ? 'bg-emerald-500' : 'bg-slate-200'
-                  }`}
-                />
-              </div>
-              <p className="text-[10px] text-[#64748B]">
-                {strengthScore <= 1 && 'Weak password'}
-                {strengthScore === 2 && 'Good password'}
-                {strengthScore >= 3 && 'Strong password'}
-              </p>
-            </div>
-          )}
         </div>
 
         {/* Confirm Password */}
@@ -330,28 +365,64 @@ function SignupForm() {
             <Lock className="w-4 h-4 text-[#64748B] absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type={showPassword ? 'text' : 'password'}
-              required
+              required={isSupabaseConfigured}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Repeat your password"
+              placeholder="Re-enter your password"
               className="w-full pl-9 pr-3 py-2 rounded-xl border border-[#E5EAF1] bg-[#F4F7FB] text-xs font-medium text-[#172B4D] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1685D4]/20 focus:border-[#1685D4] transition-all"
             />
           </div>
-          {confirmPassword && (
-            <p className="text-[10px] mt-1 flex items-center gap-1 font-medium">
-              {isPasswordsMatch ? (
-                <span className="text-emerald-600 flex items-center gap-0.5">
-                  <Check className="w-3 h-3" /> Passwords match
-                </span>
-              ) : (
-                <span className="text-rose-500">Passwords do not match</span>
-              )}
-            </p>
-          )}
         </div>
 
-        {/* Terms & Privacy acceptance */}
-        <div className="pt-1 flex items-start gap-2">
+        {/* Password Strength Indicator */}
+        {password.length > 0 && isSupabaseConfigured && (
+          <div className="space-y-1.5 p-2.5 rounded-xl bg-[#F4F7FB] border border-[#E5EAF1]">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="font-semibold text-[#64748B]">Password Strength</span>
+              <span
+                className={`font-bold ${
+                  strengthScore === 3
+                    ? 'text-emerald-600'
+                    : strengthScore === 2
+                    ? 'text-amber-600'
+                    : 'text-rose-600'
+                }`}
+              >
+                {strengthScore === 3 ? 'Strong' : strengthScore === 2 ? 'Medium' : 'Weak'}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-1">
+              <div
+                className={`h-1 rounded-full ${
+                  strengthScore >= 1 ? 'bg-rose-500' : 'bg-slate-200'
+                }`}
+              />
+              <div
+                className={`h-1 rounded-full ${
+                  strengthScore >= 2 ? 'bg-amber-500' : 'bg-slate-200'
+                }`}
+              />
+              <div
+                className={`h-1 rounded-full ${
+                  strengthScore >= 3 ? 'bg-emerald-500' : 'bg-slate-200'
+                }`}
+              />
+            </div>
+            <div className="flex flex-col gap-1 text-[10px] text-[#64748B] pt-1">
+              <span className={`flex items-center gap-1 ${isMinLength ? 'text-emerald-600 font-bold' : ''}`}>
+                <Check className={`w-3 h-3 ${isMinLength ? 'opacity-100' : 'opacity-30'}`} />
+                At least 6 characters
+              </span>
+              <span className={`flex items-center gap-1 ${isPasswordsMatch ? 'text-emerald-600 font-bold' : ''}`}>
+                <Check className={`w-3 h-3 ${isPasswordsMatch ? 'opacity-100' : 'opacity-30'}`} />
+                Passwords match
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Terms and Conditions Checkbox */}
+        <div className="flex items-start gap-2 pt-1">
           <input
             id="terms"
             type="checkbox"
@@ -359,26 +430,26 @@ function SignupForm() {
             onChange={(e) => setAgreedToTerms(e.target.checked)}
             className="w-4 h-4 mt-0.5 accent-[#1685D4] rounded cursor-pointer"
           />
-          <label htmlFor="terms" className="text-[11px] text-[#64748B] leading-tight select-none cursor-pointer">
-            I accept TripSplit&apos;s <span className="text-[#1685D4] underline font-medium">Terms of Service</span> and acknowledge the <span className="text-[#1685D4] underline font-medium">Privacy Policy</span>. We never ask for your UPI PIN.
+          <label htmlFor="terms" className="text-xs text-[#64748B] select-none cursor-pointer leading-tight">
+            I agree to the{' '}
+            <span className="text-[#1685D4] font-semibold hover:underline">Terms of Service</span> and{' '}
+            <span className="text-[#1685D4] font-semibold hover:underline">Privacy Policy</span>.
           </label>
         </div>
 
         {/* Submit Button */}
-        <div className="pt-2">
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full py-2.5 rounded-xl bg-[#173B70] hover:bg-[#1685D4] text-white font-bold text-xs tracking-wide shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-          >
-            <span>{isLoading ? 'Creating Your Account...' : 'Sign Up Free'}</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="w-full py-2.5 rounded-xl bg-[#173B70] hover:bg-[#1685D4] text-white font-bold text-xs tracking-wide shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2 mt-4 cursor-pointer"
+        >
+          <span>{isLoading ? 'Creating Account...' : 'Create Account'}</span>
+          <ArrowRight className="w-4 h-4" />
+        </button>
       </form>
 
       {/* Footer Link */}
-      <div className="mt-6 pt-4 border-t border-[#E5EAF1] text-center text-xs text-[#64748B]">
+      <div className="mt-5 pt-4 border-t border-[#E5EAF1] text-center text-xs text-[#64748B]">
         Already have an account?{' '}
         <Link href="/login" className="font-bold text-[#1685D4] hover:underline">
           Sign In
@@ -391,7 +462,7 @@ function SignupForm() {
 export default function SignupPage() {
   return (
     <div className="min-h-screen bg-[#F4F7FB] flex flex-col justify-center items-center p-4">
-      <Suspense fallback={<div className="text-xs text-[#64748B]">Loading registration...</div>}>
+      <Suspense fallback={<div className="text-xs text-[#64748B]">Loading signup...</div>}>
         <SignupForm />
       </Suspense>
     </div>

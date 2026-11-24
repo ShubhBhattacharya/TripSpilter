@@ -16,6 +16,7 @@ interface AuthContextType {
   setShowOnboarding: (show: boolean) => void;
   signOut: () => Promise<void>;
   updateProfile: (data: { displayName: string; upiId: string }) => Promise<boolean>;
+  signInAsDemo: (demoData?: { name?: string; email?: string; upiId?: string }) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -27,6 +28,7 @@ const AuthContext = createContext<AuthContextType>({
   setShowOnboarding: () => {},
   signOut: async () => {},
   updateProfile: async () => false,
+  signInAsDemo: () => {},
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -35,6 +37,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!isSupabaseConfigured) {
       if (typeof window !== 'undefined' && sessionStorage.getItem('tripsplit_preview_signed_out') === 'true') {
         return null;
+      }
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('tripsplit_demo_user');
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            return {
+              id: parsed.id || mockUser.id,
+              display_name: parsed.name || mockUser.name,
+              upi_id: parsed.upiId || mockUser.upiId,
+              avatar_url: parsed.avatar || mockUser.avatar,
+            };
+          } catch {
+            // fallback
+          }
+        }
       }
       return {
         id: mockUser.id,
@@ -119,11 +137,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [supabase, fetchProfile]);
 
+  const signInAsDemo = (demoData?: { name?: string; email?: string; upiId?: string }) => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('tripsplit_preview_signed_out');
+      const demoObj = {
+        id: 'usr_guest',
+        name: demoData?.name || mockUser.name,
+        email: demoData?.email || mockUser.email,
+        avatar: mockUser.avatar,
+        upiId: demoData?.upiId || mockUser.upiId,
+      };
+      localStorage.setItem('tripsplit_demo_user', JSON.stringify(demoObj));
+      setProfile({
+        id: demoObj.id,
+        display_name: demoObj.name,
+        upi_id: demoObj.upiId,
+        avatar_url: demoObj.avatar,
+      });
+      setShowOnboarding(false);
+    }
+  };
+
   const signOut = async () => {
     if (isSupabaseConfigured) {
       await supabase.auth.signOut();
-    } else if (typeof window !== 'undefined') {
+    }
+    if (typeof window !== 'undefined') {
       sessionStorage.setItem('tripsplit_preview_signed_out', 'true');
+      localStorage.removeItem('tripsplit_demo_user');
     }
     setUser(null);
     setProfile(null);
@@ -183,6 +224,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setShowOnboarding,
         signOut,
         updateProfile,
+        signInAsDemo,
       }}
     >
       {children}

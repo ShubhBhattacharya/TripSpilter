@@ -4,6 +4,7 @@ import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient, isSupabaseConfigured } from '../../lib/supabase/client';
+import { useAuth } from '../../components/auth/AuthProvider';
 import {
   Lock,
   Mail,
@@ -12,6 +13,8 @@ import {
   EyeOff,
   AlertCircle,
   CheckCircle2,
+  Sparkles,
+  Info,
 } from 'lucide-react';
 
 function LoginForm() {
@@ -20,6 +23,8 @@ function LoginForm() {
   const redirectTo = searchParams.get('redirectTo') || '/';
   const urlError = searchParams.get('error');
   const urlMessage = searchParams.get('message');
+
+  const { signInAsDemo } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -42,20 +47,48 @@ function LoginForm() {
 
   const supabase = createClient();
 
+  const handleDemoLogin = () => {
+    setError(null);
+    signInAsDemo({
+      name: 'Aarav Sharma',
+      email: 'aarav.sharma@example.com',
+      upiId: 'aarav@okhdfcbank',
+    });
+    setSuccessMsg('Signed in as Demo Traveler! Redirecting to TripSplit...');
+    setTimeout(() => {
+      router.push(redirectTo);
+      router.refresh();
+    }, 400);
+  };
+
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccessMsg(null);
 
-    if (!email || !password) {
-      setError('Please provide both your email and password.');
+    if (!email) {
+      setError('Please provide your email address.');
       return;
     }
 
+    // Graceful fallback when Supabase is not yet configured in .env.local
     if (!isSupabaseConfigured) {
-      setError(
-        'Supabase authentication is not configured in .env.local. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to enable live authentication.'
-      );
+      const displayName = email.split('@')[0] || 'Traveler';
+      signInAsDemo({
+        name: displayName.charAt(0).toUpperCase() + displayName.slice(1),
+        email: email.trim(),
+        upiId: `${displayName.toLowerCase()}@okhdfcbank`,
+      });
+      setSuccessMsg('Signed in as Demo Traveler! Redirecting...');
+      setTimeout(() => {
+        router.push(redirectTo);
+        router.refresh();
+      }, 400);
+      return;
+    }
+
+    if (!password) {
+      setError('Please provide your password.');
       return;
     }
 
@@ -88,10 +121,18 @@ function LoginForm() {
     setError(null);
     setSuccessMsg(null);
 
+    // Graceful fallback when Supabase Google OAuth is not yet configured
     if (!isSupabaseConfigured) {
-      setError(
-        'Google OAuth requires Supabase authentication setup in .env.local.'
-      );
+      signInAsDemo({
+        name: 'Google Demo Traveler',
+        email: 'traveler.google@example.com',
+        upiId: 'traveler@okhdfcbank',
+      });
+      setSuccessMsg('Signed in with Google Demo Account! Redirecting...');
+      setTimeout(() => {
+        router.push(redirectTo);
+        router.refresh();
+      }, 400);
       return;
     }
 
@@ -133,11 +174,24 @@ function LoginForm() {
         </p>
       </div>
 
-      {/* Google OAuth Option (as in Image 2) */}
+      {/* Non-blocking Demo Mode Notification when Supabase is not configured */}
+      {!isSupabaseConfigured && (
+        <div className="mb-4 p-3 rounded-xl bg-sky-50 border border-sky-200 flex items-start gap-2.5 text-xs text-sky-900">
+          <Info className="w-4 h-4 shrink-0 mt-0.5 text-sky-600" />
+          <div className="text-left">
+            <p className="font-bold text-sky-950">Demo & Preview Mode Active</p>
+            <p className="text-[11px] text-sky-800 mt-0.5 leading-relaxed">
+              Supabase cloud credentials are not set in <code className="bg-sky-100/80 px-1 py-0.5 rounded font-mono text-[10px]">.env.local</code>. You can test all features using Google Demo, Email, or the Guest button below without interruption.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Google OAuth Option */}
       <button
         type="button"
         onClick={handleGoogleLogin}
-        className="w-full py-2.5 px-4 rounded-xl border border-[#E5EAF1] bg-[#F4F7FB]/50 hover:bg-[#F4F7FB] text-xs font-semibold text-[#172B4D] flex items-center justify-center gap-2.5 transition-all shadow-2xs hover:shadow-xs active:scale-[0.99] mb-4"
+        className="w-full py-2.5 px-4 rounded-xl border border-[#E5EAF1] bg-[#F4F7FB]/50 hover:bg-[#F4F7FB] text-xs font-semibold text-[#172B4D] flex items-center justify-center gap-2.5 transition-all shadow-2xs hover:shadow-xs active:scale-[0.99] mb-3 cursor-pointer"
       >
         <svg className="w-4 h-4" viewBox="0 0 24 24">
           <path
@@ -158,6 +212,16 @@ function LoginForm() {
           />
         </svg>
         <span>Continue with Google</span>
+      </button>
+
+      {/* Seamless Demo / Guest Traveler Button */}
+      <button
+        type="button"
+        onClick={handleDemoLogin}
+        className="w-full py-2.5 px-4 rounded-xl border border-dashed border-[#1685D4] bg-[#F0F7FF] hover:bg-[#E0EFFF] text-xs font-bold text-[#1685D4] flex items-center justify-center gap-2 transition-all active:scale-[0.99] mb-4 cursor-pointer shadow-2xs"
+      >
+        <Sparkles className="w-4 h-4 text-[#1685D4]" />
+        <span>Continue as Demo / Guest Traveler</span>
       </button>
 
       {/* Divider */}
@@ -217,10 +281,10 @@ function LoginForm() {
             <Lock className="w-4 h-4 text-[#64748B] absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type={showPassword ? 'text' : 'password'}
-              required
+              required={isSupabaseConfigured}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
+              placeholder={isSupabaseConfigured ? 'Enter your password' : 'Enter password (optional in demo mode)'}
               className="w-full pl-9 pr-9 py-2 rounded-xl border border-[#E5EAF1] bg-[#F4F7FB] text-xs font-medium text-[#172B4D] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1685D4]/20 focus:border-[#1685D4] transition-all"
             />
             <button
@@ -251,7 +315,7 @@ function LoginForm() {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full py-2.5 rounded-xl bg-[#173B70] hover:bg-[#1685D4] text-white font-bold text-xs tracking-wide shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+          className="w-full py-2.5 rounded-xl bg-[#173B70] hover:bg-[#1685D4] text-white font-bold text-xs tracking-wide shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
         >
           <span>{isLoading ? 'Signing In...' : 'Sign In'}</span>
           <ArrowRight className="w-4 h-4" />

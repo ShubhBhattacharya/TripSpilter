@@ -32,8 +32,8 @@ function ForgotPasswordForm() {
     }
 
     if (!isSupabaseConfigured) {
-      setError(
-        'Supabase authentication is not configured. Please add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local.'
+      setSuccessMsg(
+        `Demo password recovery simulated for ${trimmedEmail}! In live cloud mode with Supabase credentials configured, a secure password reset link is delivered to your inbox.`
       );
       return;
     }
