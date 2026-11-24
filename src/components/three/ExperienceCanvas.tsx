@@ -39,10 +39,10 @@ export function ExperienceCanvas() {
 
   return (
     <div className="relative w-full h-screen bg-slate-950 overflow-hidden select-none">
-      {/* Real Full-Screen Photographic Panoramic Background in Stage 3 */}
+      {/* 1. Real Full-Screen Photographic Panoramic Background in Stage 3 (z-0) */}
       {stage === 'virtual-tour' && <RealPanoramaViewer spot={currentSpot} />}
 
-      {/* 3D WebGL Canvas Layer (Transparent in Stage 3 so real photo is visible) */}
+      {/* 2. Transparent 3D WebGL Canvas Layer mounted ABOVE 360 photo at z-20 */}
       <Canvas
         shadows
         gl={{
@@ -51,9 +51,13 @@ export function ExperienceCanvas() {
           powerPreference: 'high-performance',
         }}
         camera={{ position: [0.3, 1.45, 4.5], fov: 48 }}
-        className="absolute inset-0 z-10 w-full h-full pointer-events-none"
+        className="!fixed inset-0 z-20 pointer-events-none w-full h-full"
       >
         <CameraRig />
+
+        {/* Dedicated Scene Lighting so Guide character stays bright across all stages */}
+        <ambientLight intensity={1.8} color="#fffbeb" />
+        <directionalLight position={[2, 4, 5]} intensity={2.2} color="#fff7ed" />
 
         <Suspense fallback={<CanvasLoader />}>
           <OfficeScene />
@@ -61,7 +65,7 @@ export function ExperienceCanvas() {
         </Suspense>
       </Canvas>
 
-      {/* Glassmorphic UI HUD (Controls, Speech Bubble, Badges, Split Bill) */}
+      {/* 3. Glassmorphic UI HUD (Controls, Speech Bubble, Badges, Split Bill) at z-40 */}
       <OverlayUI />
     </div>
   );

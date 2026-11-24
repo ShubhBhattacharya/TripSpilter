@@ -27,7 +27,7 @@ export function CameraRig() {
       targetLookAt.current.set(0.4, 1.0, -0.6);
     } else if (stage === 'virtual-tour') {
       // Stage 3: Camera for transparent canvas viewing 3D guide in bottom right
-      targetPosition.current.set(0, 0, 3.0);
+      targetPosition.current.set(0, 0, 4.5);
       targetLookAt.current.set(0, 0, 0);
     } else if (stage === 'bill') {
       // Stage 4: Framing celebratory guide on right side of office

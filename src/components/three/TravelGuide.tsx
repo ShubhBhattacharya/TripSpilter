@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useFBX, useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
-import { useTrip3DStore, GuideAnimation } from '@/store/useTrip3DStore';
+import { useTrip3DStore } from '@/store/useTrip3DStore';
 
 interface TravelGuideProps {
   position?: [number, number, number];
@@ -101,8 +101,8 @@ export function TravelGuide({ position = [1.1, 0, 1.2], rotation = [0, -0.35, 0]
       targetRotY.current = -0.4;
       targetScale.current = 0.01;
     } else if (stage === 'virtual-tour') {
-      // Stage 3: Framed neatly in bottom-right corner over 360 photo
-      targetPos.current.set(1.35, -0.85, 2.2);
+      // Stage 3: Framed neatly in bottom-right corner over 360 photo pointing at the scene
+      targetPos.current.set(1.45, -1.15, 2.5);
       targetRotY.current = -0.45;
       targetScale.current = 0.0085;
     } else if (stage === 'bill') {

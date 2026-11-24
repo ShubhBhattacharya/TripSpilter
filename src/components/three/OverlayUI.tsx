@@ -418,11 +418,11 @@ export function OverlayUI() {
           <div />
 
           {/* Bottom Controls Row: Bottom-Left Card + Bottom-Center Dock + Bottom-Right Guide Speech Bubble */}
-          <div className="pointer-events-none relative z-30 w-full flex flex-col md:flex-row items-end justify-between gap-4 mt-auto">
+          <div className="pointer-events-none relative z-40 w-full flex flex-col md:flex-row items-end justify-between gap-4 mt-auto">
             {/* Bottom-Left Spot Info Card (Reference Image 1) */}
             <div className="pointer-events-auto p-4 md:p-5 rounded-3xl bg-white/95 backdrop-blur-2xl border border-white/60 shadow-2xl text-slate-900 max-w-sm">
               <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">
-                {city.name} •
+                {city.name} • Spot {currentSpotIndex + 1} of {city.spots.length}
               </div>
               <h3 className="text-xl font-black text-slate-900 mb-3">{currentSpot.name}</h3>
 
@@ -432,13 +432,13 @@ export function OverlayUI() {
                 className={`cursor-pointer w-full py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${
                   selectedSpotIds.includes(currentSpot.id)
                     ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
-                    : 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-500/30 hover:scale-[1.02]'
+                    : 'bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg shadow-orange-500/30 hover:scale-[1.02] active:scale-[0.98]'
                 }`}
               >
                 {selectedSpotIds.includes(currentSpot.id) ? (
                   <>
-                    <Check className="w-4 h-4" />
-                    Spot Added to Itinerary!
+                    <Check className="w-4 h-4 stroke-[3]" />
+                    <span>✓ Spot Added to Itinerary!</span>
                   </>
                 ) : (
                   <>+ Add Spot to Trip ({currentSpot.cost > 0 ? `₹${currentSpot.cost}` : 'Free'})</>
@@ -447,28 +447,43 @@ export function OverlayUI() {
             </div>
 
             {/* Bottom-Center Spot Selector Dock */}
-            <div className="pointer-events-auto hidden sm:flex items-center gap-1.5 p-1.5 rounded-2xl bg-black/70 backdrop-blur-xl border border-white/20 text-xs shadow-2xl">
-              {city.spots.map((spot, idx) => {
-                const isCurrent = currentSpotIndex === idx;
-                return (
-                  <button
-                    key={spot.id}
-                    type="button"
-                    onClick={() => setCurrentSpotIndex(idx)}
-                    className={`cursor-pointer px-3.5 py-1.5 rounded-xl font-bold transition-all ${
-                      isCurrent
-                        ? 'bg-white text-slate-900 shadow-lg scale-105'
-                        : 'text-white/80 hover:text-white hover:bg-white/15'
-                    }`}
-                  >
-                    {spot.name}
-                  </button>
-                );
-              })}
+            <div className="pointer-events-auto hidden sm:flex flex-col items-center gap-2 p-2 rounded-2xl bg-black/75 backdrop-blur-xl border border-white/20 text-xs shadow-2xl">
+              <div className="flex items-center justify-between w-full px-2 gap-4">
+                <span className="text-[11px] font-bold text-slate-300 tracking-wider">
+                  {city.spots.length} City Spots
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setStage('bill')}
+                  className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white font-extrabold text-[11px] shadow-md shadow-orange-500/30 transition-all hover:scale-105 active:scale-95"
+                >
+                  <span>Finish Tour & Split Bill</span>
+                  <ArrowRight className="w-3 h-3" />
+                </button>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {city.spots.map((spot, idx) => {
+                  const isCurrent = currentSpotIndex === idx;
+                  return (
+                    <button
+                      key={spot.id}
+                      type="button"
+                      onClick={() => setCurrentSpotIndex(idx)}
+                      className={`cursor-pointer px-3 py-1.5 rounded-xl font-bold transition-all text-xs ${
+                        isCurrent
+                          ? 'bg-white text-slate-900 shadow-lg scale-105'
+                          : 'text-white/80 hover:text-white hover:bg-white/15'
+                      }`}
+                    >
+                      {idx + 1}. {spot.name}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            {/* Bottom-Right Guide Speech Bubble (Reference Image 1) */}
-            <div className="pointer-events-auto relative p-4 md:p-5 rounded-3xl bg-white/95 backdrop-blur-2xl border border-white/60 shadow-2xl text-slate-900 max-w-sm">
+            {/* Bottom-Right Guide Speech Bubble (Reference Image 1: Floats above 3D character) */}
+            <div className="pointer-events-auto relative p-4 md:p-5 rounded-3xl bg-white/95 backdrop-blur-2xl border border-white/60 shadow-2xl text-slate-900 max-w-xs md:max-w-sm mb-2 md:mb-6">
               <p className="text-xs font-semibold text-slate-800 leading-relaxed mb-3">
                 {currentSpot.speechQuote}
               </p>
