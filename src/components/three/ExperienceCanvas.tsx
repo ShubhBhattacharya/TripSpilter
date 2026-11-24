@@ -5,7 +5,7 @@ import { Canvas } from '@react-three/fiber';
 import { useProgress, Html } from '@react-three/drei';
 import { TravelGuide } from './TravelGuide';
 import { OfficeScene } from './OfficeScene';
-import { PanoramaSphere } from './PanoramaSphere';
+import { RealPanoramaViewer } from './RealPanoramaViewer';
 import { CameraRig } from './CameraRig';
 import { OverlayUI } from './OverlayUI';
 import { useTrip3DStore } from '@/store/useTrip3DStore';
@@ -35,34 +35,33 @@ function CanvasLoader() {
 
 export function ExperienceCanvas() {
   const stage = useTrip3DStore((s) => s.stage);
+  const currentSpot = useTrip3DStore((s) => s.getCurrentSpot());
 
   return (
     <div className="relative w-full h-screen bg-slate-950 overflow-hidden select-none">
+      {/* Real Full-Screen Photographic Panoramic Background in Stage 3 */}
+      {stage === 'virtual-tour' && <RealPanoramaViewer spot={currentSpot} />}
+
+      {/* 3D WebGL Canvas Layer (Transparent in Stage 3 so real photo is visible) */}
       <Canvas
         shadows
         gl={{
           antialias: true,
-          alpha: false,
+          alpha: true,
           powerPreference: 'high-performance',
         }}
-        camera={{ position: [0.4, 1.5, 4.8], fov: 48 }}
-        className="w-full h-full"
+        camera={{ position: [0.3, 1.45, 4.5], fov: 48 }}
+        className="absolute inset-0 z-10 w-full h-full pointer-events-none"
       >
         <CameraRig />
 
         <Suspense fallback={<CanvasLoader />}>
-          {stage === 'virtual-tour' ? (
-            <PanoramaSphere />
-          ) : (
-            <>
-              <OfficeScene />
-              <TravelGuide />
-            </>
-          )}
+          <OfficeScene />
+          <TravelGuide />
         </Suspense>
       </Canvas>
 
-      {/* HTML Overlay with Controls, Hotspots, and Split Bill */}
+      {/* Glassmorphic UI HUD (Controls, Speech Bubble, Badges, Split Bill) */}
       <OverlayUI />
     </div>
   );

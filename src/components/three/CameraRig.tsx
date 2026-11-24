@@ -9,33 +9,35 @@ export function CameraRig() {
   const { stage } = useTrip3DStore();
   const { camera } = useThree();
 
-  const targetPosition = useRef(new THREE.Vector3(0.4, 1.5, 4.8));
-  const targetLookAt = useRef(new THREE.Vector3(0.5, 1.1, 0));
-  const currentLookAt = useRef(new THREE.Vector3(0.5, 1.1, 0));
+  const targetPosition = useRef(new THREE.Vector3(0.3, 1.45, 4.5));
+  const targetLookAt = useRef(new THREE.Vector3(0.4, 1.05, 0));
+  const currentLookAt = useRef(new THREE.Vector3(0.4, 1.05, 0));
 
   useEffect(() => {
     if (stage === 'entrance') {
-      targetPosition.current.set(0.4, 1.5, 4.8);
-      targetLookAt.current.set(0.5, 1.1, 0);
+      // Stage 1: Framing character on the right side from head to toe
+      targetPosition.current.set(0.3, 1.45, 4.5);
+      targetLookAt.current.set(0.4, 1.05, 0);
     } else if (stage === 'walking') {
-      targetPosition.current.set(1.1, 1.55, 2.0);
-      targetLookAt.current.set(0.6, 1.1, -0.6);
+      targetPosition.current.set(0.4, 1.4, 2.6);
+      targetLookAt.current.set(0.4, 1.0, -0.6);
     } else if (stage === 'desk') {
-      targetPosition.current.set(0.85, 1.48, 1.35);
-      targetLookAt.current.set(0.4, 1.05, -0.7);
+      // Stage 2: Beside desk
+      targetPosition.current.set(0.35, 1.4, 2.3);
+      targetLookAt.current.set(0.4, 1.0, -0.6);
+    } else if (stage === 'virtual-tour') {
+      // Stage 3: Camera for transparent canvas viewing 3D guide in bottom right
+      targetPosition.current.set(0, 0, 3.0);
+      targetLookAt.current.set(0, 0, 0);
     } else if (stage === 'bill') {
-      targetPosition.current.set(0, 1.45, 2.4);
-      targetLookAt.current.set(0, 1.0, 0);
+      // Stage 4: Framing celebratory guide on right side of office
+      targetPosition.current.set(0.3, 1.45, 3.2);
+      targetLookAt.current.set(0.4, 1.05, 0);
     }
   }, [stage]);
 
   useFrame((_, delta) => {
-    // When in virtual-tour mode, OrbitControls in PanoramaSphere controls the camera orientation
-    if (stage === 'virtual-tour') {
-      return;
-    }
-
-    const t = Math.min(1, delta * 3.0);
+    const t = Math.min(1, delta * 3.5);
     camera.position.lerp(targetPosition.current, t);
     currentLookAt.current.lerp(targetLookAt.current, t);
     camera.lookAt(currentLookAt.current);

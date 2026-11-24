@@ -6,23 +6,20 @@ import { useRouter } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   Compass,
-  Volume2,
-  VolumeX,
   ArrowRight,
   ArrowLeft,
   Users,
   CheckCircle2,
   Sparkles,
   QrCode,
-  Share2,
   RotateCcw,
-  Building2,
-  Calendar,
-  IndianRupee,
-  Eye,
-  Check,
+  Volume2,
+  VolumeX,
   ChevronRight,
-  X,
+  ChevronLeft,
+  Check,
+  Eye,
+  MapPin,
   ExternalLink,
 } from 'lucide-react';
 import { useTrip3DStore } from '@/store/useTrip3DStore';
@@ -64,7 +61,17 @@ export function OverlayUI() {
     setStage('walking');
     setTimeout(() => {
       setStage('desk');
-    }, 1100);
+    }, 1000);
+  };
+
+  const handleNextSpot = () => {
+    const nextIdx = (currentSpotIndex + 1) % city.spots.length;
+    setCurrentSpotIndex(nextIdx);
+  };
+
+  const handlePrevSpot = () => {
+    const prevIdx = (currentSpotIndex - 1 + city.spots.length) % city.spots.length;
+    setCurrentSpotIndex(prevIdx);
   };
 
   const handleSaveToMyTrips = () => {
@@ -103,82 +110,84 @@ export function OverlayUI() {
   };
 
   return (
-    <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-between p-4 md:p-6 overflow-hidden">
-      {/* 1. TOP NAV BAR */}
-      <header className="pointer-events-auto flex items-center justify-between gap-4 w-full">
-        {/* Brand & Stage Pill */}
+    <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-between overflow-hidden">
+      {/* 1. TOP HEADER NAVIGATION (Matching Reference Image 1 & 3) */}
+      <header className="pointer-events-auto flex items-center justify-between gap-4 w-full px-6 py-4 bg-gradient-to-b from-black/40 to-transparent">
+        {/* Brand & Breadcrumbs */}
         <div className="flex items-center gap-3">
           <Link
             href="/"
-            className="flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-slate-900/80 backdrop-blur-xl border border-white/10 hover:border-sky-500/50 shadow-xl transition-all duration-300"
+            className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-2xl bg-white/90 backdrop-blur-xl border border-white/40 shadow-lg hover:bg-white text-slate-900 transition-all"
           >
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-sky-500/30">
-              <Compass className="w-4 h-4 animate-spin-slow" />
+            <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-orange-500 to-amber-600 flex items-center justify-center text-white font-black text-sm shadow-sm">
+              <span>₹</span>
             </div>
-            <div>
-              <div className="text-xs font-black tracking-tight text-white flex items-center gap-1.5">
-                TripSplit
-                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-sky-500/20 text-sky-300 border border-sky-400/30">
-                  3D HQ
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-400 font-medium">Virtual Experience</p>
-            </div>
+            <span className="font-extrabold text-sm tracking-tight text-slate-900">TripSplit</span>
           </Link>
 
-          {/* Stage Progress Pills (Desktop) */}
-          <div className="hidden lg:flex items-center gap-1.5 p-1 rounded-2xl bg-slate-950/70 backdrop-blur-xl border border-white/10 text-xs">
-            {[
-              { key: 'entrance', label: '1. Welcome' },
-              { key: 'desk', label: '2. Destination' },
-              { key: 'virtual-tour', label: '3. 360° Tour' },
-              { key: 'bill', label: '4. Split Bill' },
-            ].map((step) => {
-              const isCurrent = stage === step.key || (stage === 'walking' && step.key === 'desk');
-              return (
-                <button
-                  key={step.key}
-                  type="button"
-                  onClick={() => setStage(step.key as any)}
-                  className={`px-3 py-1.5 rounded-xl font-semibold transition-all ${
-                    isCurrent
-                      ? 'bg-sky-500 text-white shadow-md shadow-sky-500/40'
-                      : 'text-slate-400 hover:text-white hover:bg-white/5'
-                  }`}
-                >
-                  {step.label}
-                </button>
-              );
-            })}
+          {/* Breadcrumb Indicator (Reference Image 1: "Login > Route navigation") */}
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/40 backdrop-blur-md border border-white/10 text-xs text-white/80">
+            <span className="text-white/60">Stage {stage === 'entrance' ? '1' : stage === 'desk' ? '2' : stage === 'virtual-tour' ? '3' : '4'}:</span>
+            <span className="font-semibold text-white">
+              {stage === 'entrance' && 'Welcome HQ'}
+              {stage === 'desk' && 'Destination & Expenses'}
+              {stage === 'virtual-tour' && '360° Route Navigation'}
+              {stage === 'bill' && 'Split Bill Receipt'}
+            </span>
           </div>
+        </div>
+
+        {/* Stage Progress Pills (Desktop) */}
+        <div className="hidden lg:flex items-center gap-1 p-1 rounded-2xl bg-black/50 backdrop-blur-xl border border-white/15 text-xs text-white">
+          {[
+            { key: 'entrance', label: '1. Welcome' },
+            { key: 'desk', label: '2. Destination' },
+            { key: 'virtual-tour', label: '3. 360° Tour' },
+            { key: 'bill', label: '4. Split Bill' },
+          ].map((step) => {
+            const isCurrent = stage === step.key || (stage === 'walking' && step.key === 'desk');
+            return (
+              <button
+                key={step.key}
+                type="button"
+                onClick={() => setStage(step.key as any)}
+                className={`px-3 py-1 rounded-xl font-semibold transition-all ${
+                  isCurrent
+                    ? 'bg-amber-500 text-white shadow-md shadow-amber-500/40'
+                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                {step.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Right Controls */}
         <div className="flex items-center gap-2">
-          {/* Mute Audio Toggle */}
+          {stage === 'virtual-tour' && (
+            <button
+              type="button"
+              onClick={() => setStage('bill')}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold text-xs shadow-lg shadow-orange-500/30 hover:scale-105 active:scale-95 transition-all"
+            >
+              <span>Split Bill ({selectedSpotIds.length})</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+
           <button
             type="button"
             onClick={toggleAudio}
-            className="p-2.5 rounded-2xl bg-slate-900/80 backdrop-blur-xl border border-white/10 hover:border-white/20 text-slate-300 hover:text-white shadow-lg transition-all"
+            className="p-2 rounded-xl bg-black/40 backdrop-blur-xl border border-white/15 text-white/80 hover:text-white shadow-lg transition-all"
             title={isAudioEnabled ? 'Mute Ambiance' : 'Play Ambiance'}
           >
-            {isAudioEnabled ? <Volume2 className="w-4 h-4 text-sky-400" /> : <VolumeX className="w-4 h-4" />}
+            {isAudioEnabled ? <Volume2 className="w-4 h-4 text-amber-400" /> : <VolumeX className="w-4 h-4" />}
           </button>
 
-          {/* Reset / Start Over */}
-          <button
-            type="button"
-            onClick={resetExperience}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-slate-900/80 backdrop-blur-xl border border-white/10 hover:border-white/20 text-xs font-semibold text-slate-300 hover:text-white shadow-lg transition-all"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Restart
-          </button>
-
-          {/* Exit to 2D Dashboard */}
           <Link
             href="/trips"
-            className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-white/10 hover:bg-white/15 backdrop-blur-xl border border-white/20 text-xs font-bold text-white shadow-lg transition-all"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/15 hover:bg-white/25 backdrop-blur-xl border border-white/20 text-xs font-bold text-white shadow-lg transition-all"
           >
             Dashboard
             <ArrowRight className="w-3.5 h-3.5" />
@@ -186,69 +195,79 @@ export function OverlayUI() {
         </div>
       </header>
 
-      {/* 2. STAGE SPECIFIC INTERLAYS */}
-
-      {/* STAGE 1: ENTRANCE */}
+      {/* 2. STAGE 1: WELCOME / ENTRANCE CARD (Positioned on Left Side matching Reference Image 2) */}
       {stage === 'entrance' && (
-        <div className="pointer-events-auto absolute left-6 md:left-10 top-1/2 -translate-y-1/2 max-w-md w-full animate-in fade-in slide-in-from-left-8 duration-500 z-30">
-          <div className="p-6 md:p-7 rounded-3xl bg-slate-900/90 backdrop-blur-2xl border border-white/15 shadow-2xl shadow-sky-950/60 text-left">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/20 text-sky-300 border border-sky-400/30 text-xs font-bold mb-3">
-              <Sparkles className="w-3.5 h-3.5 text-sky-400" />
-              Interactive 3D Concierge
-            </div>
-            <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight leading-tight mb-2">
-              Welcome to <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-indigo-300">TripSplit Travel HQ</span>
+        <div className="pointer-events-auto fixed left-6 md:left-10 top-24 bottom-6 w-[380px] max-w-[90vw] z-20 flex flex-col justify-center animate-in fade-in slide-in-from-left-8 duration-500">
+          <div className="p-7 md:p-8 rounded-3xl bg-slate-900/80 backdrop-blur-2xl border border-white/20 shadow-2xl shadow-black/60 text-white">
+            <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight leading-none mb-3">
+              Trip Split
             </h1>
-            <p className="text-xs md:text-sm text-slate-300 mb-5 leading-relaxed">
-              Step inside our virtual travel office. Explore handpicked destinations in high-definition 360° virtual tours, customize group sightseeing spots, and split costs instantly with dynamic UPI QR codes.
+            <p className="text-sm text-slate-200 mb-8 leading-relaxed font-medium">
+              Easily split group expenses on the go.
             </p>
 
-            <div className="grid grid-cols-3 gap-2 py-2.5 px-3 rounded-2xl bg-white/5 border border-white/10 text-left mb-5">
-              <div>
-                <p className="text-[10px] text-slate-400 uppercase font-semibold">Step 1</p>
-                <p className="text-xs font-bold text-white">Meet Concierge</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-slate-400 uppercase font-semibold">Step 2</p>
-                <p className="text-xs font-bold text-sky-300">360° Tour</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-slate-400 uppercase font-semibold">Step 3</p>
-                <p className="text-xs font-bold text-emerald-300">Live Split Bill</p>
-              </div>
-            </div>
-
+            {/* Primary Start Trip Button (Reference Image 2) */}
             <button
               type="button"
               onClick={handleEnterOffice}
-              className="w-full flex items-center justify-center gap-2.5 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-sm shadow-xl shadow-sky-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all"
+              className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 text-white font-extrabold text-base shadow-xl shadow-orange-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all mb-4 text-center"
             >
-              Enter Office & Plan Trip
-              <ArrowRight className="w-4 h-4" />
+              Start Trip
             </button>
+
+            <div className="text-center text-[11px] text-slate-400 font-medium mb-4">or</div>
+
+            {/* Secondary Dual Action Buttons */}
+            <div className="grid grid-cols-2 gap-2.5 mb-6">
+              <button
+                type="button"
+                onClick={handleEnterOffice}
+                className="py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-xs font-semibold text-white transition-all text-center"
+              >
+                Create New Group
+              </button>
+              <button
+                type="button"
+                onClick={handleEnterOffice}
+                className="py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-xs font-semibold text-white transition-all text-center"
+              >
+                Join Existing
+              </button>
+            </div>
+
+            {/* Quick Pagination Control Pill (Reference Image 2) */}
+            <div className="flex items-center justify-center gap-3 pt-2 border-t border-white/10">
+              <button
+                type="button"
+                onClick={handleEnterOffice}
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/70 hover:text-white"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-[11px] text-slate-300 font-semibold tracking-wider">Meet 3D Guide</span>
+              <button
+                type="button"
+                onClick={handleEnterOffice}
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/70 hover:text-white"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* STAGE 2: DESK / DESTINATION SELECTOR */}
+      {/* 3. STAGE 2: DESTINATION & TRIP EXPENSES (Positioned on Left Side matching Reference Image 3) */}
       {stage === 'desk' && (
-        <div className="pointer-events-auto max-w-xl mx-auto mb-6 w-full animate-in fade-in slide-in-from-bottom-6 duration-400">
-          <div className="p-5 md:p-7 rounded-3xl bg-slate-900/90 backdrop-blur-2xl border border-white/15 shadow-2xl text-white">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <div className="flex items-center gap-2 text-xs font-bold text-sky-400 uppercase tracking-wider">
-                  <Building2 className="w-4 h-4" />
-                  Select Group Destination
-                </div>
-                <h2 className="text-xl md:text-2xl font-black text-white">Where are you heading?</h2>
-              </div>
-              <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-white/10 text-slate-300">
-                {city.spots.length} Attractions Ready
-              </span>
+        <div className="pointer-events-auto fixed left-6 md:left-10 top-24 bottom-6 w-[380px] max-w-[90vw] z-20 flex flex-col justify-center animate-in fade-in slide-in-from-left-6 duration-400">
+          <div className="p-6 md:p-7 rounded-3xl bg-slate-900/85 backdrop-blur-2xl border border-white/20 shadow-2xl text-white">
+            <div className="mb-4">
+              <h2 className="text-xl font-black text-white tracking-tight">TRIP EXPENSES</h2>
+              <p className="text-xs text-slate-300">Splitwise-style collaborative features</p>
             </div>
 
-            {/* City Selection Grid */}
-            <div className="grid grid-cols-3 gap-2.5 mb-5">
+            {/* Destination Selection Tabs */}
+            <div className="grid grid-cols-3 gap-1.5 p-1 rounded-2xl bg-white/5 border border-white/10 mb-4">
               {DESTINATIONS.map((d) => {
                 const isSelected = selectedCityId === d.id;
                 return (
@@ -256,62 +275,83 @@ export function OverlayUI() {
                     key={d.id}
                     type="button"
                     onClick={() => setSelectedCityId(d.id)}
-                    className={`p-3 rounded-2xl border text-left transition-all ${
+                    className={`py-2 px-1 rounded-xl text-center text-xs font-bold transition-all ${
                       isSelected
-                        ? 'bg-sky-500/20 border-sky-400 text-white shadow-lg shadow-sky-500/20'
-                        : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-white'
+                        ? 'bg-amber-500 text-white shadow-md shadow-amber-500/30'
+                        : 'text-slate-400 hover:text-white hover:bg-white/5'
                     }`}
                   >
-                    <p className="font-bold text-xs md:text-sm text-white line-clamp-1">{d.name.split(',')[0]}</p>
-                    <p className="text-[10px] text-slate-400 line-clamp-1">{d.state}</p>
-                    <div className="mt-2 text-[11px] font-semibold text-emerald-400">
-                      ₹{d.startingPrice}+ /person
-                    </div>
+                    {d.name.split(',')[0]}
                   </button>
                 );
               })}
             </div>
 
-            {/* Selected City Highlight Card */}
-            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 mb-5">
-              <div className="flex items-start justify-between gap-3 mb-2">
-                <div>
-                  <h3 className="font-black text-base text-white">{city.name}</h3>
-                  <p className="text-xs text-sky-300 font-medium">{city.tagline}</p>
+            {/* Splitwise Expense Category Breakdown (Matching Reference Image 3) */}
+            <div className="space-y-2.5 mb-5">
+              <div className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/10">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-bold text-xs">
+                    A
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-white">Accommodation</p>
+                    <p className="text-[10px] text-slate-400">Jaipur Heritage Stay</p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Est. Cost</span>
-                  <span className="text-sm font-black text-emerald-400">₹{totalCost}</span>
+                <span className="text-xs font-black text-emerald-400">+₹1,200</span>
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/10">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-rose-500/20 text-rose-300 flex items-center justify-center font-bold text-xs">
+                    M
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-white">Food & Dining</p>
+                    <p className="text-[10px] text-slate-400">Dal Baati & Thali</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-rose-400">-₹450</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-slate-300">
+                    Split
+                  </span>
                 </div>
               </div>
-              <p className="text-xs text-slate-300 mb-3">{city.description}</p>
 
-              {/* Spot Pills */}
-              <div className="flex flex-wrap gap-1.5">
-                {city.spots.map((s) => (
-                  <span
-                    key={s.id}
-                    className="px-2.5 py-1 rounded-xl bg-white/10 text-[11px] font-medium text-slate-200 border border-white/5"
-                  >
-                    {s.name} ({s.cost > 0 ? `₹${s.cost}` : 'Free'})
+              <div className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/10">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-sky-500/20 text-sky-300 flex items-center justify-center font-bold text-xs">
+                    J
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-white">Transport & Cabs</p>
+                    <p className="text-[10px] text-slate-400">Fort Shuttle</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-emerald-400">+₹250</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/10 text-slate-300">
+                    Split
                   </span>
-                ))}
+                </div>
               </div>
             </div>
 
             {/* Launch CTA */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
               <button
                 type="button"
                 onClick={() => setStage('entrance')}
-                className="py-3 px-4 rounded-2xl bg-white/5 hover:bg-white/10 text-slate-300 font-semibold text-xs border border-white/10 transition-all"
+                className="py-3 px-4 rounded-xl bg-white/10 hover:bg-white/15 text-slate-300 font-semibold text-xs transition-all"
               >
                 Back
               </button>
               <button
                 type="button"
                 onClick={() => setStage('virtual-tour')}
-                className="flex-1 flex items-center justify-center gap-2 py-3 px-6 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-sm shadow-xl shadow-sky-500/30 hover:scale-[1.01] active:scale-[0.99] transition-all"
+                className="flex-1 flex items-center justify-center gap-2 py-3 px-5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white font-bold text-xs shadow-xl shadow-orange-500/30 hover:scale-[1.01] active:scale-[0.99] transition-all"
               >
                 <Eye className="w-4 h-4" />
                 Launch 360° Virtual Tour
@@ -322,153 +362,133 @@ export function OverlayUI() {
         </div>
       )}
 
-      {/* STAGE 3: 360° VIRTUAL TOUR */}
+      {/* 4. STAGE 3: REAL 360° PANORAMA OVERLAY (Matching Reference Image 1) */}
       {stage === 'virtual-tour' && (
-        <div className="pointer-events-auto flex flex-col justify-between w-full h-full pb-2">
-          {/* Top Virtual Tour Header */}
-          <div className="max-w-xl mx-auto w-full pt-16 md:pt-14 text-center">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/85 backdrop-blur-xl border border-sky-400/40 text-xs font-bold text-white shadow-xl">
-              <Eye className="w-3.5 h-3.5 text-sky-400 animate-pulse" />
-              <span>360° Equirectangular Tour • Click & drag around to explore</span>
-            </div>
+        <div className="pointer-events-auto absolute inset-0 z-20 flex flex-col justify-between p-6">
+          {/* Floating Monument Badges (Reference Image 1) */}
+          <div className="absolute inset-0 pointer-events-none">
+            {currentSpot.floatingBadges.map((badge, idx) => (
+              <div
+                key={idx}
+                style={{ top: badge.top, left: badge.left }}
+                className="absolute -translate-x-1/2 -translate-y-1/2 px-4 py-2 rounded-2xl bg-white/90 backdrop-blur-md border border-white/50 text-xs font-bold text-slate-900 shadow-xl pointer-events-auto hover:scale-105 transition-transform"
+              >
+                {badge.label}
+              </div>
+            ))}
           </div>
 
-          {/* Bottom Dock: Attractions Selector Carousel */}
-          <div className="max-w-4xl mx-auto w-full mt-auto">
-            <div className="p-4 md:p-5 rounded-3xl bg-slate-900/90 backdrop-blur-2xl border border-white/15 shadow-2xl">
-              {/* Active Spot Banner & Inclusion Toggle */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 mb-3 border-b border-white/10">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
-                      {currentSpot.category}
-                    </span>
-                    <h3 className="font-black text-lg text-white">{currentSpot.name}</h3>
-                    <span className="text-xs font-bold text-emerald-400">
-                      {currentSpot.cost > 0 ? `₹${currentSpot.cost}` : 'Free Entry'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-300 mt-0.5">{currentSpot.subtitle}</p>
-                </div>
+          {/* Spacer */}
+          <div />
 
-                <div className="flex items-center gap-3">
-                  {/* Add / Remove from Group Split */}
+          {/* Bottom Controls Row: Bottom-Left Card + Bottom-Center Dock + Bottom-Right Guide Speech Bubble */}
+          <div className="w-full flex flex-col md:flex-row items-end justify-between gap-4 mt-auto">
+            {/* Bottom-Left Spot Info Card (Reference Image 1) */}
+            <div className="p-4 md:p-5 rounded-3xl bg-white/90 backdrop-blur-2xl border border-white/40 shadow-2xl text-slate-900 max-w-sm">
+              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">
+                {city.name} •
+              </div>
+              <h3 className="text-xl font-black text-slate-900 mb-3">{currentSpot.name}</h3>
+
+              <button
+                type="button"
+                onClick={() => toggleSpot(currentSpot.id)}
+                className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${
+                  selectedSpotIds.includes(currentSpot.id)
+                    ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
+                    : 'bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-500/30 hover:scale-[1.02]'
+                }`}
+              >
+                {selectedSpotIds.includes(currentSpot.id) ? (
+                  <>
+                    <Check className="w-4 h-4" />
+                    Spot Added to Itinerary!
+                  </>
+                ) : (
+                  <>+ Add Spot to Trip ({currentSpot.cost > 0 ? `₹${currentSpot.cost}` : 'Free'})</>
+                )}
+              </button>
+            </div>
+
+            {/* Bottom-Center Spot Selector Dock */}
+            <div className="hidden sm:flex items-center gap-1.5 p-1.5 rounded-2xl bg-black/60 backdrop-blur-xl border border-white/20 text-xs">
+              {city.spots.map((spot, idx) => {
+                const isCurrent = currentSpotIndex === idx;
+                return (
                   <button
+                    key={spot.id}
                     type="button"
-                    onClick={() => toggleSpot(currentSpot.id)}
-                    className={`flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs font-bold border transition-all ${
-                      selectedSpotIds.includes(currentSpot.id)
-                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40 shadow-md shadow-emerald-500/20'
-                        : 'bg-white/5 text-slate-400 border-white/10 hover:text-white'
+                    onClick={() => setCurrentSpotIndex(idx)}
+                    className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
+                      isCurrent
+                        ? 'bg-white text-slate-900 shadow-lg'
+                        : 'text-white/70 hover:text-white hover:bg-white/10'
                     }`}
                   >
-                    <CheckCircle2
-                      className={`w-4 h-4 ${
-                        selectedSpotIds.includes(currentSpot.id) ? 'text-emerald-400' : 'text-slate-500'
-                      }`}
-                    />
-                    {selectedSpotIds.includes(currentSpot.id) ? 'Included in Split' : 'Add to Split'}
+                    {spot.name}
                   </button>
+                );
+              })}
+            </div>
 
-                  {/* Proceed to Split Bill */}
-                  <button
-                    type="button"
-                    onClick={() => setStage('bill')}
-                    className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-sky-500/30 transition-all hover:scale-[1.02]"
-                  >
-                    <span>Proceed to Split Bill ({selectedSpotIds.length})</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Spots Carousel Track */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {city.spots.map((spot, idx) => {
-                  const isCurrent = currentSpotIndex === idx;
-                  const isSelected = selectedSpotIds.includes(spot.id);
-
-                  return (
-                    <button
-                      key={spot.id}
-                      type="button"
-                      onClick={() => setCurrentSpotIndex(idx)}
-                      className={`p-2.5 rounded-2xl border text-left transition-all ${
-                        isCurrent
-                          ? 'bg-sky-500/25 border-sky-400 shadow-md shadow-sky-500/20'
-                          : 'bg-white/5 border-white/10 hover:bg-white/10'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-1 mb-1">
-                        <span className="font-bold text-xs text-white line-clamp-1">{spot.name}</span>
-                        {isSelected && <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
-                      </div>
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-slate-400">{spot.duration}</span>
-                        <span className="font-semibold text-emerald-400">
-                          {spot.cost > 0 ? `₹${spot.cost}` : 'Free'}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+            {/* Bottom-Right Guide Speech Bubble (Reference Image 1) */}
+            <div className="relative p-4 md:p-5 rounded-3xl bg-white/95 backdrop-blur-2xl border border-white/50 shadow-2xl text-slate-900 max-w-sm">
+              <p className="text-xs font-semibold text-slate-800 leading-relaxed mb-3">
+                {currentSpot.speechQuote}
+              </p>
+              <button
+                type="button"
+                onClick={handleNextSpot}
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-600 hover:text-sky-700 hover:underline"
+              >
+                <span>[Next Spot: {currentSpot.nextSpotName} →]</span>
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* STAGE 4: SPLIT BILL RECEIPT & DYNAMIC UPI QR */}
+      {/* 5. STAGE 4: SPLIT BILL RECEIPT (Positioned on Left Side matching Reference Image 4) */}
       {stage === 'bill' && (
-        <div className="pointer-events-auto max-w-lg mx-auto my-auto w-full animate-in fade-in zoom-in-95 duration-400">
-          <div className="p-6 md:p-8 rounded-3xl bg-slate-900/95 backdrop-blur-2xl border border-white/15 shadow-2xl text-white">
-            {/* Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-5">
-              <div>
-                <div className="flex items-center gap-1.5 text-xs font-bold text-sky-400 uppercase tracking-wider">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Verified TripSplit Receipt
-                </div>
-                <h2 className="text-2xl font-black text-white">{city.name} Split</h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setStage('virtual-tour')}
-                className="p-2 rounded-2xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white border border-white/10"
-                title="Back to 360° Tour"
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </button>
+        <div className="pointer-events-auto fixed left-6 md:left-10 top-20 bottom-6 w-[400px] max-w-[92vw] z-20 flex flex-col justify-center animate-in fade-in slide-in-from-left-6 duration-400">
+          <div className="max-h-[85vh] overflow-y-auto p-5 md:p-6 rounded-3xl bg-white/95 backdrop-blur-2xl border border-white/60 shadow-2xl text-slate-900 flex flex-col">
+            {/* Receipt Header (Reference Image 4) */}
+            <div className="text-center pb-3 border-b border-dashed border-slate-300 mb-3">
+              <h2 className="text-xl font-black text-slate-900 tracking-tight">TripSplit Receipt</h2>
+              <p className="text-[11px] text-slate-500 font-medium">Glassmorphic receipt • Verified UPI</p>
             </div>
 
-            {/* Selected Spots Breakdown */}
-            <div className="space-y-2 mb-5 max-h-40 overflow-y-auto pr-1">
+            {/* Itemized Line Items (Compact & Scrollable) */}
+            <div className="space-y-1.5 mb-3 max-h-36 overflow-y-auto pr-1 text-xs">
+              <div className="flex justify-between text-slate-600">
+                <span>Cab / Outing fare:</span>
+                <span className="font-bold text-slate-900">₹1,500</span>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <span>Heritage Lodge:</span>
+                <span className="font-bold text-slate-900">₹2,200</span>
+              </div>
               {selectedSpots.map((spot) => (
-                <div
-                  key={spot.id}
-                  className="flex items-center justify-between p-2.5 rounded-xl bg-white/5 border border-white/5 text-xs"
-                >
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span className="font-semibold text-white">{spot.name}</span>
-                  </div>
-                  <span className="font-bold text-slate-200">
+                <div key={spot.id} className="flex justify-between text-slate-600">
+                  <span>{spot.name}:</span>
+                  <span className="font-bold text-slate-900">
                     {spot.cost > 0 ? `₹${spot.cost}` : 'Free'}
                   </span>
                 </div>
               ))}
             </div>
 
-            {/* Interactive Friends Slider */}
-            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 mb-5">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                  <Users className="w-4 h-4 text-sky-400" />
-                  Number of Friends Splitting:
-                </span>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-400/30">
-                  {friendsCount} {friendsCount === 1 ? 'Person' : 'Friends'}
-                </span>
+            {/* Total Line (Reference Image 4) */}
+            <div className="flex justify-between items-center py-2 border-y border-slate-200 mb-3">
+              <span className="font-extrabold text-sm text-slate-800">Total:</span>
+              <span className="font-black text-base text-slate-900">₹{(totalCost + 3700).toLocaleString('en-IN')}</span>
+            </div>
+
+            {/* Friends Split Slider */}
+            <div className="p-2.5 rounded-xl bg-slate-100 border border-slate-200 mb-3">
+              <div className="flex justify-between text-xs font-bold text-slate-700 mb-1">
+                <span>Friends Splitting:</span>
+                <span className="text-amber-600">{friendsCount} {friendsCount === 1 ? 'Person' : 'Friends'}</span>
               </div>
               <input
                 type="range"
@@ -476,83 +496,52 @@ export function OverlayUI() {
                 max={12}
                 value={friendsCount}
                 onChange={(e) => setFriendsCount(parseInt(e.target.value, 10))}
-                className="w-full accent-sky-400 cursor-pointer"
+                className="w-full accent-amber-500 cursor-pointer"
               />
-              <div className="flex justify-between text-[10px] text-slate-400 mt-1 font-medium">
-                <span>Solo (1)</span>
-                <span>Trio (3)</span>
-                <span>Group (6)</span>
-                <span>Large Squad (12)</span>
+              <div className="flex justify-between text-[11px] font-bold text-emerald-600 mt-1">
+                <span>Your Share:</span>
+                <span>₹{Math.ceil((totalCost + 3700) / friendsCount).toLocaleString('en-IN')}/person</span>
               </div>
             </div>
 
-            {/* Cost Summary Box */}
-            <div className="grid grid-cols-2 gap-3 p-4 rounded-2xl bg-gradient-to-br from-sky-950/60 to-indigo-950/60 border border-sky-500/30 mb-5">
-              <div>
-                <p className="text-[11px] font-semibold text-slate-400 uppercase">Total Trip Itinerary</p>
-                <p className="text-lg font-black text-white">₹{totalCost.toLocaleString('en-IN')}</p>
-              </div>
-              <div className="text-right border-l border-white/10 pl-3">
-                <p className="text-[11px] font-semibold text-sky-300 uppercase">Per Person Share</p>
-                <p className="text-xl font-black text-emerald-400">₹{perPersonCost.toLocaleString('en-IN')}</p>
-              </div>
-            </div>
-
-            {/* Dynamic UPI QR Code Box */}
-            <div className="flex items-center gap-4 p-4 rounded-2xl bg-white p-3.5 mb-5 shadow-inner">
-              <div className="p-2 rounded-xl bg-slate-100 shrink-0">
+            {/* Dynamic UPI QR Code Box (Reference Image 4) */}
+            <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-50 border border-slate-200 mb-3 shadow-inner">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                Scan UPI with GPay / PhonePe / Paytm
+              </span>
+              <div className="p-2 bg-white rounded-xl shadow-xs border border-slate-200">
                 <QRCodeSVG
-                  value={`upi://pay?pa=tripsplit@okhdfcbank&pn=TripSplit&am=${perPersonCost}&cu=INR&tn=TripSplit_${city.id}`}
-                  size={96}
+                  value={`upi://pay?pa=tripsplit@okhdfcbank&pn=TripSplit&am=${Math.ceil((totalCost + 3700) / friendsCount)}&cu=INR&tn=TripSplit_${city.id}`}
+                  size={120}
                   level="H"
                 />
               </div>
-              <div className="text-slate-900">
-                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold mb-1">
-                  <QrCode className="w-3 h-3" />
-                  Instant UPI Payment
-                </div>
-                <h4 className="font-extrabold text-xs text-slate-900">Scan with GPay / PhonePe / Paytm</h4>
-                <p className="text-[11px] text-slate-600 mt-0.5">
-                  Auto-populated for ₹{perPersonCost}/person share.
-                </p>
-                <button
-                  type="button"
-                  onClick={handleCopyPaymentLink}
-                  className="mt-2 text-[11px] font-bold text-sky-600 hover:text-sky-700 underline"
-                >
-                  {copiedLink ? '✓ UPI Link Copied!' : 'Copy Payment Link'}
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleCopyPaymentLink}
+                className="mt-1 text-[11px] font-bold text-sky-600 hover:text-sky-700 underline"
+              >
+                {copiedLink ? '✓ Copied Payment Link!' : 'Copy Payment Link'}
+              </button>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-2.5">
+            {/* Save & Pay Action Buttons */}
+            <div className="flex flex-col gap-2">
               <button
                 type="button"
                 onClick={handleSaveToMyTrips}
                 disabled={savedSuccess}
-                className="flex-1 flex items-center justify-center gap-2 py-3 px-5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/30 transition-all hover:scale-[1.01]"
+                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-xs shadow-lg shadow-emerald-500/30 transition-all"
               >
-                {savedSuccess ? (
-                  <>
-                    <CheckCircle2 className="w-4 h-4" />
-                    Saved to My Trips! Redirecting...
-                  </>
-                ) : (
-                  <>
-                    <Check className="w-4 h-4" />
-                    Save Itinerary to My Trips
-                  </>
-                )}
+                {savedSuccess ? '✓ Saved to My Trips! Redirecting...' : 'Save & Pay via UPI'}
               </button>
 
               <button
                 type="button"
-                onClick={resetExperience}
-                className="py-3 px-4 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs border border-white/10 transition-all"
+                onClick={() => setStage('virtual-tour')}
+                className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-all"
               >
-                Explore Another City
+                ← Back to 360° Tour
               </button>
             </div>
           </div>

@@ -1,3 +1,9 @@
+export interface FloatingBadge {
+  label: string;
+  top: string;
+  left: string;
+}
+
 export interface Spot {
   id: string;
   name: string;
@@ -10,6 +16,13 @@ export interface Spot {
   bestTime: string;
   description: string;
   highlights: string[];
+  wikiTitle: string;
+  realPhotoUrl: string;
+  lat: number;
+  lng: number;
+  speechQuote: string;
+  nextSpotName: string;
+  floatingBadges: FloatingBadge[];
   panorama: {
     ambientColor: string;
     skyTop: string;
@@ -54,6 +67,16 @@ export const DESTINATIONS: Destination[] = [
         bestTime: 'Morning (Golden Sunrise)',
         description: 'Iconic five-story pink sandstone palace with intricate latticework windows designed for royal breezes.',
         highlights: ['953 Casements', 'Rooftop City View', 'Pink Sandstone Façade'],
+        wikiTitle: 'Hawa Mahal',
+        realPhotoUrl: 'https://images.unsplash.com/photo-1599661046289-e31897846e41?q=85&w=2400&auto=format&fit=crop',
+        lat: 26.923936,
+        lng: 75.826744,
+        speechQuote: 'Welcome to Hawa Mahal! 953 jharokhon wala iconic palace. Settle inside view aur explore karein.',
+        nextSpotName: 'Amer Fort',
+        floatingBadges: [
+          { label: '+ Add to Itinerary', top: '64%', left: '18%' },
+          { label: '+ Book Heritage Walk (₹500)', top: '68%', left: '58%' },
+        ],
         panorama: {
           ambientColor: '#ffe4cc',
           skyTop: '#ff7e5f',
@@ -76,6 +99,16 @@ export const DESTINATIONS: Destination[] = [
         bestTime: 'Early Afternoon',
         description: 'Majestic fortress overlooking Maota Lake, famous for its mirror-tiled Sheesh Mahal and royal courtyards.',
         highlights: ['Sheesh Mahal Glasswork', 'Maota Lake Vista', 'Diwan-e-Khas Archways'],
+        wikiTitle: 'Amber Fort',
+        realPhotoUrl: 'https://images.unsplash.com/photo-1603288940300-47020e50e93a?q=85&w=2400&auto=format&fit=crop',
+        lat: 26.985487,
+        lng: 75.851345,
+        speechQuote: 'Ye hai Amer Fort! Sheesh Mahal aur Maota Lake ka royal view. Elephant path aur ramparts check out karein.',
+        nextSpotName: 'Jal Mahal',
+        floatingBadges: [
+          { label: '+ Sheesh Mahal Entry Included', top: '55%', left: '25%' },
+          { label: '+ Sunset Bastion View', top: '60%', left: '62%' },
+        ],
         panorama: {
           ambientColor: '#fef3c7',
           skyTop: '#1e3a8a',
@@ -98,6 +131,16 @@ export const DESTINATIONS: Destination[] = [
         bestTime: 'Sunset & Dusk',
         description: 'Serene four-story submerged palace sitting in the center of tranquil Man Sagar Lake with Aravalli hills backdrop.',
         highlights: ['Water Mirror Reflections', 'Illuminated Evening Lights', 'Aravalli Hills Panorama'],
+        wikiTitle: 'Jal Mahal',
+        realPhotoUrl: 'https://images.unsplash.com/photo-1605649487212-47bdab064df7?q=85&w=2400&auto=format&fit=crop',
+        lat: 26.953444,
+        lng: 75.846206,
+        speechQuote: 'Jal Mahal Man Sagar Lake ke beech mein tairta hua mehsus hota hai. Zero entry fee landmark for your group!',
+        nextSpotName: 'Nahargarh Fort',
+        floatingBadges: [
+          { label: '★ Free Public Viewpoint', top: '58%', left: '22%' },
+          { label: '+ Sunset Photography Spot', top: '65%', left: '60%' },
+        ],
         panorama: {
           ambientColor: '#dbeafe',
           skyTop: '#4c1d95',
@@ -120,6 +163,16 @@ export const DESTINATIONS: Destination[] = [
         bestTime: 'Evening Sunset',
         description: 'Perched on the edge of the Aravalli hills, Nahargarh offers the ultimate panoramic viewpoint of Jaipur city lights.',
         highlights: ['360° Skyline View', 'Padao Open-air Bistro', 'Historic Stepwell (Baori)'],
+        wikiTitle: 'Nahargarh Fort',
+        realPhotoUrl: 'https://images.unsplash.com/photo-1609137144813-7d9921338f24?q=85&w=2400&auto=format&fit=crop',
+        lat: 26.937233,
+        lng: 75.815617,
+        speechQuote: 'Nahargarh cliffside bastions se poori Jaipur city ka sunset aur night skyline dikhta hai. Perfect for squad pictures!',
+        nextSpotName: 'Hawa Mahal',
+        floatingBadges: [
+          { label: '+ Padao Sunset Cafe', top: '52%', left: '24%' },
+          { label: '+ Historic Baori Stepwell', top: '62%', left: '65%' },
+        ],
         panorama: {
           ambientColor: '#fed7aa',
           skyTop: '#0f172a',
@@ -153,6 +206,16 @@ export const DESTINATIONS: Destination[] = [
         bestTime: 'Morning',
         description: 'Sprawling alpine meadows nestled amidst glaciers and snow-crowned peaks with soaring paragliders.',
         highlights: ['Paragliding Views', 'Snow Quad Biking', 'Cable Car Ropeway'],
+        wikiTitle: 'Solang Valley',
+        realPhotoUrl: 'https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?q=85&w=2400&auto=format&fit=crop',
+        lat: 32.316667,
+        lng: 77.158333,
+        speechQuote: 'Welcome to Solang Valley! Paragliding aur snow adventures ke liye best spot. Chaliye fly karein!',
+        nextSpotName: 'Hadimba Temple',
+        floatingBadges: [
+          { label: '+ Paragliding Launch Point', top: '50%', left: '20%' },
+          { label: '+ Cable Car Ropeway', top: '65%', left: '60%' },
+        ],
         panorama: {
           ambientColor: '#e0f2fe',
           skyTop: '#0284c7',
@@ -175,6 +238,16 @@ export const DESTINATIONS: Destination[] = [
         bestTime: 'Late Morning',
         description: 'Pagoda-style wooden temple built in 1553 surrounded by towering centuries-old deodar trees.',
         highlights: ['Carved Deodar Wood', 'Cedar Grove Trails', 'Himachali Architecture'],
+        wikiTitle: 'Hidimba Devi Temple',
+        realPhotoUrl: 'https://images.unsplash.com/photo-1597074866923-dc0589150358?q=85&w=2400&auto=format&fit=crop',
+        lat: 32.2492,
+        lng: 77.1709,
+        speechQuote: 'Dhungri Van ke ghane cedar deodar jangal mein Hadimba Temple ki wooden carving dekhiye.',
+        nextSpotName: 'Atal Tunnel & Sissu',
+        floatingBadges: [
+          { label: '★ Historic Wooden Architecture', top: '55%', left: '22%' },
+          { label: '+ Deodar Nature Walk', top: '62%', left: '62%' },
+        ],
         panorama: {
           ambientColor: '#dcfce7',
           skyTop: '#064e3b',
@@ -197,6 +270,16 @@ export const DESTINATIONS: Destination[] = [
         bestTime: 'Midday',
         description: 'Engineering marvel emerging into the dramatic barren moonscapes and hanging waterfalls of Sissu valley.',
         highlights: ['Sissu Waterfall', 'Lahaul Riverbed', 'Dramatic Valley Shift'],
+        wikiTitle: 'Atal Tunnel',
+        realPhotoUrl: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=85&w=2400&auto=format&fit=crop',
+        lat: 32.4417,
+        lng: 77.1667,
+        speechQuote: 'World longest highway tunnel cross karte hi Lahaul valley aur Sissu waterfall ka breathtaking scene!',
+        nextSpotName: 'Solang Valley',
+        floatingBadges: [
+          { label: '+ Sissu Waterfall View', top: '52%', left: '20%' },
+          { label: '+ Glacier Chandra River', top: '60%', left: '65%' },
+        ],
         panorama: {
           ambientColor: '#ede9fe',
           skyTop: '#1e1b4b',
@@ -230,6 +313,16 @@ export const DESTINATIONS: Destination[] = [
         bestTime: 'Golden Sunset',
         description: 'Iconic red laterite cliff fort overlooking crashing turquoise waves and Ozran beach sands.',
         highlights: ['Panoramic Sea Horizon', 'Iconic Photo Points', 'Sunset Breeze'],
+        wikiTitle: 'Chapora Fort',
+        realPhotoUrl: 'https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?q=85&w=2400&auto=format&fit=crop',
+        lat: 15.6053,
+        lng: 73.7381,
+        speechQuote: 'Dil Chahta Hai iconic fort bastions! Arabian sea ka grand 360 view friends ke sath experience karein.',
+        nextSpotName: 'Palolem Crescent Bay',
+        floatingBadges: [
+          { label: '+ Red Laterite Bastion', top: '55%', left: '22%' },
+          { label: '+ Sunset Sea Horizon', top: '65%', left: '60%' },
+        ],
         panorama: {
           ambientColor: '#fef08a',
           skyTop: '#ea580c',
@@ -252,6 +345,16 @@ export const DESTINATIONS: Destination[] = [
         bestTime: 'Early Morning',
         description: 'Crescent-shaped calm bay lined with coconut palms, vibrant beach huts, and gentle dolphin waters.',
         highlights: ['Sea Kayaking', 'Monkey Island View', 'Palm-fringed Coast'],
+        wikiTitle: 'Palolem Beach',
+        realPhotoUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=85&w=2400&auto=format&fit=crop',
+        lat: 15.0101,
+        lng: 74.0232,
+        speechQuote: 'Palolem Crescent bay ki calm waves aur sea kayaking vibes. Perfect relaxing day with squad!',
+        nextSpotName: 'Vagator Cliff',
+        floatingBadges: [
+          { label: '+ Sea Kayaking Rental', top: '54%', left: '20%' },
+          { label: '+ Dolphin Spotting Bay', top: '63%', left: '65%' },
+        ],
         panorama: {
           ambientColor: '#ccfbf1',
           skyTop: '#0d9488',
