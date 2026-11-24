@@ -25,9 +25,12 @@ import {
 } from 'lucide-react';
 import { useTrip3DStore, ExtraActivity } from '@/store/useTrip3DStore';
 import { DESTINATIONS } from '@/data/destinations';
+import { useAuth } from '@/components/auth/AuthProvider';
+import { buildVerifiedUpiUri } from '@/lib/financial/upi-engine';
 
 export function OverlayUI() {
   const router = useRouter();
+  const { user, profile } = useAuth();
   const {
     stage,
     setStage,
@@ -64,6 +67,25 @@ export function OverlayUI() {
   const totalCost = getTotalCost();
   const perPersonCost = getPerPersonCost();
 
+  // Financial & UPI Calculation strictly from selected items with no arbitrary constants
+  const payeeVpa = (profile?.upi_id && profile.upi_id.includes('@')) ? profile.upi_id : 'tripsplit.vendor@okaxis';
+  const payeeName = profile?.display_name || 'TripSplit Coordinator';
+  const perPersonShare = totalCost > 0 ? Math.ceil(totalCost / Math.max(1, friendsCount)) : 0;
+
+  const upiUri = useMemo(() => {
+    if (perPersonShare <= 0) return '';
+    try {
+      return buildVerifiedUpiUri({
+        payeeVpa,
+        payeeName,
+        amount: perPersonShare,
+        transactionNote: `TripSplit_${city.id}`,
+      });
+    } catch {
+      return `upi://pay?pa=${payeeVpa}&pn=${encodeURIComponent(payeeName)}&am=${perPersonShare}&cu=INR&tn=TripSplit_${city.id}`;
+    }
+  }, [payeeVpa, payeeName, perPersonShare, city.id]);
+
   const filteredDestinations = useMemo(() => {
     return DESTINATIONS.filter((d) => {
       const q = searchQuery.toLowerCase().trim();
@@ -97,15 +119,15 @@ export function OverlayUI() {
     setCurrentSpotIndex(prevIdx);
   };
 
-  const handleSaveToMyTrips = () => {
+  const handleSaveToMyTrips = async () => {
     try {
       const tripData = {
         name: `${city.name} 3D Itinerary`,
         destination: city.name,
         startDate: new Date().toISOString().split('T')[0],
-        totalBudget: totalCost + 3700,
+        totalBudget: totalCost,
         friendsCount,
-        perPersonShare: Math.ceil((totalCost + 3700) / friendsCount),
+        perPersonShare,
         spots: [
           ...selectedSpots.map((s) => ({ name: s.name, cost: s.cost })),
           ...addedActivities.map((a) => ({ name: a.name, cost: a.cost })),
@@ -116,6 +138,22 @@ export function OverlayUI() {
       const existing = JSON.parse(localStorage.getItem('tripsplit_custom_trips') || '[]');
       existing.unshift(tripData);
       localStorage.setItem('tripsplit_custom_trips', JSON.stringify(existing));
+
+      // If user is authenticated, persist trip to Supabase backend
+      if (user) {
+        await fetch('/api/trips', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: `${city.name.split(',')[0]} 3D Outing`,
+            destination: city.name,
+            startDate: new Date().toISOString().split('T')[0],
+            endDate: new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0],
+            budget: totalCost > 0 ? totalCost : 1000,
+            coverImage: city.heroImage || city.spots[0]?.realPhotoUrl,
+          }),
+        }).catch((err) => console.error('Trip persistence error:', err));
+      }
     } catch {
       // localStorage fallback
     }
@@ -127,10 +165,9 @@ export function OverlayUI() {
   };
 
   const handleCopyPaymentLink = () => {
-    const finalPerPerson = Math.ceil((totalCost + 3700) / friendsCount);
-    const upiUrl = `upi://pay?pa=tripsplit@okhdfcbank&pn=TripSplit&am=${finalPerPerson}&cu=INR&tn=TripSplit_${city.id}`;
+    if (!upiUri) return;
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(upiUrl);
+      navigator.clipboard.writeText(upiUri);
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2000);
     }
@@ -577,36 +614,33 @@ export function OverlayUI() {
               <p className="text-[11px] text-slate-500 font-medium">{city.spots.length} Destination Highlights • Verified UPI</p>
             </div>
 
-            {/* Itemized Line Items (Compact & Scrollable) */}
+            {/* Itemized Line Items (Strictly based on selected items - zero arbitrary costs) */}
             <div className="space-y-1.5 mb-3 max-h-36 overflow-y-auto pr-1 text-xs">
-              <div className="flex justify-between text-slate-600">
-                <span>{city.name.split(',')[0]} Cab & Sightseeing:</span>
-                <span className="font-bold text-slate-900">₹1,500</span>
-              </div>
-              <div className="flex justify-between text-slate-600">
-                <span>{city.name.split(',')[0]} Stay & Resort:</span>
-                <span className="font-bold text-slate-900">₹2,200</span>
-              </div>
+              {selectedSpots.length === 0 && addedActivities.length === 0 && (
+                <div className="text-center py-2 text-slate-400 font-medium">
+                  No spots or activities selected yet.
+                </div>
+              )}
               {selectedSpots.map((spot) => (
                 <div key={spot.id} className="flex justify-between text-slate-600">
                   <span>{spot.name}:</span>
                   <span className="font-bold text-slate-900">
-                    {spot.cost > 0 ? `₹${spot.cost}` : 'Free'}
+                    {spot.cost > 0 ? `₹${spot.cost.toLocaleString('en-IN')}` : 'Free'}
                   </span>
                 </div>
               ))}
               {addedActivities.map((act) => (
                 <div key={act.id} className="flex justify-between text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg">
                   <span>{act.name}:</span>
-                  <span className="font-bold">₹{act.cost}</span>
+                  <span className="font-bold">₹{act.cost.toLocaleString('en-IN')}</span>
                 </div>
               ))}
             </div>
 
-            {/* Total Line (Reference Image 4) */}
+            {/* Total Line (Strictly calculated from persisted items) */}
             <div className="flex justify-between items-center py-2 border-y border-slate-200 mb-3">
               <span className="font-extrabold text-sm text-slate-800">Total:</span>
-              <span className="font-black text-base text-slate-900">₹{(totalCost + 3700).toLocaleString('en-IN')}</span>
+              <span className="font-black text-base text-slate-900">₹{totalCost.toLocaleString('en-IN')}</span>
             </div>
 
             {/* Friends Split Slider */}
@@ -625,29 +659,48 @@ export function OverlayUI() {
               />
               <div className="flex justify-between text-[11px] font-bold text-emerald-600 mt-1">
                 <span>Your Share:</span>
-                <span>₹{Math.ceil((totalCost + 3700) / friendsCount).toLocaleString('en-IN')}/person</span>
+                <span>₹{perPersonShare.toLocaleString('en-IN')}/person</span>
               </div>
             </div>
 
-            {/* Dynamic UPI QR Code Box (Reference Image 4) */}
-            <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-50 border border-slate-200 mb-3 shadow-inner">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                Scan UPI with GPay / PhonePe / Paytm
-              </span>
-              <div className="p-2 bg-white rounded-xl shadow-xs border border-slate-200">
-                <QRCodeSVG
-                  value={`upi://pay?pa=tripsplit@okhdfcbank&pn=TripSplit&am=${Math.ceil((totalCost + 3700) / friendsCount)}&cu=INR&tn=TripSplit_${city.id}`}
-                  size={120}
-                  level="H"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={handleCopyPaymentLink}
-                className="cursor-pointer mt-1 text-[11px] font-bold text-sky-600 hover:text-sky-700 underline"
-              >
-                {copiedLink ? '✓ Copied Payment Link!' : 'Copy Payment Link'}
-              </button>
+            {/* Dynamic UPI QR Code Box */}
+            <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-50 border border-slate-200 mb-3 shadow-inner text-center">
+              {perPersonShare > 0 && upiUri ? (
+                <>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                    Scan UPI with GPay / PhonePe / Paytm
+                  </span>
+                  <div className="p-2 bg-white rounded-xl shadow-xs border border-slate-200">
+                    <QRCodeSVG
+                      value={upiUri}
+                      size={120}
+                      level="H"
+                    />
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-1 font-mono">
+                    Payee: <span className="font-semibold text-slate-700">{payeeVpa}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyPaymentLink}
+                    className="cursor-pointer mt-1 text-[11px] font-bold text-sky-600 hover:text-sky-700 underline"
+                  >
+                    {copiedLink ? '✓ Copied Verified Payment Link!' : 'Copy Payment Link'}
+                  </button>
+                  <p className="text-[9px] text-slate-400 mt-1 leading-tight">
+                    *Initiates UPI intent in your banking app. Settlement confirms upon payment verification.
+                  </p>
+                </>
+              ) : (
+                <div className="py-4 px-2 text-center">
+                  <span className="text-xs font-bold text-emerald-600">
+                    🎉 Free Itinerary Selected
+                  </span>
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    No admission fee for chosen spots. Save trip to track schedule!
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Save & Pay Action Buttons */}

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sidebar } from '../../components/layout/Sidebar';
 import { TopHeader } from '../../components/layout/TopHeader';
 import { BottomNav } from '../../components/layout/BottomNav';
@@ -16,12 +16,31 @@ export default function ProfileSettingsPage() {
   const { user, profile, updateProfile, signOut } = useAuth();
 
   const [displayName, setDisplayName] = useState(
-    profile?.display_name || user?.user_metadata?.full_name || 'Aarav Sharma'
+    profile?.display_name || user?.user_metadata?.full_name || (user?.email ? user.email.split('@')[0] : '')
   );
-  const [upiId, setUpiId] = useState(profile?.upi_id || 'aarav@okhdfcbank');
-  const [phone, setPhone] = useState(user?.user_metadata?.phone || '+91 98765 43210');
+  const [upiId, setUpiId] = useState(profile?.upi_id || '');
+  const [phone, setPhone] = useState(user?.user_metadata?.phone || user?.phone || '');
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Sync state when asynchronous Supabase auth profile resolves
+  useEffect(() => {
+    if (profile?.display_name) {
+      setDisplayName(profile.display_name);
+    } else if (user?.user_metadata?.full_name) {
+      setDisplayName(user.user_metadata.full_name);
+    } else if (user?.email && !displayName) {
+      setDisplayName(user.email.split('@')[0]);
+    }
+
+    if (profile?.upi_id) {
+      setUpiId(profile.upi_id);
+    }
+
+    if (user?.user_metadata?.phone || user?.phone) {
+      setPhone(user?.user_metadata?.phone || user?.phone || '');
+    }
+  }, [profile, user]);
 
   // Privacy permissions state
   const [permissions, setPermissions] = useState({
@@ -152,6 +171,7 @@ export default function ProfileSettingsPage() {
                     required
                     value={upiId}
                     onChange={(e) => setUpiId(e.target.value)}
+                    placeholder="e.g. yourname@okaxis or 9876543210@paytm"
                     className="w-full px-3 py-2 rounded-xl border border-[#E5EAF1] bg-[#F4F7FB] text-xs font-medium text-[#172B4D] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#1685D4]/20 focus:border-[#1685D4]"
                   />
                   <p className="text-[10px] text-[#64748B] mt-1">

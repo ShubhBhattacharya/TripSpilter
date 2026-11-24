@@ -36,7 +36,58 @@ export default function MyTripsPage() {
   const [isScanMerchantOpen, setIsScanMerchantOpen] = useState(false);
 
   useEffect(() => {
+    // Load any custom 3D trips saved locally
+    const loadLocalCustomTrips = (): Trip[] => {
+      try {
+        const rawCustom = typeof window !== 'undefined' ? localStorage.getItem('tripsplit_custom_trips') : null;
+        if (rawCustom) {
+          const parsed = JSON.parse(rawCustom);
+          if (Array.isArray(parsed)) {
+            return parsed.map((c: any, i: number) => ({
+              id: `local-3d-${i}`,
+              title: c.name || `${c.destination} 3D Outing`,
+              tagline: `Interactive 3D itinerary for ${c.destination}`,
+              destination: c.destination,
+              coverImage:
+                'https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?auto=format&fit=crop&w=1200&q=80',
+              startDate: c.startDate || new Date().toISOString().split('T')[0],
+              endDate: new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0],
+              budget: Number(c.totalBudget) || 0,
+              totalSpend: 0,
+              status: 'ACTIVE',
+              members: defaultMembers,
+              itinerary: (c.spots || []).map((s: any, sIdx: number) => ({
+                id: `itin-${sIdx}`,
+                day: 1,
+                time: '10:00 AM',
+                title: s.name,
+                category: 'Activity',
+                cost: Number(s.cost) || 0,
+                location: c.destination,
+                notes: 'Saved from 3D Virtual Tour',
+              })),
+              polls: [],
+              bookings: [],
+              vendorSplits: [],
+              debts: [],
+            }));
+          }
+        }
+      } catch {
+        // ignore
+      }
+      return [];
+    };
+
     if (!isConfigured) {
+      const localTrips = loadLocalCustomTrips();
+      if (localTrips.length > 0) {
+        setTrips((prev) => {
+          const existingIds = new Set(prev.map((p) => p.id));
+          const uniqueNew = localTrips.filter((lt) => !existingIds.has(lt.id));
+          return [...uniqueNew, ...prev];
+        });
+      }
       return;
     }
 
@@ -97,7 +148,8 @@ export default function MyTripsPage() {
               vendorSplits: [],
               debts: [],
             }));
-            setTrips(mapped);
+            const localCustom = loadLocalCustomTrips();
+            setTrips([...localCustom, ...mapped]);
           }
         }
       } catch {
