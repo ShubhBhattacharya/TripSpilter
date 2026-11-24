@@ -190,20 +190,20 @@ export function OverlayUI() {
 
       {/* STAGE 1: ENTRANCE */}
       {stage === 'entrance' && (
-        <div className="pointer-events-auto max-w-lg mx-auto mb-10 w-full animate-in fade-in slide-in-from-bottom-8 duration-500">
-          <div className="p-6 md:p-8 rounded-3xl bg-slate-900/85 backdrop-blur-2xl border border-white/15 shadow-2xl shadow-sky-950/60 text-center">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/20 text-sky-300 border border-sky-400/30 text-xs font-bold mb-4">
+        <div className="pointer-events-auto absolute left-6 md:left-10 top-1/2 -translate-y-1/2 max-w-md w-full animate-in fade-in slide-in-from-left-8 duration-500 z-30">
+          <div className="p-6 md:p-7 rounded-3xl bg-slate-900/90 backdrop-blur-2xl border border-white/15 shadow-2xl shadow-sky-950/60 text-left">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/20 text-sky-300 border border-sky-400/30 text-xs font-bold mb-3">
               <Sparkles className="w-3.5 h-3.5 text-sky-400" />
               Interactive 3D Concierge
             </div>
             <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight leading-tight mb-2">
               Welcome to <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-indigo-300">TripSplit Travel HQ</span>
             </h1>
-            <p className="text-sm text-slate-300 mb-6 leading-relaxed">
+            <p className="text-xs md:text-sm text-slate-300 mb-5 leading-relaxed">
               Step inside our virtual travel office. Explore handpicked destinations in high-definition 360° virtual tours, customize group sightseeing spots, and split costs instantly with dynamic UPI QR codes.
             </p>
 
-            <div className="grid grid-cols-3 gap-2 py-3 px-4 rounded-2xl bg-white/5 border border-white/10 text-left mb-6">
+            <div className="grid grid-cols-3 gap-2 py-2.5 px-3 rounded-2xl bg-white/5 border border-white/10 text-left mb-5">
               <div>
                 <p className="text-[10px] text-slate-400 uppercase font-semibold">Step 1</p>
                 <p className="text-xs font-bold text-white">Meet Concierge</p>

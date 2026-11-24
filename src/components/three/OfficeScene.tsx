@@ -199,24 +199,37 @@ export function OfficeScene() {
         <meshStandardMaterial color="#f8fafc" roughness={0.2} />
       </mesh>
 
-      {/* 4. LIGHTING ATMOSPHERE */}
-      <ambientLight intensity={0.7} color="#f8fafc" />
+      {/* 4. WARM PIXAR-STYLE LIGHTING ATMOSPHERE */}
+      <ambientLight intensity={1.4} color="#fef3c7" />
+
+      {/* Front Key Directional Light for Guide Character & Furniture */}
       <directionalLight
-        position={[4, 6, 4]}
-        intensity={1.5}
+        position={[3, 5, 5]}
+        intensity={2.0}
+        color="#fffbeb"
         castShadow
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
         shadow-camera-near={0.5}
-        shadow-camera-far={20}
-        shadow-camera-left={-6}
-        shadow-camera-right={6}
-        shadow-camera-top={6}
-        shadow-camera-bottom={-6}
-        color="#ffffff"
+        shadow-camera-far={25}
+        shadow-camera-left={-8}
+        shadow-camera-right={8}
+        shadow-camera-top={8}
+        shadow-camera-bottom={-8}
       />
+
+      {/* Soft Fill Directional Light */}
+      <directionalLight
+        position={[-3, 6, 2]}
+        intensity={0.8}
+        color="#e0f2fe"
+      />
+
       {/* Warm Floor Accent Lamp */}
-      <pointLight position={[-3.2, 1.8, 1.6]} intensity={1.2} distance={5} color="#f59e0b" />
+      <pointLight position={[-3.2, 1.8, 1.6]} intensity={1.5} distance={6} color="#f59e0b" />
+
+      {/* Warm Character Rim/Chest Point Fill */}
+      <pointLight position={[1.8, 1.8, 2.2]} intensity={1.0} distance={5} color="#fed7aa" />
     </group>
   );
 }

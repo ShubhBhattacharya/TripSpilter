@@ -11,7 +11,7 @@ interface TravelGuideProps {
   rotation?: [number, number, number];
 }
 
-export function TravelGuide({ position = [0, 0, 0], rotation = [0, 0, 0] }: TravelGuideProps) {
+export function TravelGuide({ position = [1.2, 0, 1.5], rotation = [0, -0.3, 0] }: TravelGuideProps) {
   const groupRef = useRef<THREE.Group>(null);
   const targetPos = useRef(new THREE.Vector3(...position));
   const targetRotY = useRef(rotation[1]);
@@ -69,8 +69,8 @@ export function TravelGuide({ position = [0, 0, 0], rotation = [0, 0, 0] }: Trav
         const mesh = child as THREE.Mesh;
         if (mesh.material) {
           const mat = mesh.material as THREE.MeshStandardMaterial;
-          mat.roughness = 0.55;
-          mat.metalness = 0.1;
+          mat.roughness = 0.45;
+          mat.metalness = 0.05;
         }
       }
     });
@@ -90,8 +90,8 @@ export function TravelGuide({ position = [0, 0, 0], rotation = [0, 0, 0] }: Trav
   // Guide movement between stages
   useEffect(() => {
     if (stage === 'entrance') {
-      targetPos.current.set(0, 0, 1.2);
-      targetRotY.current = 0;
+      targetPos.current.set(1.2, 0, 1.5);
+      targetRotY.current = -0.3;
     } else if (stage === 'walking' || stage === 'desk') {
       targetPos.current.set(0.65, 0, -0.6);
       targetRotY.current = -0.4;
@@ -118,13 +118,13 @@ export function TravelGuide({ position = [0, 0, 0], rotation = [0, 0, 0] }: Trav
       {/* Mixamo character scale is normalized to human ~1.75m height */}
       <primitive object={idleFbx} scale={0.01} dispose={null} />
 
-      {/* Guide Spotlight & Floating Nametag */}
+      {/* Guide Warm Key Spotlight */}
       <spotLight
-        position={[0, 3, 1]}
-        angle={0.6}
+        position={[1.2, 3.5, 2.5]}
+        angle={0.65}
         penumbra={0.8}
-        intensity={1.2}
-        color="#38bdf8"
+        intensity={2.0}
+        color="#fef08a"
         target={groupRef.current || undefined}
       />
     </group>

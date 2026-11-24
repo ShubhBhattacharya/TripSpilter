@@ -45,7 +45,7 @@ export function ExperienceCanvas() {
           alpha: false,
           powerPreference: 'high-performance',
         }}
-        camera={{ position: [0, 1.6, 3.8], fov: 50 }}
+        camera={{ position: [0.4, 1.5, 4.8], fov: 48 }}
         className="w-full h-full"
       >
         <CameraRig />

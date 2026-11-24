@@ -9,14 +9,14 @@ export function CameraRig() {
   const { stage } = useTrip3DStore();
   const { camera } = useThree();
 
-  const targetPosition = useRef(new THREE.Vector3(0, 1.6, 3.8));
-  const targetLookAt = useRef(new THREE.Vector3(0, 1.2, 0));
-  const currentLookAt = useRef(new THREE.Vector3(0, 1.2, 0));
+  const targetPosition = useRef(new THREE.Vector3(0.4, 1.5, 4.8));
+  const targetLookAt = useRef(new THREE.Vector3(0.5, 1.1, 0));
+  const currentLookAt = useRef(new THREE.Vector3(0.5, 1.1, 0));
 
   useEffect(() => {
     if (stage === 'entrance') {
-      targetPosition.current.set(0, 1.6, 3.8);
-      targetLookAt.current.set(0, 1.2, 0);
+      targetPosition.current.set(0.4, 1.5, 4.8);
+      targetLookAt.current.set(0.5, 1.1, 0);
     } else if (stage === 'walking') {
       targetPosition.current.set(1.1, 1.55, 2.0);
       targetLookAt.current.set(0.6, 1.1, -0.6);
