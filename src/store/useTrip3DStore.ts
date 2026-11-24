@@ -50,7 +50,7 @@ const initialSpotIds = defaultCity.spots.map((s) => s.id);
 export const useTrip3DStore = create<Trip3DState>((set, get) => ({
   stage: 'entrance',
   guideAnimation: 'Waving',
-  selectedCityId: 'jaipur',
+  selectedCityId: defaultCity.id,
   currentSpotIndex: 0,
   selectedSpotIds: initialSpotIds,
   addedActivities: [],
@@ -75,7 +75,7 @@ export const useTrip3DStore = create<Trip3DState>((set, get) => ({
   setSelectedCityId: (cityId) => {
     const city = DESTINATIONS.find((d) => d.id === cityId) || DESTINATIONS[0];
     set({
-      selectedCityId: cityId,
+      selectedCityId: city.id,
       currentSpotIndex: 0,
       selectedSpotIds: city.spots.map((s) => s.id),
       addedActivities: [],
@@ -117,12 +117,13 @@ export const useTrip3DStore = create<Trip3DState>((set, get) => ({
   setActiveHotspot: (activeHotspot) => set({ activeHotspot }),
 
   resetExperience: () => {
+    const firstCity = DESTINATIONS[0];
     set({
       stage: 'entrance',
       guideAnimation: 'Waving',
-      selectedCityId: 'jaipur',
+      selectedCityId: firstCity.id,
       currentSpotIndex: 0,
-      selectedSpotIds: DESTINATIONS[0].spots.map((s) => s.id),
+      selectedSpotIds: firstCity.spots.map((s) => s.id),
       addedActivities: [],
       friendsCount: 4,
       activeHotspot: null,

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
@@ -21,6 +21,7 @@ import {
   Eye,
   MapPin,
   ExternalLink,
+  Search,
 } from 'lucide-react';
 import { useTrip3DStore, ExtraActivity } from '@/store/useTrip3DStore';
 import { DESTINATIONS } from '@/data/destinations';
@@ -53,6 +54,8 @@ export function OverlayUI() {
 
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedRegion, setSelectedRegion] = useState<'All' | 'North' | 'South' | 'West' | 'East' | 'Central' | 'Northeast'>('All');
 
   const city = getSelectedCity();
   const currentSpot = getCurrentSpot();
@@ -60,6 +63,22 @@ export function OverlayUI() {
   const totalItemsCount = getTotalItemsCount();
   const totalCost = getTotalCost();
   const perPersonCost = getPerPersonCost();
+
+  const filteredDestinations = useMemo(() => {
+    return DESTINATIONS.filter((d) => {
+      const q = searchQuery.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        d.name.toLowerCase().includes(q) ||
+        d.state.toLowerCase().includes(q) ||
+        d.spots.some((s) => s.name.toLowerCase().includes(q));
+
+      const matchesRegion =
+        selectedRegion === 'All' || d.region === selectedRegion;
+
+      return matchesSearch && matchesRegion;
+    });
+  }, [searchQuery, selectedRegion]);
 
   const handleEnterOffice = () => {
     setStage('walking');
@@ -266,57 +285,103 @@ export function OverlayUI() {
 
       {/* 3. STAGE 2: DESTINATION & TRIP EXPENSES (Positioned on Left Side matching Reference Image 3) */}
       {stage === 'desk' && (
-        <div className="pointer-events-auto fixed left-6 md:left-10 top-24 bottom-6 w-[380px] max-w-[90vw] z-40 flex flex-col justify-center animate-in fade-in slide-in-from-left-6 duration-400">
-          <div className="p-6 md:p-7 rounded-3xl bg-slate-900/85 backdrop-blur-2xl border border-white/20 shadow-2xl text-white">
-            <div className="mb-4">
-              <h2 className="text-xl font-black text-white tracking-tight">TRIP EXPENSES</h2>
-              <p className="text-xs text-slate-300">Splitwise-style collaborative features</p>
+        <div className="pointer-events-auto fixed left-6 md:left-10 top-20 bottom-6 w-[410px] max-w-[92vw] z-40 flex flex-col justify-center animate-in fade-in slide-in-from-left-6 duration-400">
+          <div className="max-h-[86vh] overflow-y-auto p-5 md:p-6 rounded-3xl bg-slate-900/90 backdrop-blur-2xl border border-white/20 shadow-2xl text-white flex flex-col">
+            <div className="mb-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-black text-white tracking-tight">TRIP EXPENSES</h2>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  {filteredDestinations.length} of {DESTINATIONS.length} Cities
+                </span>
+              </div>
+              <p className="text-xs text-slate-300">Pick any Indian destination to explore 360° spots</p>
             </div>
 
-            {/* Destination Selection Tabs */}
-            <div className="grid grid-cols-3 gap-1.5 p-1 rounded-2xl bg-white/5 border border-white/10 mb-4">
-              {DESTINATIONS.map((d) => {
+            {/* Destination Search Bar */}
+            <div className="relative mb-2">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search 50+ destinations (e.g. Manali, Goa)..."
+                className="w-full pl-9 pr-3 py-2 rounded-xl bg-white/10 border border-white/15 text-xs text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-all"
+              />
+            </div>
+
+            {/* Region Filter Pills */}
+            <div className="flex items-center gap-1 overflow-x-auto pb-1 mb-2.5 scrollbar-none text-[10px]">
+              {(['All', 'North', 'South', 'West', 'East', 'Central', 'Northeast'] as const).map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setSelectedRegion(r)}
+                  className={`cursor-pointer px-2.5 py-1 rounded-lg font-bold whitespace-nowrap transition-all ${
+                    selectedRegion === r
+                      ? 'bg-amber-500 text-white shadow-sm'
+                      : 'bg-white/5 text-slate-300 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+
+            {/* Scrollable Destination Selection Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 p-1 rounded-2xl bg-white/5 border border-white/10 mb-3 max-h-36 overflow-y-auto">
+              {filteredDestinations.map((d) => {
                 const isSelected = selectedCityId === d.id;
                 return (
                   <button
                     key={d.id}
                     type="button"
                     onClick={() => setSelectedCityId(d.id)}
-                    className={`cursor-pointer py-2 px-1 rounded-xl text-center text-xs font-bold transition-all ${
+                    className={`cursor-pointer py-1.5 px-2 rounded-xl text-left text-xs font-bold transition-all truncate border ${
                       isSelected
-                        ? 'bg-amber-500 text-white shadow-md shadow-amber-500/30'
-                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        ? 'bg-amber-500 text-white border-amber-400 shadow-md shadow-amber-500/30 scale-[1.02]'
+                        : 'border-transparent text-slate-300 hover:text-white hover:bg-white/10'
                     }`}
+                    title={d.name}
                   >
-                    {d.name.split(',')[0]}
+                    <span className="block truncate">{d.name.split(',')[0]}</span>
+                    <span className="block text-[9px] opacity-75 truncate">{d.state}</span>
                   </button>
                 );
               })}
             </div>
 
-            {/* Splitwise Expense Category Breakdown (Matching Reference Image 3) */}
-            <div className="space-y-2.5 mb-5">
-              <div className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/10">
+            {/* Active Destination Preview Banner */}
+            <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 mb-3 text-xs">
+              <div className="flex items-center gap-1.5 truncate">
+                <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span className="font-extrabold text-white truncate">{city.name}</span>
+              </div>
+              <span className="text-[10px] text-amber-300 font-bold shrink-0">{city.spots.length} Spots Ready</span>
+            </div>
+
+            {/* Splitwise Expense Category Breakdown (Dynamic for selected city) */}
+            <div className="space-y-2 mb-3.5">
+              <div className="flex items-center justify-between p-2.5 rounded-2xl bg-white/5 border border-white/10">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-bold text-xs">
+                  <div className="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-bold text-xs">
                     A
                   </div>
                   <div>
                     <p className="text-xs font-bold text-white">Accommodation</p>
-                    <p className="text-[10px] text-slate-400">Jaipur Heritage Stay</p>
+                    <p className="text-[10px] text-slate-400">{city.name.split(',')[0]} Stay & Resort</p>
                   </div>
                 </div>
                 <span className="text-xs font-black text-emerald-400">+₹1,200</span>
               </div>
 
-              <div className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/10">
+              <div className="flex items-center justify-between p-2.5 rounded-2xl bg-white/5 border border-white/10">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-rose-500/20 text-rose-300 flex items-center justify-center font-bold text-xs">
+                  <div className="w-7 h-7 rounded-full bg-rose-500/20 text-rose-300 flex items-center justify-center font-bold text-xs">
                     M
                   </div>
                   <div>
                     <p className="text-xs font-bold text-white">Food & Dining</p>
-                    <p className="text-[10px] text-slate-400">Dal Baati & Thali</p>
+                    <p className="text-[10px] text-slate-400">{city.name.split(',')[0]} Local Delicacies</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -327,14 +392,14 @@ export function OverlayUI() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/10">
+              <div className="flex items-center justify-between p-2.5 rounded-2xl bg-white/5 border border-white/10">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-sky-500/20 text-sky-300 flex items-center justify-center font-bold text-xs">
+                  <div className="w-7 h-7 rounded-full bg-sky-500/20 text-sky-300 flex items-center justify-center font-bold text-xs">
                     J
                   </div>
                   <div>
                     <p className="text-xs font-bold text-white">Transport & Cabs</p>
-                    <p className="text-[10px] text-slate-400">Fort Shuttle</p>
+                    <p className="text-[10px] text-slate-400">{city.spots[0]?.name || 'City'} Shuttle & Cabs</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -347,7 +412,7 @@ export function OverlayUI() {
             </div>
 
             {/* Launch CTA */}
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2.5 pt-1 border-t border-white/10">
               <button
                 type="button"
                 onClick={() => setStage('entrance')}
@@ -505,18 +570,21 @@ export function OverlayUI() {
           <div className="max-h-[85vh] overflow-y-auto p-5 md:p-6 rounded-3xl bg-white/95 backdrop-blur-2xl border border-white/60 shadow-2xl text-slate-900 flex flex-col">
             {/* Receipt Header (Reference Image 4) */}
             <div className="text-center pb-3 border-b border-dashed border-slate-300 mb-3">
+              <div className="inline-block px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-extrabold uppercase tracking-wider mb-1">
+                {city.name} Split
+              </div>
               <h2 className="text-xl font-black text-slate-900 tracking-tight">TripSplit Receipt</h2>
-              <p className="text-[11px] text-slate-500 font-medium">Glassmorphic receipt • Verified UPI</p>
+              <p className="text-[11px] text-slate-500 font-medium">{city.spots.length} Destination Highlights • Verified UPI</p>
             </div>
 
             {/* Itemized Line Items (Compact & Scrollable) */}
             <div className="space-y-1.5 mb-3 max-h-36 overflow-y-auto pr-1 text-xs">
               <div className="flex justify-between text-slate-600">
-                <span>Cab / Outing fare:</span>
+                <span>{city.name.split(',')[0]} Cab & Sightseeing:</span>
                 <span className="font-bold text-slate-900">₹1,500</span>
               </div>
               <div className="flex justify-between text-slate-600">
-                <span>Heritage Lodge:</span>
+                <span>{city.name.split(',')[0]} Stay & Resort:</span>
                 <span className="font-bold text-slate-900">₹2,200</span>
               </div>
               {selectedSpots.map((spot) => (
