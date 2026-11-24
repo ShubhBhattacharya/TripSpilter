@@ -45,7 +45,7 @@ export function RealPanoramaViewer({ spot }: RealPanoramaViewerProps) {
     };
   }, [spot.wikiTitle, spot.realPhotoUrl]);
 
-  // Interactive Pan / Drag handlers
+  // Interactive Pan / Mouse Drag handlers
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
     startPos.current = { x: e.clientX - currentOffset.current.x, y: e.clientY - currentOffset.current.y };
@@ -53,14 +53,33 @@ export function RealPanoramaViewer({ spot }: RealPanoramaViewerProps) {
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging) return;
-    const nx = Math.max(-120, Math.min(120, e.clientX - startPos.current.x));
-    const ny = Math.max(-60, Math.min(60, e.clientY - startPos.current.y));
+    const nx = Math.max(-140, Math.min(140, e.clientX - startPos.current.x));
+    const ny = Math.max(-70, Math.min(70, e.clientY - startPos.current.y));
     currentOffset.current = { x: nx, y: ny };
     setDragOffset({ x: nx, y: ny });
   };
 
   const handleMouseUp = () => {
     setIsDragging(false);
+  };
+
+  // Touch handlers for mobile/tablet
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length > 0) {
+      setIsDragging(true);
+      startPos.current = {
+        x: e.touches[0].clientX - currentOffset.current.x,
+        y: e.touches[0].clientY - currentOffset.current.y,
+      };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || e.touches.length === 0) return;
+    const nx = Math.max(-140, Math.min(140, e.touches[0].clientX - startPos.current.x));
+    const ny = Math.max(-70, Math.min(70, e.touches[0].clientY - startPos.current.y));
+    currentOffset.current = { x: nx, y: ny };
+    setDragOffset({ x: nx, y: ny });
   };
 
   return (
@@ -70,13 +89,16 @@ export function RealPanoramaViewer({ spot }: RealPanoramaViewerProps) {
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleMouseUp}
     >
-      {/* High-Resolution Real Monument Panoramic Photograph */}
+      {/* High-Resolution Real Monument Panoramic Photograph with smooth pan */}
       <div
-        className="absolute -inset-16 bg-cover bg-center transition-transform duration-300 ease-out will-change-transform"
+        className="absolute -inset-20 bg-cover bg-center transition-transform duration-200 ease-out will-change-transform"
         style={{
           backgroundImage: `url('${photoUrl}')`,
-          transform: `scale(1.12) translate(${dragOffset.x * 0.4}px, ${dragOffset.y * 0.3}px)`,
+          transform: `scale(1.15) translate(${dragOffset.x * 0.45}px, ${dragOffset.y * 0.35}px)`,
         }}
       />
 

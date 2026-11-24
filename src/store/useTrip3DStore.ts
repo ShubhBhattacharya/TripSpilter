@@ -4,12 +4,19 @@ import { DESTINATIONS, Destination, Spot } from '@/data/destinations';
 export type ExperienceStage = 'entrance' | 'walking' | 'desk' | 'virtual-tour' | 'bill';
 export type GuideAnimation = 'Idle' | 'Waving' | 'Walking' | 'Pointing' | 'Thankful';
 
+export interface ExtraActivity {
+  id: string;
+  name: string;
+  cost: number;
+}
+
 interface Trip3DState {
   stage: ExperienceStage;
   guideAnimation: GuideAnimation;
   selectedCityId: string;
   currentSpotIndex: number;
   selectedSpotIds: string[];
+  addedActivities: ExtraActivity[];
   friendsCount: number;
   isAudioEnabled: boolean;
   isOrbiting: boolean;
@@ -21,6 +28,7 @@ interface Trip3DState {
   setSelectedCityId: (cityId: string) => void;
   setCurrentSpotIndex: (index: number) => void;
   toggleSpot: (spotId: string) => void;
+  toggleActivity: (activity: ExtraActivity) => void;
   selectAllCitySpots: () => void;
   setFriendsCount: (count: number) => void;
   toggleAudio: () => void;
@@ -31,6 +39,7 @@ interface Trip3DState {
   getSelectedCity: () => Destination;
   getCurrentSpot: () => Spot;
   getSelectedSpots: () => Spot[];
+  getTotalItemsCount: () => number;
   getTotalCost: () => number;
   getPerPersonCost: () => number;
 }
@@ -44,6 +53,7 @@ export const useTrip3DStore = create<Trip3DState>((set, get) => ({
   selectedCityId: 'jaipur',
   currentSpotIndex: 0,
   selectedSpotIds: initialSpotIds,
+  addedActivities: [],
   friendsCount: 4,
   isAudioEnabled: false,
   isOrbiting: false,
@@ -68,6 +78,7 @@ export const useTrip3DStore = create<Trip3DState>((set, get) => ({
       selectedCityId: cityId,
       currentSpotIndex: 0,
       selectedSpotIds: city.spots.map((s) => s.id),
+      addedActivities: [],
     });
   },
 
@@ -81,6 +92,16 @@ export const useTrip3DStore = create<Trip3DState>((set, get) => ({
       }
     } else {
       set({ selectedSpotIds: [...current, spotId] });
+    }
+  },
+
+  toggleActivity: (activity) => {
+    const current = get().addedActivities;
+    const exists = current.some((a) => a.id === activity.id);
+    if (exists) {
+      set({ addedActivities: current.filter((a) => a.id !== activity.id) });
+    } else {
+      set({ addedActivities: [...current, activity] });
     }
   },
 
@@ -102,6 +123,7 @@ export const useTrip3DStore = create<Trip3DState>((set, get) => ({
       selectedCityId: 'jaipur',
       currentSpotIndex: 0,
       selectedSpotIds: DESTINATIONS[0].spots.map((s) => s.id),
+      addedActivities: [],
       friendsCount: 4,
       activeHotspot: null,
     });
@@ -124,9 +146,15 @@ export const useTrip3DStore = create<Trip3DState>((set, get) => ({
     return city.spots.filter((s) => ids.includes(s.id));
   },
 
+  getTotalItemsCount: () => {
+    return get().selectedSpotIds.length + get().addedActivities.length;
+  },
+
   getTotalCost: () => {
     const spots = get().getSelectedSpots();
-    return spots.reduce((acc, s) => acc + s.cost, 0);
+    const spotCost = spots.reduce((acc, s) => acc + s.cost, 0);
+    const activityCost = get().addedActivities.reduce((acc, a) => acc + a.cost, 0);
+    return spotCost + activityCost;
   },
 
   getPerPersonCost: () => {

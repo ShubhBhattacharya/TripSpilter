@@ -1,5 +1,8 @@
 export interface FloatingBadge {
+  id: string;
   label: string;
+  cost: number;
+  type: 'itinerary' | 'activity';
   top: string;
   left: string;
 }
@@ -74,8 +77,8 @@ export const DESTINATIONS: Destination[] = [
         speechQuote: 'Welcome to Hawa Mahal! 953 jharokhon wala iconic palace. Settle inside view aur explore karein.',
         nextSpotName: 'Amer Fort',
         floatingBadges: [
-          { label: '+ Add to Itinerary', top: '64%', left: '18%' },
-          { label: '+ Book Heritage Walk (₹500)', top: '68%', left: '58%' },
+          { id: 'hawa-itinerary', label: '+ Add to Itinerary', cost: 0, type: 'itinerary', top: '64%', left: '18%' },
+          { id: 'hawa-heritage-walk', label: '+ Book Heritage Walk (₹500)', cost: 500, type: 'activity', top: '68%', left: '58%' },
         ],
         panorama: {
           ambientColor: '#ffe4cc',
@@ -106,8 +109,8 @@ export const DESTINATIONS: Destination[] = [
         speechQuote: 'Ye hai Amer Fort! Sheesh Mahal aur Maota Lake ka royal view. Elephant path aur ramparts check out karein.',
         nextSpotName: 'Jal Mahal',
         floatingBadges: [
-          { label: '+ Sheesh Mahal Entry Included', top: '55%', left: '25%' },
-          { label: '+ Sunset Bastion View', top: '60%', left: '62%' },
+          { id: 'amer-itinerary', label: '+ Add to Itinerary', cost: 0, type: 'itinerary', top: '55%', left: '25%' },
+          { id: 'amer-sheesh-guide', label: '+ Sheesh Mahal Audio Guide (₹250)', cost: 250, type: 'activity', top: '60%', left: '62%' },
         ],
         panorama: {
           ambientColor: '#fef3c7',
@@ -138,8 +141,8 @@ export const DESTINATIONS: Destination[] = [
         speechQuote: 'Jal Mahal Man Sagar Lake ke beech mein tairta hua mehsus hota hai. Zero entry fee landmark for your group!',
         nextSpotName: 'Nahargarh Fort',
         floatingBadges: [
-          { label: '★ Free Public Viewpoint', top: '58%', left: '22%' },
-          { label: '+ Sunset Photography Spot', top: '65%', left: '60%' },
+          { id: 'jal-itinerary', label: '+ Add to Itinerary', cost: 0, type: 'itinerary', top: '58%', left: '22%' },
+          { id: 'jal-boat-ride', label: '+ Sunset Promenade Pass (₹150)', cost: 150, type: 'activity', top: '65%', left: '60%' },
         ],
         panorama: {
           ambientColor: '#dbeafe',
@@ -170,8 +173,8 @@ export const DESTINATIONS: Destination[] = [
         speechQuote: 'Nahargarh cliffside bastions se poori Jaipur city ka sunset aur night skyline dikhta hai. Perfect for squad pictures!',
         nextSpotName: 'Hawa Mahal',
         floatingBadges: [
-          { label: '+ Padao Sunset Cafe', top: '52%', left: '24%' },
-          { label: '+ Historic Baori Stepwell', top: '62%', left: '65%' },
+          { id: 'nahar-itinerary', label: '+ Add to Itinerary', cost: 0, type: 'itinerary', top: '52%', left: '24%' },
+          { id: 'nahar-padao-entry', label: '+ Padao Sunset Bistro Table (₹350)', cost: 350, type: 'activity', top: '62%', left: '65%' },
         ],
         panorama: {
           ambientColor: '#fed7aa',
@@ -213,8 +216,8 @@ export const DESTINATIONS: Destination[] = [
         speechQuote: 'Welcome to Solang Valley! Paragliding aur snow adventures ke liye best spot. Chaliye fly karein!',
         nextSpotName: 'Hadimba Temple',
         floatingBadges: [
-          { label: '+ Paragliding Launch Point', top: '50%', left: '20%' },
-          { label: '+ Cable Car Ropeway', top: '65%', left: '60%' },
+          { id: 'solang-itinerary', label: '+ Add to Itinerary', cost: 0, type: 'itinerary', top: '50%', left: '20%' },
+          { id: 'solang-cable-car', label: '+ Cable Car Ropeway Ticket (₹500)', cost: 500, type: 'activity', top: '65%', left: '60%' },
         ],
         panorama: {
           ambientColor: '#e0f2fe',
@@ -245,8 +248,8 @@ export const DESTINATIONS: Destination[] = [
         speechQuote: 'Dhungri Van ke ghane cedar deodar jangal mein Hadimba Temple ki wooden carving dekhiye.',
         nextSpotName: 'Atal Tunnel & Sissu',
         floatingBadges: [
-          { label: '★ Historic Wooden Architecture', top: '55%', left: '22%' },
-          { label: '+ Deodar Nature Walk', top: '62%', left: '62%' },
+          { id: 'hadimba-itinerary', label: '+ Add to Itinerary', cost: 0, type: 'itinerary', top: '55%', left: '22%' },
+          { id: 'hadimba-forest-guide', label: '+ Cedar Forest Guided Walk (₹200)', cost: 200, type: 'activity', top: '62%', left: '62%' },
         ],
         panorama: {
           ambientColor: '#dcfce7',
@@ -277,8 +280,8 @@ export const DESTINATIONS: Destination[] = [
         speechQuote: 'World longest highway tunnel cross karte hi Lahaul valley aur Sissu waterfall ka breathtaking scene!',
         nextSpotName: 'Solang Valley',
         floatingBadges: [
-          { label: '+ Sissu Waterfall View', top: '52%', left: '20%' },
-          { label: '+ Glacier Chandra River', top: '60%', left: '65%' },
+          { id: 'atal-itinerary', label: '+ Add to Itinerary', cost: 0, type: 'itinerary', top: '52%', left: '20%' },
+          { id: 'sissu-waterfall-pass', label: '+ Sissu Waterfall Zip Access (₹300)', cost: 300, type: 'activity', top: '60%', left: '65%' },
         ],
         panorama: {
           ambientColor: '#ede9fe',
@@ -320,8 +323,8 @@ export const DESTINATIONS: Destination[] = [
         speechQuote: 'Dil Chahta Hai iconic fort bastions! Arabian sea ka grand 360 view friends ke sath experience karein.',
         nextSpotName: 'Palolem Crescent Bay',
         floatingBadges: [
-          { label: '+ Red Laterite Bastion', top: '55%', left: '22%' },
-          { label: '+ Sunset Sea Horizon', top: '65%', left: '60%' },
+          { id: 'vagator-itinerary', label: '+ Add to Itinerary', cost: 0, type: 'itinerary', top: '55%', left: '22%' },
+          { id: 'chapora-sunset-entry', label: '+ Bastion Sunset Reserved Spot (₹200)', cost: 200, type: 'activity', top: '65%', left: '60%' },
         ],
         panorama: {
           ambientColor: '#fef08a',
@@ -352,8 +355,8 @@ export const DESTINATIONS: Destination[] = [
         speechQuote: 'Palolem Crescent bay ki calm waves aur sea kayaking vibes. Perfect relaxing day with squad!',
         nextSpotName: 'Vagator Cliff',
         floatingBadges: [
-          { label: '+ Sea Kayaking Rental', top: '54%', left: '20%' },
-          { label: '+ Dolphin Spotting Bay', top: '63%', left: '65%' },
+          { id: 'palolem-itinerary', label: '+ Add to Itinerary', cost: 0, type: 'itinerary', top: '54%', left: '20%' },
+          { id: 'palolem-kayak-rental', label: '+ Twin Sea Kayak 1hr (₹350)', cost: 350, type: 'activity', top: '63%', left: '65%' },
         ],
         panorama: {
           ambientColor: '#ccfbf1',
