@@ -69,6 +69,16 @@ export const WelcomeLandingPage: React.FC<WelcomeLandingPageProps> = ({
 
           {/* Desktop Navigation Links */}
           <nav className="hidden md:flex items-center gap-7 text-xs font-semibold text-[#64748B]">
+            <Link
+              href="/3d-experience"
+              className="flex items-center gap-1.5 text-sky-600 hover:text-sky-700 font-bold transition-colors"
+            >
+              <Compass className="w-3.5 h-3.5 animate-spin-slow" />
+              <span>3D Travel HQ</span>
+              <span className="px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 text-[9px] font-extrabold uppercase tracking-wide border border-sky-200">
+                Interactive
+              </span>
+            </Link>
             <a href="#features" className="hover:text-[#173B70] transition-colors">Features</a>
             <a href="#how-it-works" className="hover:text-[#173B70] transition-colors">How It Works</a>
             <Link href="/explore" className="hover:text-[#173B70] transition-colors flex items-center gap-1">
@@ -153,6 +163,15 @@ export const WelcomeLandingPage: React.FC<WelcomeLandingPageProps> = ({
 
                 {/* CTA Row */}
                 <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                  <Link
+                    href="/3d-experience"
+                    className="flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-black text-sm shadow-xl shadow-sky-500/30 hover:scale-[1.02] active:scale-95 transition-all border border-sky-300/40"
+                  >
+                    <Compass className="w-4 h-4 animate-spin-slow" />
+                    <span>Launch 3D Travel HQ</span>
+                    <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  </Link>
+
                   <Link
                     href="/signup"
                     onClick={onGetStarted}
@@ -379,6 +398,42 @@ export const WelcomeLandingPage: React.FC<WelcomeLandingPageProps> = ({
             <p className="text-xs text-[#64748B] leading-relaxed">
               Our graph settlement optimizer collapses multi-person debts into the absolute minimum number of UPI transfers, eliminating circular IOUs.
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* 3D Travel HQ Interactive Experience Showcase */}
+      <section className="py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
+        <div className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-slate-900 via-sky-950 to-indigo-950 p-8 sm:p-12 border border-sky-500/30 shadow-2xl text-white">
+          <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-8">
+            <div className="space-y-4 max-w-2xl">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/20 text-sky-300 border border-sky-400/30 text-xs font-bold">
+                <Compass className="w-3.5 h-3.5 animate-spin-slow" />
+                <span>Next-Gen Travel-Tech Feature</span>
+              </div>
+              <h3 className="text-2xl sm:text-4xl font-black tracking-tight">
+                Step Inside Our <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-indigo-300">Virtual 3D Travel HQ</span>
+              </h3>
+              <p className="text-sm text-slate-300 leading-relaxed">
+                Meet our 3D AI travel concierge, walk through our virtual headquarters, preview destinations in 360° equirectangular panoramas, and split attraction tickets with instant UPI QR codes before you even leave home.
+              </p>
+              <div className="flex flex-wrap items-center gap-4 text-xs text-sky-200">
+                <span className="flex items-center gap-1.5 font-semibold">✓ 3D Animated Guide</span>
+                <span className="flex items-center gap-1.5 font-semibold">✓ 360° Spherical Tours</span>
+                <span className="flex items-center gap-1.5 font-semibold">✓ Dynamic UPI QR Settlement</span>
+              </div>
+            </div>
+
+            <div className="shrink-0 w-full lg:w-auto">
+              <Link
+                href="/3d-experience"
+                className="flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-extrabold text-base shadow-xl shadow-sky-500/40 hover:scale-[1.02] active:scale-95 transition-all border border-sky-300/40"
+              >
+                <Compass className="w-5 h-5 animate-spin-slow" />
+                <span>Launch 3D Travel HQ</span>
+                <ArrowRight className="w-5 h-5" />
+              </Link>
+            </div>
           </div>
         </div>
       </section>

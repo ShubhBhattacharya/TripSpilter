@@ -56,6 +56,12 @@ export const Sidebar: React.FC = () => {
       icon: Globe,
     },
     {
+      name: '3D Travel HQ',
+      href: '/3d-experience',
+      icon: Compass,
+      badge: '360°',
+    },
+    {
       name: 'Direct QR Split',
       href: '/qr-split',
       icon: QrCode,
@@ -142,6 +148,11 @@ export const Sidebar: React.FC = () => {
                 />
                 <span>{item.name}</span>
               </div>
+              {item.badge && (
+                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-sky-100 text-sky-700 border border-sky-200 uppercase tracking-tight">
+                  {item.badge}
+                </span>
+              )}
             </Link>
           );
         })}
