@@ -1,12 +1,11 @@
 'use client';
 
-import React, { useMemo, useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
+import React, { useMemo } from 'react';
 import { OrbitControls, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { useTrip3DStore } from '@/store/useTrip3DStore';
 import { Spot } from '@/data/destinations';
-import { Info, Sparkles, MapPin, Eye } from 'lucide-react';
+import { Sparkles, MapPin } from 'lucide-react';
 
 interface HotspotData {
   id: string;

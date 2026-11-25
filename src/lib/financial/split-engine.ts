@@ -449,7 +449,7 @@ export function calculatePercentageSplit(input: PercentageSplitInput): {
     paise: Math.floor((totalPaise * p.percent) / 100),
   }));
 
-  let allocated = rawShares.reduce((acc, s) => acc + s.paise, 0);
+  const allocated = rawShares.reduce((acc, s) => acc + s.paise, 0);
   let remainder = totalPaise - allocated;
   let idx = 0;
   while (remainder > 0 && rawShares.length > 0) {

@@ -45,7 +45,7 @@ function LoginForm() {
     return null;
   });
 
-  const supabase = createClient();
+  const supabase = React.useMemo(() => (isSupabaseConfigured ? createClient() : null), []);
 
   const handleDemoLogin = () => {
     setError(null);
@@ -72,7 +72,7 @@ function LoginForm() {
     }
 
     // Graceful fallback when Supabase is not yet configured in .env.local
-    if (!isSupabaseConfigured) {
+    if (!isSupabaseConfigured || !supabase) {
       const displayName = email.split('@')[0] || 'Traveler';
       signInAsDemo({
         name: displayName.charAt(0).toUpperCase() + displayName.slice(1),
@@ -122,7 +122,7 @@ function LoginForm() {
     setSuccessMsg(null);
 
     // Graceful fallback when Supabase Google OAuth is not yet configured
-    if (!isSupabaseConfigured) {
+    if (!isSupabaseConfigured || !supabase) {
       signInAsDemo({
         name: 'Google Demo Traveler',
         email: 'traveler.google@example.com',

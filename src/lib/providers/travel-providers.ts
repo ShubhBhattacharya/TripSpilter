@@ -10,9 +10,44 @@ export interface LiveProviderEnvelope<T> {
   status: ProviderAvailability;
   source: string;
   lastUpdated: string;
+  cached?: boolean;
   missingCredential?: string;
   disclaimer?: string;
   data: T | null;
+}
+
+const providerCache = new Map<string, { expiresAt: number; payload: unknown }>();
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+function getCached<T>(key: string): LiveProviderEnvelope<T> | null {
+  const entry = providerCache.get(key);
+  if (!entry || Date.now() > entry.expiresAt) {
+    providerCache.delete(key);
+    return null;
+  }
+  const cloned = entry.payload as LiveProviderEnvelope<T>;
+  return { ...cloned, cached: true };
+}
+
+function setCached<T>(key: string, payload: LiveProviderEnvelope<T>): void {
+  if (payload.status === 'live_verified' || payload.status === 'indicative_public_api') {
+    providerCache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, payload });
+  }
+}
+
+async function fetchWithRetry(url: string, init: RequestInit, retries = 1): Promise<Response> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, init);
+      if (res.status < 500 || attempt === retries) return res;
+    } catch (err) {
+      lastErr = err;
+      if (attempt === retries) throw err;
+    }
+    await new Promise((r) => setTimeout(r, 250 * (attempt + 1)));
+  }
+  throw lastErr instanceof Error ? lastErr : new Error('Provider fetch failed');
 }
 
 export interface PlaceResult {
@@ -109,9 +144,13 @@ export async function searchLivePlaces(
     };
   }
 
+  const cacheKey = `places:${query.toLowerCase().trim()}:${(city || '').toLowerCase().trim()}`;
+  const cached = getCached<PlaceResult[]>(cacheKey);
+  if (cached) return cached;
+
   try {
     const textQuery = city ? `${query} in ${city}, India` : query;
-    const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
+    const res = await fetchWithRetry('https://places.googleapis.com/v1/places:searchText', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -151,19 +190,21 @@ export async function searchLivePlaces(
         rating: p.rating,
         lat: p.location?.latitude || 0,
         lng: p.location?.longitude || 0,
-        // Never leak API key in client photo URL; proxy via /api/travel/places if rendering photo
-        photoUrl: photoName ? `/api/travel/places?photoName=${encodeURIComponent(photoName)}` : undefined,
+        // Proxy photo cleanly via /api/travel?type=photo so GOOGLE_MAPS_API_KEY never leaks in client URLs
+        photoUrl: photoName ? `/api/travel?type=photo&photoName=${encodeURIComponent(photoName)}` : undefined,
         attribution: p.photos?.[0]?.authorAttributions?.[0]?.displayName || 'Google Places contributor',
         openingHours: p.regularOpeningHours?.weekdayDescriptions,
       };
     });
 
-    return {
+    const envelope: LiveProviderEnvelope<PlaceResult[]> = {
       status: 'live_verified',
       source: 'Google Places API (New)',
       lastUpdated: now,
       data: places,
     };
+    setCached(cacheKey, envelope);
+    return envelope;
   } catch (err) {
     return {
       status: 'error',

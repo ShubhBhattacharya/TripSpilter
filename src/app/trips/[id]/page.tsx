@@ -168,22 +168,37 @@ function TripWorkspaceContent() {
       }
 
       // Check localStorage for user-created custom trips (e.g. from 3D experience)
+      interface LocalCustomSpot {
+        name?: string;
+        cost?: number;
+      }
+      interface LocalCustomTrip {
+        id?: string;
+        name?: string;
+        destination?: string;
+        coverImage?: string;
+        startDate?: string;
+        endDate?: string;
+        totalBudget?: number;
+        members?: typeof defaultMembers;
+        spots?: LocalCustomSpot[];
+      }
       try {
         const rawLocalTrips = typeof window !== 'undefined' ? localStorage.getItem('tripsplit_custom_trips') : null;
         if (rawLocalTrips) {
-          const parsed = JSON.parse(rawLocalTrips);
+          const parsed = JSON.parse(rawLocalTrips) as LocalCustomTrip[];
           if (Array.isArray(parsed)) {
             const foundIdx = parsed.findIndex(
-              (ct: any, idx: number) => ct.id === tripId || `local-3d-${idx}` === tripId
+              (ct, idx) => ct.id === tripId || `local-3d-${idx}` === tripId
             );
             if (foundIdx !== -1) {
               const ct = parsed[foundIdx];
               const localMembers = Array.isArray(ct.members) && ct.members.length > 0 ? ct.members : defaultMembers;
               const mappedTrip: Trip = {
                 id: tripId,
-                title: ct.name || `${ct.destination} 3D Outing`,
-                tagline: `Interactive 3D itinerary for ${ct.destination}`,
-                destination: ct.destination,
+                title: ct.name || `${ct.destination || 'Trip'} 3D Outing`,
+                tagline: `Interactive 3D itinerary for ${ct.destination || 'India'}`,
+                destination: ct.destination || 'India',
                 coverImage:
                   ct.coverImage ||
                   'https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?auto=format&fit=crop&w=1200&q=80',
@@ -193,14 +208,15 @@ function TripWorkspaceContent() {
                 totalSpend: 0,
                 status: 'ACTIVE',
                 members: localMembers,
-                itinerary: (ct.spots || []).map((s: any, sIdx: number) => ({
+                itinerary: (ct.spots || []).map((s, sIdx) => ({
                   id: `itin-${sIdx}`,
                   day: 1,
                   time: '10:00 AM',
-                  title: s.name,
+                  title: s.name || 'Tour Spot',
                   category: 'Activity',
-                  cost: Number(s.cost) || 0,
-                  location: ct.destination,
+                  estimatedCost: Number(s.cost) || 0,
+                  location: ct.destination || 'India',
+                  mapsUrl: `https://maps.google.com/?q=${encodeURIComponent(ct.destination || 'India')}`,
                   notes: 'Saved from 3D Virtual Tour',
                 })),
                 polls: [],

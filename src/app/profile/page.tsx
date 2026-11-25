@@ -23,23 +23,26 @@ export default function ProfileSettingsPage() {
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Sync state when asynchronous Supabase auth profile resolves
+  // Sync state when asynchronous Supabase auth profile resolves (wrapped via microtask)
   useEffect(() => {
-    if (profile?.display_name) {
-      setDisplayName(profile.display_name);
-    } else if (user?.user_metadata?.full_name) {
-      setDisplayName(user.user_metadata.full_name);
-    } else if (user?.email && !displayName) {
-      setDisplayName(user.email.split('@')[0]);
-    }
+    const timer = setTimeout(() => {
+      if (profile?.display_name) {
+        setDisplayName(profile.display_name);
+      } else if (user?.user_metadata?.full_name) {
+        setDisplayName(user.user_metadata.full_name);
+      } else if (user?.email) {
+        setDisplayName((prev: string) => prev || user.email!.split('@')[0]);
+      }
 
-    if (profile?.upi_id) {
-      setUpiId(profile.upi_id);
-    }
+      if (profile?.upi_id) {
+        setUpiId(profile.upi_id);
+      }
 
-    if (user?.user_metadata?.phone || user?.phone) {
-      setPhone(user?.user_metadata?.phone || user?.phone || '');
-    }
+      if (user?.user_metadata?.phone || user?.phone) {
+        setPhone(user?.user_metadata?.phone || user?.phone || '');
+      }
+    }, 0);
+    return () => clearTimeout(timer);
   }, [profile, user]);
 
   // Privacy permissions state

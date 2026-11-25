@@ -20,6 +20,7 @@ interface TravelGuideProps {
 
 export function TravelGuide({ position = [1.1, 0, 1.2], rotation = [0, -0.35, 0] }: TravelGuideProps) {
   const groupRef = useRef<THREE.Group>(null);
+  const spotLightRef = useRef<THREE.SpotLight>(null);
   const targetPos = useRef(new THREE.Vector3(...position));
   const targetRotY = useRef(rotation[1]);
   const targetScale = useRef(0.01);
@@ -28,19 +29,16 @@ export function TravelGuide({ position = [1.1, 0, 1.2], rotation = [0, -0.35, 0]
   const neckBoneRef = useRef<THREE.Bone | null>(null);
   const jawBoneRef = useRef<THREE.Bone | null>(null);
   const spineBoneRef = useRef<THREE.Bone | null>(null);
-  const morphMeshesRef = useRef<THREE.Mesh[]>([]);
   const speechClockRef = useRef(0);
 
   const { stage, guideAnimation, isSpeaking } = useTrip3DStore();
 
-  // Load base skinned mesh & animation clips
   const idleFbx = useFBX('/models/character/idle.fbx');
   const wavingFbx = useFBX('/models/character/waving.fbx');
   const walkingFbx = useFBX('/models/character/walking.fbx');
   const pointingFbx = useFBX('/models/character/pointing.fbx');
   const thankfulFbx = useFBX('/models/character/thankful.fbx');
 
-  // Clone animations with explicit readable names
   const animations = useMemo(() => {
     const clips: THREE.AnimationClip[] = [];
 
@@ -75,13 +73,16 @@ export function TravelGuide({ position = [1.1, 0, 1.2], rotation = [0, -0.35, 0]
 
   const { actions } = useAnimations(animations, groupRef);
 
-  // Setup shadows, materials, and collect speaking bones / morph targets
+  // Setup shadows, materials, spotlight target & speaking bone references outside render
   useEffect(() => {
+    if (spotLightRef.current && groupRef.current) {
+      spotLightRef.current.target = groupRef.current;
+    }
+
     headBoneRef.current = null;
     neckBoneRef.current = null;
     jawBoneRef.current = null;
     spineBoneRef.current = null;
-    morphMeshesRef.current = [];
 
     idleFbx.traverse((child) => {
       if ((child as THREE.Bone).isBone) {
@@ -102,9 +103,6 @@ export function TravelGuide({ position = [1.1, 0, 1.2], rotation = [0, -0.35, 0]
         child.castShadow = true;
         child.receiveShadow = true;
         const mesh = child as THREE.Mesh;
-        if (mesh.morphTargetInfluences && mesh.morphTargetInfluences.length > 0) {
-          morphMeshesRef.current.push(mesh);
-        }
         if (mesh.material) {
           const mat = mesh.material as THREE.MeshStandardMaterial;
           mat.roughness = 0.4;
@@ -114,7 +112,6 @@ export function TravelGuide({ position = [1.1, 0, 1.2], rotation = [0, -0.35, 0]
     });
   }, [idleFbx]);
 
-  // Handle smooth animation crossfades
   useEffect(() => {
     const currentAction = actions[guideAnimation] || actions['Idle'];
     if (currentAction) {
@@ -125,7 +122,6 @@ export function TravelGuide({ position = [1.1, 0, 1.2], rotation = [0, -0.35, 0]
     }
   }, [guideAnimation, actions]);
 
-  // Guide movement & scale per stage
   useEffect(() => {
     if (stage === 'entrance') {
       targetPos.current.set(1.1, 0, 1.2);
@@ -146,7 +142,7 @@ export function TravelGuide({ position = [1.1, 0, 1.2], rotation = [0, -0.35, 0]
     }
   }, [stage]);
 
-  // Smooth lerping + synchronized speaking motion (head nod, subtle body emphasis, jaw/morph sync)
+  // Smooth lerping + procedural speaking motion synchronized strictly with audio playback
   useFrame((_, delta) => {
     if (!groupRef.current) return;
 
@@ -164,7 +160,6 @@ export function TravelGuide({ position = [1.1, 0, 1.2], rotation = [0, -0.35, 0]
       speechClockRef.current += delta;
       const t = speechClockRef.current;
 
-      // Expressive conversational head & torso emphasis synced strictly to audio playback
       if (headBoneRef.current) {
         headBoneRef.current.rotation.x += Math.sin(t * 7.5) * 0.045;
         headBoneRef.current.rotation.y += Math.sin(t * 3.1) * 0.06;
@@ -179,24 +174,9 @@ export function TravelGuide({ position = [1.1, 0, 1.2], rotation = [0, -0.35, 0]
       if (jawBoneRef.current) {
         jawBoneRef.current.rotation.x += (Math.sin(t * 14) * 0.5 + 0.5) * 0.12;
       }
-      for (const mesh of morphMeshesRef.current) {
-        if (mesh.morphTargetInfluences && mesh.morphTargetInfluences.length > 0) {
-          mesh.morphTargetInfluences[0] = (Math.sin(t * 13) * 0.5 + 0.5) * 0.65;
-        }
-      }
-      // Subtle animated body lift on the whole group while actively speaking
       groupRef.current.position.y += Math.sin(t * 6.0) * 0.0025;
     } else {
       speechClockRef.current = 0;
-      for (const mesh of morphMeshesRef.current) {
-        if (mesh.morphTargetInfluences && mesh.morphTargetInfluences.length > 0) {
-          mesh.morphTargetInfluences[0] = THREE.MathUtils.lerp(
-            mesh.morphTargetInfluences[0],
-            0,
-            Math.min(1, delta * 10)
-          );
-        }
-      }
     }
   });
 
@@ -204,14 +184,13 @@ export function TravelGuide({ position = [1.1, 0, 1.2], rotation = [0, -0.35, 0]
     <group ref={groupRef} position={position} rotation={rotation} scale={0.01}>
       <primitive object={idleFbx} scale={1} dispose={null} />
 
-      {/* Guide Warm Key Spotlight */}
       <spotLight
+        ref={spotLightRef}
         position={[0.5, 3.5, 1.5]}
         angle={0.7}
         penumbra={0.8}
         intensity={2.2}
         color="#fffbeb"
-        target={groupRef.current || undefined}
       />
     </group>
   );

@@ -8,7 +8,7 @@ import {
   UnauthorizedError,
   ForbiddenError,
 } from '../../../../lib/security/auth-guards';
-import { toPaise } from '../../../../lib/financial/split-engine';
+import { calculateEqualSplit, toPaise } from '../../../../lib/financial/split-engine';
 
 const updateExpenseSchema = z.object({
   vendorName: z.string().min(1).max(100).optional(),
@@ -29,7 +29,10 @@ export async function PATCH(
     const body = await request.json();
     const parsed = updateExpenseSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.issues[0]?.message || 'Validation error' }, { status: 400 });
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message || 'Validation error' },
+        { status: 400 }
+      );
     }
 
     const supabase = await createClient();
@@ -37,7 +40,7 @@ export async function PATCH(
 
     const { data: expense } = await supabase
       .from('expenses')
-      .select('id, trip_id, paid_by')
+      .select('id, trip_id, paid_by, expense_splits(id, user_id)')
       .eq('id', expenseId)
       .maybeSingle();
 
@@ -54,13 +57,32 @@ export async function PATCH(
     if (parsed.data.totalAmount !== undefined) {
       patch.total_amount = parsed.data.totalAmount;
       patch.total_amount_paise = toPaise(parsed.data.totalAmount);
+
+      // Recompute member splits deterministically so Sum(splits) === totalAmount ALWAYS holds
+      const existingSplits = (expense.expense_splits || []) as Array<{ id: string; user_id: string }>;
+      if (existingSplits.length > 0) {
+        const recalculated = calculateEqualSplit({
+          totalAmount: parsed.data.totalAmount,
+          memberIds: existingSplits.map((s) => s.user_id),
+        });
+        for (let i = 0; i < existingSplits.length; i++) {
+          const share = recalculated[i];
+          await supabase
+            .from('expense_splits')
+            .update({
+              amount_owed: share.amount,
+              amount_owed_paise: share.amountPaise,
+            })
+            .eq('id', existingSplits[i].id);
+        }
+      }
     }
 
     const { data, error } = await supabase
       .from('expenses')
       .update(patch)
       .eq('id', expenseId)
-      .select()
+      .select('*, expense_splits(*)')
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

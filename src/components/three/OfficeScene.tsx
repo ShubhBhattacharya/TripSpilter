@@ -5,8 +5,25 @@ import { useFBX, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 import { useTrip3DStore } from '@/store/useTrip3DStore';
 
-// Safe Sub-component for FBX Prop
-function FBXModel({
+class FBXErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  render() {
+    if (this.state.hasError) return null;
+    return this.props.children;
+  }
+}
+
+// Safe Sub-component for FBX Prop (hooks unconditional, wrapped cleanly in ErrorBoundary)
+function FBXModelInner({
   path,
   position = [0, 0, 0],
   rotation = [0, 0, 0],
@@ -19,38 +36,48 @@ function FBXModel({
   scale?: number | [number, number, number];
   color?: string;
 }) {
-  try {
-    const fbx = useFBX(path);
-    const cloned = useMemo(() => {
-      const c = fbx.clone(true);
-      c.traverse((child) => {
-        if ((child as THREE.Mesh).isMesh) {
-          child.castShadow = true;
-          child.receiveShadow = true;
-          if (color) {
-            const mesh = child as THREE.Mesh;
-            mesh.material = new THREE.MeshStandardMaterial({
-              color,
-              roughness: 0.6,
-              metalness: 0.2,
-            });
-          }
+  const fbx = useFBX(path);
+  const cloned = useMemo(() => {
+    const c = fbx.clone(true);
+    c.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        if (color) {
+          const mesh = child as THREE.Mesh;
+          mesh.material = new THREE.MeshStandardMaterial({
+            color,
+            roughness: 0.6,
+            metalness: 0.2,
+          });
         }
-      });
-      return c;
-    }, [fbx, color]);
+      }
+    });
+    return c;
+  }, [fbx, color]);
 
-    return (
-      <primitive
-        object={cloned}
-        position={position}
-        rotation={rotation}
-        scale={typeof scale === 'number' ? [scale, scale, scale] : scale}
-      />
-    );
-  } catch {
-    return null;
-  }
+  return (
+    <primitive
+      object={cloned}
+      position={position}
+      rotation={rotation}
+      scale={typeof scale === 'number' ? [scale, scale, scale] : scale}
+    />
+  );
+}
+
+function FBXModel(props: {
+  path: string;
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+  scale?: number | [number, number, number];
+  color?: string;
+}) {
+  return (
+    <FBXErrorBoundary>
+      <FBXModelInner {...props} />
+    </FBXErrorBoundary>
+  );
 }
 
 export function OfficeScene() {

@@ -1,24 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { createClient } from '../../../../lib/supabase/server';
+import { isSupabaseConfigured } from '../../../../lib/supabase/client';
+import {
+  checkRateLimit,
+  getClientIdentifier,
+  applyRateLimitHeaders,
+} from '../../../../lib/rate-limit';
 
 export const runtime = 'nodejs';
 
 const explainSchema = z.object({
-  cityId: z.string().min(1),
-  cityName: z.string().min(1),
-  state: z.string().min(1),
-  region: z.string().optional(),
-  tagline: z.string().optional(),
-  cityDescription: z.string().optional(),
-  spotName: z.string().min(1),
-  spotSubtitle: z.string().optional(),
-  spotDescription: z.string().optional(),
-  spotCategory: z.string().optional(),
-  bestTime: z.string().optional(),
-  duration: z.string().optional(),
-  cost: z.number().optional(),
-  wikiTitle: z.string().optional(),
-  nearbySpots: z.array(z.string()).optional(),
+  cityId: z.string().min(1).max(80),
+  cityName: z.string().min(1).max(120),
+  state: z.string().min(1).max(80),
+  region: z.string().max(40).optional(),
+  tagline: z.string().max(240).optional(),
+  cityDescription: z.string().max(600).optional(),
+  spotName: z.string().min(1).max(120),
+  spotSubtitle: z.string().max(200).optional(),
+  spotDescription: z.string().max(600).optional(),
+  spotCategory: z.string().max(60).optional(),
+  bestTime: z.string().max(80).optional(),
+  duration: z.string().max(80).optional(),
+  cost: z.number().min(0).max(1000000).optional(),
+  wikiTitle: z.string().max(150).optional(),
+  nearbySpots: z.array(z.string().max(120)).max(10).optional(),
   language: z.enum(['hi', 'en']).default('hi'),
   question: z.string().max(400).optional(),
 });
@@ -27,7 +34,6 @@ type ExplainInput = z.infer<typeof explainSchema>;
 
 async function fetchWikipediaSummary(wikiTitle?: string, language: 'hi' | 'en' = 'en'): Promise<string | null> {
   if (!wikiTitle) return null;
-  // First try Hindi Wikipedia when Hindi is requested; fallback to English Wikipedia for LLM translation or EN mode
   const hosts = language === 'hi' ? ['hi.wikipedia.org', 'en.wikipedia.org'] : ['en.wikipedia.org'];
   for (const host of hosts) {
     try {
@@ -40,8 +46,7 @@ async function fetchWikipediaSummary(wikiTitle?: string, language: 'hi' | 'en' =
       const data = await res.json();
       const extract = typeof data?.extract === 'string' ? data.extract.trim() : '';
       if (!extract) continue;
-      const sentences = extract.split(/(?<=[।.!?])\s+/).slice(0, 2).join(' ');
-      return sentences;
+      return extract.split(/(?<=[।.!?])\s+/).slice(0, 2).join(' ');
     } catch {
       continue;
     }
@@ -90,7 +95,7 @@ async function generateWithLLM(
       } based on the verified location details below:\n${contextBlock}`
     : `Give an engaging spoken tour introduction for travelers arriving at ${spotName} in ${cityName}. Cover its cultural significance, what makes it famous, best time to visit, and nearby spots from this verified context:\n${contextBlock}`;
 
-  const openAiKey = process.env.OPENAI_API_KEY;
+  const openAiKey = process.env.OPENAI_API_KEY?.trim();
   if (openAiKey) {
     try {
       const res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -116,15 +121,15 @@ async function generateWithLLM(
         if (content) return content;
       }
     } catch {
-      // Fall through to Gemini or verified grounded builder
+      // Fall through safely
     }
   }
 
-  const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY;
+  const geminiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY)?.trim();
   if (geminiKey) {
     try {
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -233,35 +238,70 @@ function buildVerifiedFallbackExplanation(
 
 export async function POST(req: NextRequest) {
   try {
+    let userId: string | null = null;
+    if (isSupabaseConfigured) {
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      userId = user?.id || null;
+    }
+
+    // Strict rate limiting against anonymous or burst abuse
+    const rateLimit = await checkRateLimit(
+      getClientIdentifier('guide_explain', req, userId),
+      userId ? 30 : 12,
+      60000
+    );
+    const headers = new Headers();
+    applyRateLimitHeaders(headers, rateLimit);
+
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: `Too many requests. Please wait ${rateLimit.reset}s.` },
+        { status: 429, headers }
+      );
+    }
+
     const body = await req.json();
     const parsed = explainSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
         { error: parsed.error.issues[0]?.message || 'Invalid guide explanation request' },
-        { status: 400 }
+        { status: 400, headers }
       );
     }
 
     const input = parsed.data;
     const wikiFact = await fetchWikipediaSummary(input.wikiTitle || input.spotName, input.language);
-    const llmText = await generateWithLLM(input, wikiFact);
+
+    // Protect paid OpenAI/Gemini API credits from unauthenticated scraping when auth is enabled
+    const allowPaidLlm = !isSupabaseConfigured || Boolean(userId);
+    const llmText = allowPaidLlm ? await generateWithLLM(input, wikiFact) : null;
 
     if (llmText) {
-      return NextResponse.json({
-        explanation: llmText,
-        language: input.language,
-        source: process.env.OPENAI_API_KEY ? 'openai' : 'gemini',
-        groundedWithWikipedia: Boolean(wikiFact),
-      });
+      return NextResponse.json(
+        {
+          explanation: llmText,
+          language: input.language,
+          source: process.env.OPENAI_API_KEY ? 'openai' : 'gemini',
+          groundedWithWikipedia: Boolean(wikiFact),
+        },
+        { headers }
+      );
     }
 
     const fallbackText = buildVerifiedFallbackExplanation(input, wikiFact);
-    return NextResponse.json({
-      explanation: fallbackText,
-      language: input.language,
-      source: wikiFact ? 'wikipedia-grounded' : 'verified-metadata',
-      groundedWithWikipedia: Boolean(wikiFact),
-    });
+    return NextResponse.json(
+      {
+        explanation: fallbackText,
+        language: input.language,
+        source: wikiFact ? 'wikipedia-grounded' : 'verified-metadata',
+        groundedWithWikipedia: Boolean(wikiFact),
+        ...(isSupabaseConfigured && !userId ? { paidAiGatedForGuests: true } : {}),
+      },
+      { headers }
+    );
   } catch {
     return NextResponse.json(
       { error: 'Unable to generate tour guide explanation right now.' },

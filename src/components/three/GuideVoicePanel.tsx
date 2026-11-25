@@ -46,28 +46,30 @@ export function GuideVoicePanel({ onNextSpot }: { onNextSpot: () => void }) {
   const abortRef = useRef<AbortController | null>(null);
   const latestRequestId = useRef(0);
 
-  // Initialize singleton voice controller once on mount, clean up on unmount
-  if (!controllerRef.current && typeof window !== 'undefined') {
-    controllerRef.current = new GuideVoiceController({
-      onStatusChange: (status, err) => {
-        setSpeechState({
-          speechStatus: status,
-          lastSpeechError: err ?? null,
-        });
-      },
-      onSpeakingChange: (speaking) => {
-        setSpeechState({ isSpeaking: speaking });
-      },
-      onProviderChange: (provider) => {
-        setProviderLabel(provider);
-      },
-    });
-  }
+  const getController = useCallback(() => {
+    if (!controllerRef.current && typeof window !== 'undefined') {
+      controllerRef.current = new GuideVoiceController({
+        onStatusChange: (status, err) => {
+          setSpeechState({
+            speechStatus: status,
+            lastSpeechError: err ?? null,
+          });
+        },
+        onSpeakingChange: (speaking) => {
+          setSpeechState({ isSpeaking: speaking });
+        },
+        onProviderChange: (provider) => {
+          setProviderLabel(provider);
+        },
+      });
+    }
+    return controllerRef.current;
+  }, [setSpeechState]);
 
-  // Sync mute state immediately with audio controller
+  // Initialize voice controller and sync mute state outside render
   useEffect(() => {
-    controllerRef.current?.setMuted(!isAudioEnabled);
-  }, [isAudioEnabled]);
+    getController()?.setMuted(!isAudioEnabled);
+  }, [getController, isAudioEnabled]);
 
   // Stop speech cleanly on component unmount or leaving virtual tour
   useEffect(() => {
@@ -139,8 +141,9 @@ export function GuideVoicePanel({ onNextSpot }: { onNextSpot: () => void }) {
         setIsLoadingText(false);
 
         const shouldSpeak = forceSpeak || (autoNarrate && isAudioEnabled);
-        if (shouldSpeak && controllerRef.current) {
-          await controllerRef.current.speak(explanationText, guideLanguage);
+        const ctrl = getController();
+        if (shouldSpeak && ctrl) {
+          await ctrl.speak(explanationText, guideLanguage);
         } else {
           setSpeechState({ speechStatus: 'idle', isSpeaking: false });
         }
@@ -149,8 +152,9 @@ export function GuideVoicePanel({ onNextSpot }: { onNextSpot: () => void }) {
         setIsLoadingText(false);
         const fallback = currentSpot.guideMessage || currentSpot.speechQuote;
         setSpeechState({ currentExplanation: fallback });
-        if ((forceSpeak || (autoNarrate && isAudioEnabled)) && controllerRef.current) {
-          await controllerRef.current.speak(fallback, guideLanguage);
+        const ctrl = getController();
+        if ((forceSpeak || (autoNarrate && isAudioEnabled)) && ctrl) {
+          await ctrl.speak(fallback, guideLanguage);
         } else {
           setSpeechState({ speechStatus: 'unavailable', lastSpeechError: 'Unable to load voice explanation' });
         }
@@ -179,13 +183,17 @@ export function GuideVoicePanel({ onNextSpot }: { onNextSpot: () => void }) {
       autoNarrate,
       isAudioEnabled,
       setSpeechState,
+      getController,
     ]
   );
 
-  // Trigger fresh explanation + narration whenever Spot or Language changes in Stage 3
+  // Trigger fresh explanation + narration asynchronously whenever Spot or Language changes in Stage 3
   useEffect(() => {
     if (stage !== 'virtual-tour') return;
-    void fetchAndSpeak();
+    const timer = setTimeout(() => {
+      void fetchAndSpeak();
+    }, 0);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage, currentSpot.id, guideLanguage]);
 

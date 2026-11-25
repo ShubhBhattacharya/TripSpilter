@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { createClient } from '../../../../lib/supabase/server';
+import { isSupabaseConfigured } from '../../../../lib/supabase/client';
+import {
+  checkRateLimit,
+  getClientIdentifier,
+  applyRateLimitHeaders,
+} from '../../../../lib/rate-limit';
 
 export const runtime = 'nodejs';
 
@@ -10,27 +17,67 @@ const ttsRequestSchema = z.object({
 
 /**
  * Server-side TTS provider route.
- * Uses OpenAI TTS (`tts-1`) when `OPENAI_API_KEY` is configured on the server.
- * When no server TTS credential is set, returns `{ configured: false }` cleanly
- * so the client falls back seamlessly to Web SpeechSynthesis without HTTP errors.
+ * Protected against anonymous paid TTS quota abuse:
+ * - Enforces sliding-window rate limits per user / IP.
+ * - Requires authenticated Supabase session before billing OpenAI `tts-1` when auth is enabled.
+ * - Returns `{ configured: false }` cleanly when unconfigured or guest so browser SpeechSynthesis handles playback.
  */
 export async function POST(req: NextRequest) {
   try {
+    let userId: string | null = null;
+    if (isSupabaseConfigured) {
+      const supabase = await createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      userId = user?.id || null;
+    }
+
+    const rateLimit = await checkRateLimit(
+      getClientIdentifier('guide_tts', req, userId),
+      userId ? 20 : 10,
+      60000
+    );
+    const headers = new Headers();
+    applyRateLimitHeaders(headers, rateLimit);
+
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: `TTS rate limit exceeded. Wait ${rateLimit.reset}s.` },
+        { status: 429, headers }
+      );
+    }
+
     const body = await req.json();
     const parsed = ttsRequestSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
         { error: parsed.error.issues[0]?.message || 'Invalid TTS payload' },
-        { status: 400 }
+        { status: 400, headers }
       );
     }
 
-    const openAiKey = process.env.OPENAI_API_KEY;
+    // Never allow anonymous unauthenticated requests to drain paid OpenAI TTS credits
+    if (isSupabaseConfigured && !userId) {
+      return NextResponse.json(
+        {
+          configured: false,
+          provider: 'browser-speech-synthesis',
+          requiresAuthForServerTts: true,
+        },
+        { headers }
+      );
+    }
+
+    const openAiKey = process.env.OPENAI_API_KEY?.trim();
     if (!openAiKey) {
-      return NextResponse.json({
-        configured: false,
-        provider: 'browser-speech-synthesis',
-      });
+      return NextResponse.json(
+        {
+          configured: false,
+          provider: 'browser-speech-synthesis',
+        },
+        { headers }
+      );
     }
 
     const { text, language } = parsed.data;
@@ -53,21 +100,24 @@ export async function POST(req: NextRequest) {
     });
 
     if (!ttsResponse.ok) {
-      return NextResponse.json({
-        configured: false,
-        provider: 'browser-speech-synthesis',
-        fallbackReason: 'Upstream TTS unavailable',
-      });
+      return NextResponse.json(
+        {
+          configured: false,
+          provider: 'browser-speech-synthesis',
+          fallbackReason: 'Upstream TTS unavailable',
+        },
+        { headers }
+      );
     }
 
     const audioBuffer = await ttsResponse.arrayBuffer();
+    headers.set('Content-Type', 'audio/mpeg');
+    headers.set('Cache-Control', 'no-store');
+    headers.set('X-TTS-Provider', 'openai-tts-1');
+
     return new NextResponse(audioBuffer, {
       status: 200,
-      headers: {
-        'Content-Type': 'audio/mpeg',
-        'Cache-Control': 'no-store',
-        'X-TTS-Provider': 'openai-tts-1',
-      },
+      headers,
     });
   } catch {
     return NextResponse.json({

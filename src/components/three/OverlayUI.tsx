@@ -23,8 +23,6 @@ export function OverlayUI() {
   const {
     stage,
     setStage,
-    selectedCityId,
-    setSelectedCityId,
     currentSpotIndex,
     setCurrentSpotIndex,
     selectedSpotIds,
@@ -35,13 +33,11 @@ export function OverlayUI() {
     setFriendsCount,
     isAudioEnabled,
     toggleAudio,
-    resetExperience,
     getSelectedCity,
     getCurrentSpot,
     getSelectedSpots,
     getTotalItemsCount,
     getTotalCost,
-    getPerPersonCost,
   } = useTrip3DStore();
 
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -52,7 +48,6 @@ export function OverlayUI() {
   const selectedSpots = getSelectedSpots();
   const totalItemsCount = getTotalItemsCount();
   const totalCost = getTotalCost();
-  const perPersonCost = getPerPersonCost();
 
   // Financial & UPI Calculation strictly from selected items with no arbitrary constants
   const payeeVpa = (profile?.upi_id && profile.upi_id.includes('@')) ? profile.upi_id : 'tripsplit.vendor@okaxis';
@@ -85,17 +80,16 @@ export function OverlayUI() {
     setCurrentSpotIndex(nextIdx);
   };
 
-  const handlePrevSpot = () => {
-    const prevIdx = (currentSpotIndex - 1 + city.spots.length) % city.spots.length;
-    setCurrentSpotIndex(prevIdx);
-  };
-
   const handleSaveToMyTrips = async () => {
     try {
+      const startIso = new Date().toISOString().split('T')[0];
+      const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
+      const endIso = new Date(new Date().getTime() + threeDaysMs).toISOString().split('T')[0];
+
       const tripData = {
         name: `${city.name} 3D Itinerary`,
         destination: city.name,
-        startDate: new Date().toISOString().split('T')[0],
+        startDate: startIso,
         totalBudget: totalCost,
         friendsCount,
         perPersonShare,
@@ -118,8 +112,8 @@ export function OverlayUI() {
           body: JSON.stringify({
             title: `${city.name.split(',')[0]} 3D Outing`,
             destination: city.name,
-            startDate: new Date().toISOString().split('T')[0],
-            endDate: new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0],
+            startDate: startIso,
+            endDate: endIso,
             budget: totalCost > 0 ? totalCost : 1000,
             coverImage: city.heroImage || city.spots[0]?.realPhotoUrl,
           }),
@@ -185,7 +179,7 @@ export function OverlayUI() {
               <button
                 key={step.key}
                 type="button"
-                onClick={() => setStage(step.key as any)}
+                onClick={() => setStage(step.key as 'entrance' | 'desk' | 'virtual-tour' | 'bill')}
                 className={`cursor-pointer px-3.5 py-1.5 rounded-xl font-bold transition-all ${
                   isCurrent
                     ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/50 scale-105'

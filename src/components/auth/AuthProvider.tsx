@@ -45,21 +45,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const parsed = JSON.parse(stored);
             return {
               id: parsed.id || mockUser.id,
-              display_name: parsed.name || mockUser.name,
-              upi_id: parsed.upiId || mockUser.upiId,
+              display_name: parsed.name || 'Traveler',
+              upi_id: parsed.upiId || '',
               avatar_url: parsed.avatar || mockUser.avatar,
             };
           } catch {
-            // fallback
+            // ignore corrupted storage
           }
         }
       }
-      return {
-        id: mockUser.id,
-        display_name: mockUser.name,
-        upi_id: mockUser.upiId,
-        avatar_url: mockUser.avatar,
-      };
+      if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') {
+        return {
+          id: mockUser.id,
+          display_name: mockUser.name,
+          upi_id: mockUser.upiId,
+          avatar_url: mockUser.avatar,
+        };
+      }
+      return null;
     }
     return null;
   });
@@ -67,10 +70,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [showOnboarding, setShowOnboarding] = useState(false);
   const router = useRouter();
 
-  const supabase = useMemo(() => createClient(), []);
+  const supabase = useMemo(() => (isSupabaseConfigured ? createClient() : null), []);
 
   const fetchProfile = useCallback(
     async (userId: string) => {
+      if (!supabase) return;
       try {
         const { data, error } = await supabase
           .from('profiles')
@@ -98,7 +102,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 
   useEffect(() => {
-    if (!isSupabaseConfigured) {
+    if (!isSupabaseConfigured || !supabase) {
       return;
     }
 
@@ -159,7 +163,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
-    if (isSupabaseConfigured) {
+    if (isSupabaseConfigured && supabase) {
       await supabase.auth.signOut();
     }
     if (typeof window !== 'undefined') {
@@ -183,7 +187,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return true;
     }
 
-    if (!user) return false;
+    if (!user || !supabase) return false;
 
     try {
       const { error } = await supabase.from('profiles').upsert({

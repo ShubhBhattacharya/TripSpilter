@@ -36,18 +36,26 @@ export default function MyTripsPage() {
   const [isScanMerchantOpen, setIsScanMerchantOpen] = useState(false);
 
   useEffect(() => {
+    interface LocalCustomTrip {
+      name?: string;
+      destination?: string;
+      startDate?: string;
+      totalBudget?: number;
+      spots?: Array<{ name?: string; cost?: number }>;
+    }
+
     // Load any custom 3D trips saved locally
     const loadLocalCustomTrips = (): Trip[] => {
       try {
         const rawCustom = typeof window !== 'undefined' ? localStorage.getItem('tripsplit_custom_trips') : null;
         if (rawCustom) {
-          const parsed = JSON.parse(rawCustom);
+          const parsed = JSON.parse(rawCustom) as LocalCustomTrip[];
           if (Array.isArray(parsed)) {
-            return parsed.map((c: any, i: number) => ({
+            return parsed.map((c, i) => ({
               id: `local-3d-${i}`,
-              title: c.name || `${c.destination} 3D Outing`,
-              tagline: `Interactive 3D itinerary for ${c.destination}`,
-              destination: c.destination,
+              title: c.name || `${c.destination || 'India'} 3D Outing`,
+              tagline: `Interactive 3D itinerary for ${c.destination || 'India'}`,
+              destination: c.destination || 'India',
               coverImage:
                 'https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?auto=format&fit=crop&w=1200&q=80',
               startDate: c.startDate || new Date().toISOString().split('T')[0],
@@ -56,14 +64,15 @@ export default function MyTripsPage() {
               totalSpend: 0,
               status: 'ACTIVE',
               members: defaultMembers,
-              itinerary: (c.spots || []).map((s: any, sIdx: number) => ({
+              itinerary: (c.spots || []).map((s, sIdx) => ({
                 id: `itin-${sIdx}`,
                 day: 1,
                 time: '10:00 AM',
-                title: s.name,
+                title: s.name || 'Tour Spot',
                 category: 'Activity',
-                cost: Number(s.cost) || 0,
-                location: c.destination,
+                estimatedCost: Number(s.cost) || 0,
+                location: c.destination || 'India',
+                mapsUrl: `https://maps.google.com/?q=${encodeURIComponent(c.destination || 'India')}`,
                 notes: 'Saved from 3D Virtual Tour',
               })),
               polls: [],
@@ -82,11 +91,14 @@ export default function MyTripsPage() {
     if (!isConfigured) {
       const localTrips = loadLocalCustomTrips();
       if (localTrips.length > 0) {
-        setTrips((prev) => {
-          const existingIds = new Set(prev.map((p) => p.id));
-          const uniqueNew = localTrips.filter((lt) => !existingIds.has(lt.id));
-          return [...uniqueNew, ...prev];
-        });
+        const timer = setTimeout(() => {
+          setTrips((prev) => {
+            const existingIds = new Set(prev.map((p) => p.id));
+            const uniqueNew = localTrips.filter((lt) => !existingIds.has(lt.id));
+            return [...uniqueNew, ...prev];
+          });
+        }, 0);
+        return () => clearTimeout(timer);
       }
       return;
     }

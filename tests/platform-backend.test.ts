@@ -9,7 +9,11 @@ import {
 } from '../src/lib/providers/travel-providers';
 import { executeAiTool } from '../src/lib/ai/tools';
 import { invokeCentralAICompanion } from '../src/lib/ai/provider';
-import { getServerIntegrationStatus } from '../src/lib/config/env';
+import { getServerIntegrationStatus, isValidSupabaseConfig } from '../src/lib/config/env';
+import { POST as explainPost } from '../src/app/api/guide/explain/route';
+import { POST as ttsPost } from '../src/app/api/guide/tts/route';
+import { GET as travelGet } from '../src/app/api/travel/route';
+import { POST as webhookPost } from '../src/app/api/payments/webhook/route';
 
 describe('Phase 5: Percentage Split Engine Invariants', () => {
   it('distributes odd paise remainders cleanly across members to equal total exactly', () => {
@@ -140,11 +144,69 @@ describe('Phase 7: Central AI Companion & Controlled Tool Security', () => {
   });
 });
 
-describe('Phase 13: Environment Status Inventory Safety', () => {
+describe('Phase 13: Environment Status Inventory & API Security Route Tests', () => {
   it('returns strictly boolean/provider enum readiness without leaking secret strings', () => {
     const status = getServerIntegrationStatus();
     expect(typeof status.supabase).toBe('boolean');
     expect(typeof status.paymentGateway).toBe('boolean');
+    expect(isValidSupabaseConfig()).toBe(false);
     expect(JSON.stringify(status)).not.toContain('placeholder');
+  });
+
+  it('guide explain route generates Wikipedia-grounded Hindi explanation and includes rate-limit headers', async () => {
+    const req = new Request('http://localhost:3000/api/guide/explain', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '203.0.113.10' },
+      body: JSON.stringify({
+        cityId: 'manali',
+        cityName: 'Manali, Himachal Pradesh',
+        state: 'Himachal Pradesh',
+        spotName: 'Hadimba Devi Temple',
+        language: 'hi',
+      }),
+    });
+    const res = await explainPost(req as never);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('X-RateLimit-Limit')).toBeTruthy();
+    const json = await res.json();
+    expect(json.language).toBe('hi');
+    expect(typeof json.explanation).toBe('string');
+    expect(json.explanation).toContain('Hadimba Devi Temple');
+  });
+
+  it('guide TTS route returns clean browser fallback status and rate-limit headers when OpenAI key absent', async () => {
+    const req = new Request('http://localhost:3000/api/guide/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '203.0.113.11' },
+      body: JSON.stringify({ text: 'Welcome to Manali', language: 'en' }),
+    });
+    const res = await ttsPost(req as never);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('X-RateLimit-Limit')).toBeTruthy();
+    const json = await res.json();
+    expect(json.configured).toBe(false);
+    expect(json.provider).toBe('browser-speech-synthesis');
+  });
+
+  it('travel API rejects SSRF / invalid photoName format and rejects missing credentials honestly', async () => {
+    const badPhotoReq = new Request('http://localhost:3000/api/travel?type=photo&photoName=http://169.254.169.254/latest/meta-data');
+    const badRes = await travelGet(badPhotoReq);
+    expect(badRes.status).toBe(400);
+
+    const hotelsReq = new Request('http://localhost:3000/api/travel?type=hotels&city=Jaipur');
+    const hotelsRes = await travelGet(hotelsReq);
+    expect(hotelsRes.status).toBe(200);
+    const hotelsJson = await hotelsRes.json();
+    expect(hotelsJson.status).toBe('waiting_for_credentials');
+    expect(hotelsJson.data).toBeNull();
+  });
+
+  it('payment webhook fails closed when webhook secret is unconfigured', async () => {
+    const req = new Request('http://localhost:3000/api/payments/webhook', {
+      method: 'POST',
+      body: JSON.stringify({ event: 'payment.captured' }),
+    });
+    const res = await webhookPost(req);
+    expect(res.status).toBe(503);
   });
 });

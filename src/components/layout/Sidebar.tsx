@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   Globe,
   Bell,
+  Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 
@@ -61,6 +62,11 @@ export const Sidebar: React.FC = () => {
       href: '/3d-experience',
       icon: Compass,
       badge: '360°',
+    },
+    {
+      name: 'AI Companion',
+      href: '/ai-assistant',
+      icon: Sparkles,
     },
     {
       name: 'Direct QR Split',

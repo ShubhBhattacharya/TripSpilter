@@ -24,7 +24,7 @@ function ResetPasswordForm() {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const supabase = createClient();
+  const supabase = React.useMemo(() => (isSupabaseConfigured ? createClient() : null), []);
 
   const isMinLength = password.length >= 6;
   const hasNumberOrSpecial = /[0-9!@#$%^&*(),.?":{}|<>]/.test(password);
@@ -46,7 +46,7 @@ function ResetPasswordForm() {
       return;
     }
 
-    if (!isSupabaseConfigured) {
+    if (!isSupabaseConfigured || !supabase) {
       setError('Supabase authentication is not configured in .env.local.');
       return;
     }

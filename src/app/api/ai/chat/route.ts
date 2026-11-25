@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { createClient } from '../../../../lib/supabase/server';
 import { isSupabaseConfigured } from '../../../../lib/supabase/client';
 import { invokeCentralAICompanion } from '../../../../lib/ai/provider';
+import { requireAuthenticatedUser, UnauthorizedError } from '../../../../lib/security/auth-guards';
 import { checkRateLimit, getClientIdentifier, applyRateLimitHeaders } from '../../../../lib/rate-limit';
 
 const chatSchema = z.object({
@@ -28,13 +29,7 @@ export async function GET(request: Request) {
 
   try {
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-    }
+    const user = await requireAuthenticatedUser(supabase);
 
     const convId = new URL(request.url).searchParams.get('conversationId');
     if (convId) {
@@ -57,7 +52,10 @@ export async function GET(request: Request) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ conversations: conversations || [] });
-  } catch {
+  } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      return NextResponse.json({ error: err.message }, { status: 401 });
+    }
     return NextResponse.json({ error: 'Unable to load AI history' }, { status: 500 });
   }
 }
@@ -77,17 +75,23 @@ export async function POST(request: Request) {
     let supabaseClient = null;
     if (isSupabaseConfigured) {
       supabaseClient = await createClient();
-      const {
-        data: { user },
-      } = await supabaseClient.auth.getUser();
-      if (user) userId = user.id;
+      // Require authenticated user when Supabase is enabled to prevent anonymous paid LLM abuse
+      const user = await requireAuthenticatedUser(supabaseClient);
+      userId = user.id;
     }
 
-    const rateLimit = await checkRateLimit(getClientIdentifier('ai_chat', request, userId), 25, 60000);
+    const rateLimit = await checkRateLimit(
+      getClientIdentifier('ai_chat', request, userId),
+      userId ? 25 : 10,
+      60000
+    );
     const headers = new Headers();
     applyRateLimitHeaders(headers, rateLimit);
     if (!rateLimit.success) {
-      return NextResponse.json({ error: `Rate limit exceeded. Retry in ${rateLimit.reset}s.` }, { status: 429, headers });
+      return NextResponse.json(
+        { error: `Rate limit exceeded. Retry in ${rateLimit.reset}s.` },
+        { status: 429, headers }
+      );
     }
 
     const aiResponse = await invokeCentralAICompanion(
@@ -100,7 +104,6 @@ export async function POST(request: Request) {
       { userId, supabase: supabaseClient }
     );
 
-    // Persist conversation cleanly when user is authenticated & Supabase is active
     let savedConversationId = parsed.data.conversationId || null;
     if (userId && supabaseClient) {
       const latestUserMessage = parsed.data.messages[parsed.data.messages.length - 1];
@@ -146,7 +149,10 @@ export async function POST(request: Request) {
       },
       { headers }
     );
-  } catch {
+  } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      return NextResponse.json({ error: err.message }, { status: 401 });
+    }
     return NextResponse.json({ error: 'AI chat service error' }, { status: 500 });
   }
 }

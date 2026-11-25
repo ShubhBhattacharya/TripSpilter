@@ -18,7 +18,7 @@ function ForgotPasswordForm() {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const supabase = createClient();
+  const supabase = React.useMemo(() => (isSupabaseConfigured ? createClient() : null), []);
 
   const handleResetRequest = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,7 +31,7 @@ function ForgotPasswordForm() {
       return;
     }
 
-    if (!isSupabaseConfigured) {
+    if (!isSupabaseConfigured || !supabase) {
       setSuccessMsg(
         `Demo password recovery simulated for ${trimmedEmail}! In live cloud mode with Supabase credentials configured, a secure password reset link is delivered to your inbox.`
       );

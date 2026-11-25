@@ -17,9 +17,11 @@ export function RealPanoramaViewer({ spot }: RealPanoramaViewerProps) {
   // Dynamically fetch highest-res monument photo from Wikimedia API with fallback to spot.realPhotoUrl
   useEffect(() => {
     let isCancelled = false;
-    setPhotoUrl(spot.realPhotoUrl);
 
     async function fetchWikiPhoto() {
+      if (!isCancelled) {
+        setPhotoUrl(spot.realPhotoUrl);
+      }
       try {
         const endpoint = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(
           spot.wikiTitle
@@ -39,9 +41,13 @@ export function RealPanoramaViewer({ spot }: RealPanoramaViewerProps) {
       }
     }
 
-    fetchWikiPhoto();
+    const timer = setTimeout(() => {
+      void fetchWikiPhoto();
+    }, 0);
+
     return () => {
       isCancelled = true;
+      clearTimeout(timer);
     };
   }, [spot.wikiTitle, spot.realPhotoUrl]);
 

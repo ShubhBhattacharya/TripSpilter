@@ -35,7 +35,7 @@ function SignupForm() {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const supabase = createClient();
+  const supabase = React.useMemo(() => (isSupabaseConfigured ? createClient() : null), []);
 
   // Password strength checks
   const isMinLength = password.length >= 6;
@@ -75,7 +75,7 @@ function SignupForm() {
     }
 
     // Graceful fallback when Supabase is not yet configured in .env.local
-    if (!isSupabaseConfigured) {
+    if (!isSupabaseConfigured || !supabase) {
       const cleanName = fullName.trim();
       signInAsDemo({
         name: cleanName,
@@ -148,7 +148,7 @@ function SignupForm() {
     setError(null);
 
     // Graceful fallback when Supabase is not configured
-    if (!isSupabaseConfigured) {
+    if (!isSupabaseConfigured || !supabase) {
       signInAsDemo({
         name: 'Google Demo Traveler',
         email: 'traveler.google@example.com',
