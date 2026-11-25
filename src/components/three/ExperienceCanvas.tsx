@@ -8,6 +8,7 @@ import { OfficeScene } from './OfficeScene';
 import { RealPanoramaViewer } from './RealPanoramaViewer';
 import { CameraRig } from './CameraRig';
 import { OverlayUI } from './OverlayUI';
+import { FullScreenDestinationDiscovery } from './FullScreenDestinationDiscovery';
 import { useTrip3DStore } from '@/store/useTrip3DStore';
 import { Compass } from 'lucide-react';
 
@@ -36,6 +37,11 @@ function CanvasLoader() {
 export function ExperienceCanvas() {
   const stage = useTrip3DStore((s) => s.stage);
   const currentSpot = useTrip3DStore((s) => s.getCurrentSpot());
+
+  // Stage 2: Dedicated FULL-SCREEN Destination Discovery Page (no 3D canvas, no office, no sidebar)
+  if (stage === 'desk') {
+    return <FullScreenDestinationDiscovery />;
+  }
 
   return (
     <div className="relative w-full h-screen bg-slate-950 overflow-hidden select-none">

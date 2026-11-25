@@ -3,6 +3,16 @@ import { DESTINATIONS, Destination, Spot } from '@/data/destinations';
 
 export type ExperienceStage = 'entrance' | 'walking' | 'desk' | 'virtual-tour' | 'bill';
 export type GuideAnimation = 'Idle' | 'Waving' | 'Walking' | 'Pointing' | 'Thankful';
+export type GuideLanguage = 'hi' | 'en';
+export type SpeechStatus =
+  | 'idle'
+  | 'preparing'
+  | 'generating'
+  | 'playing'
+  | 'paused'
+  | 'completed'
+  | 'blocked'
+  | 'unavailable';
 
 export interface ExtraActivity {
   id: string;
@@ -21,6 +31,15 @@ interface Trip3DState {
   isAudioEnabled: boolean;
   isOrbiting: boolean;
   activeHotspot: string | null;
+  destinationIntroOpen: boolean;
+
+  // Voice & AI Guide state
+  guideLanguage: GuideLanguage;
+  autoNarrate: boolean;
+  isSpeaking: boolean;
+  speechStatus: SpeechStatus;
+  currentExplanation: string;
+  lastSpeechError: string | null;
 
   // Actions
   setStage: (stage: ExperienceStage) => void;
@@ -32,7 +51,17 @@ interface Trip3DState {
   selectAllCitySpots: () => void;
   setFriendsCount: (count: number) => void;
   toggleAudio: () => void;
+  setAudioEnabled: (enabled: boolean) => void;
   setActiveHotspot: (hotspot: string | null) => void;
+  setDestinationIntroOpen: (open: boolean) => void;
+  setGuideLanguage: (lang: GuideLanguage) => void;
+  setAutoNarrate: (enabled: boolean) => void;
+  setSpeechState: (patch: {
+    isSpeaking?: boolean;
+    speechStatus?: SpeechStatus;
+    currentExplanation?: string;
+    lastSpeechError?: string | null;
+  }) => void;
   resetExperience: () => void;
 
   // Computed Helpers
@@ -55,9 +84,17 @@ export const useTrip3DStore = create<Trip3DState>((set, get) => ({
   selectedSpotIds: initialSpotIds,
   addedActivities: [],
   friendsCount: 4,
-  isAudioEnabled: false,
+  isAudioEnabled: true,
   isOrbiting: false,
   activeHotspot: null,
+  destinationIntroOpen: false,
+
+  guideLanguage: 'hi',
+  autoNarrate: true,
+  isSpeaking: false,
+  speechStatus: 'idle',
+  currentExplanation: '',
+  lastSpeechError: null,
 
   setStage: (stage) => {
     let anim: GuideAnimation = 'Idle';
@@ -67,13 +104,21 @@ export const useTrip3DStore = create<Trip3DState>((set, get) => ({
     else if (stage === 'virtual-tour') anim = 'Pointing';
     else if (stage === 'bill') anim = 'Thankful';
 
-    set({ stage, guideAnimation: anim });
+    set({
+      stage,
+      guideAnimation: anim,
+      ...(stage !== 'desk' ? { destinationIntroOpen: false } : {}),
+    });
   },
 
   setGuideAnimation: (guideAnimation) => set({ guideAnimation }),
 
   setSelectedCityId: (cityId) => {
+    const prevId = get().selectedCityId;
     const city = DESTINATIONS.find((d) => d.id === cityId) || DESTINATIONS[0];
+    if (prevId === city.id) {
+      return;
+    }
     set({
       selectedCityId: city.id,
       currentSpotIndex: 0,
@@ -114,7 +159,17 @@ export const useTrip3DStore = create<Trip3DState>((set, get) => ({
 
   toggleAudio: () => set((s) => ({ isAudioEnabled: !s.isAudioEnabled })),
 
+  setAudioEnabled: (isAudioEnabled) => set({ isAudioEnabled }),
+
   setActiveHotspot: (activeHotspot) => set({ activeHotspot }),
+
+  setDestinationIntroOpen: (destinationIntroOpen) => set({ destinationIntroOpen }),
+
+  setGuideLanguage: (guideLanguage) => set({ guideLanguage }),
+
+  setAutoNarrate: (autoNarrate) => set({ autoNarrate }),
+
+  setSpeechState: (patch) => set((s) => ({ ...s, ...patch })),
 
   resetExperience: () => {
     const firstCity = DESTINATIONS[0];
@@ -127,6 +182,11 @@ export const useTrip3DStore = create<Trip3DState>((set, get) => ({
       addedActivities: [],
       friendsCount: 4,
       activeHotspot: null,
+      destinationIntroOpen: false,
+      isSpeaking: false,
+      speechStatus: 'idle',
+      currentExplanation: '',
+      lastSpeechError: null,
     });
   },
 
