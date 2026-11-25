@@ -14,6 +14,14 @@ import { POST as explainPost } from '../src/app/api/guide/explain/route';
 import { POST as ttsPost } from '../src/app/api/guide/tts/route';
 import { GET as travelGet } from '../src/app/api/travel/route';
 import { POST as webhookPost } from '../src/app/api/payments/webhook/route';
+import { GET as authCallbackGet } from '../src/app/auth/callback/route';
+import {
+  COUNTRY_CODES,
+  validateMobileNumber,
+  validateEmailAddress,
+  evaluatePasswordStrength,
+  sanitizeNextRedirect,
+} from '../src/lib/auth/validation';
 
 describe('Phase 5: Percentage Split Engine Invariants', () => {
   it('distributes odd paise remainders cleanly across members to equal total exactly', () => {
@@ -290,5 +298,45 @@ describe('Phase 14: All-in-One AI Travel Agent Tools, Safety & Cards', () => {
     );
     expect(guestReply.model).toBe('guest-deterministic');
     expect(guestReply.missingCredentials).toEqual([]);
+  });
+});
+
+describe('Phase 15: Split-Screen Auth Validation & Redirect Security', () => {
+  it('defaults country list to India (+91) and validates E.164 mobile rules strictly', () => {
+    expect(COUNTRY_CODES[0].code).toBe('+91');
+
+    const validIn = validateMobileNumber('+91', '98765 43210');
+    expect(validIn.valid).toBe(true);
+    expect(validIn.e164).toBe('+919876543210');
+
+    const invalidPrefix = validateMobileNumber('+91', '1234567890');
+    expect(invalidPrefix.valid).toBe(false);
+
+    const tooShort = validateMobileNumber('+91', '98765');
+    expect(tooShort.valid).toBe(false);
+
+    const validUs = validateMobileNumber('+1', '4155551234');
+    expect(validUs.valid).toBe(true);
+    expect(validUs.e164).toBe('+14155551234');
+  });
+
+  it('validates email normalization, password strength, and open-redirect sanitization', () => {
+    expect(validateEmailAddress('  Team@TripSplit.IN ').normalized).toBe('team@tripsplit.in');
+    expect(validateEmailAddress('bad-email').valid).toBe(false);
+
+    expect(evaluatePasswordStrength('Pass@123').score).toBe(3);
+    expect(evaluatePasswordStrength('abc').score).toBe(0);
+
+    expect(sanitizeNextRedirect('/trips/abc-123')).toBe('/trips/abc-123');
+    expect(sanitizeNextRedirect('https://evil.example/phish')).toBe('/');
+    expect(sanitizeNextRedirect('//evil.example')).toBe('/');
+    expect(sanitizeNextRedirect('javascript:alert(1)')).toBe('/');
+  });
+
+  it('GET /auth/callback safely redirects invalid or unconfigured auth requests instead of throwing 500', async () => {
+    const req = new Request('http://localhost:3000/auth/callback');
+    const res = await authCallbackGet(req);
+    expect(res.status).toBe(307);
+    expect(res.headers.get('location')).toContain('/login?error=invalid-auth-request');
   });
 });

@@ -21,8 +21,14 @@ export const FloatingAiAssistant: React.FC = () => {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [open]);
 
-  // Never cover the Send button when already inside the dedicated /ai-assistant workspace
-  if (pathname.startsWith('/ai-assistant')) {
+  // Keep dedicated AI workspace and full-screen auth pages uncluttered
+  if (
+    pathname.startsWith('/ai-assistant') ||
+    pathname === '/login' ||
+    pathname === '/signup' ||
+    pathname === '/forgot-password' ||
+    pathname === '/reset-password'
+  ) {
     return null;
   }
 

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { type EmailOtpType } from '@supabase/supabase-js';
 import { createClient } from '../../../lib/supabase/server';
+import { isValidSupabaseConfig } from '../../../lib/config/env';
 import { sanitizeRedirectUrl } from '../../../lib/security/auth-guards';
 
 export async function GET(request: Request) {
@@ -22,6 +23,16 @@ export async function GET(request: Request) {
   const isRecoveryFlow = type === 'recovery' || rawNext === '/reset-password';
   const defaultFallback = isRecoveryFlow ? '/reset-password' : '/';
   const safeNext = sanitizeRedirectUrl(rawNext, defaultFallback);
+
+  if (!code && !(tokenHash && type)) {
+    return NextResponse.redirect(`${origin}/login?error=invalid-auth-request`);
+  }
+
+  if (!isValidSupabaseConfig()) {
+    return NextResponse.redirect(
+      `${origin}/login?error=${encodeURIComponent('Authentication provider is not configured on this server.')}`
+    );
+  }
 
   const supabase = await createClient();
 

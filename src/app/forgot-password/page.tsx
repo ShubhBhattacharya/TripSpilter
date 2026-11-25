@@ -3,6 +3,7 @@
 import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { createClient, isSupabaseConfigured } from '../../lib/supabase/client';
+import { SplitAuthLayout, TripSplitterLogoMark } from '../../components/auth/SplitAuthLayout';
 import {
   Mail,
   ArrowRight,
@@ -64,21 +65,17 @@ function ForgotPasswordForm() {
   };
 
   return (
-    <div className="w-full max-w-md bg-white border border-[#E5EAF1] rounded-2xl shadow-xl overflow-hidden p-6 sm:p-8">
-      {/* Brand Header */}
-      <div className="text-center mb-6">
-        <Link href="/" className="inline-flex items-center gap-2.5 mb-3 group">
-          <div className="w-10 h-10 rounded-xl bg-[#173B70] text-white flex items-center justify-center font-black text-xl shadow-xs group-hover:bg-[#1685D4] transition-colors">
-            <span>₹</span>
-          </div>
-          <span className="font-extrabold text-xl text-[#172B4D] tracking-tight">TripSplit</span>
-        </Link>
-        <div className="w-10 h-10 rounded-full bg-[#1685D4]/10 text-[#1685D4] flex items-center justify-center mx-auto mb-2">
+    <div className="w-full space-y-6">
+      <div className="space-y-2">
+        <div className="lg:hidden mb-3">
+          <TripSplitterLogoMark darkText={true} />
+        </div>
+        <div className="w-11 h-11 rounded-2xl bg-[#1666F2]/10 text-[#1666F2] flex items-center justify-center mb-1">
           <KeyRound className="w-5 h-5" />
         </div>
-        <h1 className="text-xl font-bold text-[#172B4D]">Forgot Password?</h1>
-        <p className="text-xs text-[#64748B] mt-1">
-          No worries. Enter your registered email and we&apos;ll send a secure password reset link.
+        <h1 className="text-2xl font-extrabold tracking-tight text-[#172B4D]">Reset your password</h1>
+        <p className="text-sm text-[#64748B]">
+          Enter your registered personal or business email and we&apos;ll send a secure password recovery link.
         </p>
       </div>
 
@@ -142,10 +139,10 @@ function ForgotPasswordForm() {
 
 export default function ForgotPasswordPage() {
   return (
-    <div className="min-h-screen bg-[#F4F7FB] flex flex-col justify-center items-center p-4">
-      <Suspense fallback={<div className="text-xs text-[#64748B]">Loading recovery form...</div>}>
+    <SplitAuthLayout>
+      <Suspense fallback={<div className="py-12 text-center text-xs text-[#64748B]">Loading recovery form...</div>}>
         <ForgotPasswordForm />
       </Suspense>
-    </div>
+    </SplitAuthLayout>
   );
 }
