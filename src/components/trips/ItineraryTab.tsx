@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { ItineraryItem, GroupPoll, TimelineCategory } from '../../types/trip';
 import { formatInr } from '../../lib/upi';
-import { currentUser } from '../../data/mockData';
+import { useAuth } from '../auth/AuthProvider';
 import { toast } from 'sonner';
 
 interface ItineraryTabProps {
@@ -30,6 +30,7 @@ export const ItineraryTab: React.FC<ItineraryTabProps> = ({
   initialItinerary,
   initialPolls,
 }) => {
+  const { user, profile } = useAuth();
   const [itinerary, setItinerary] = useState<ItineraryItem[]>(initialItinerary);
   const [polls, setPolls] = useState<GroupPoll[]>(initialPolls);
   const [selectedDay, setSelectedDay] = useState<number | 'ALL'>('ALL');
@@ -81,7 +82,7 @@ export const ItineraryTab: React.FC<ItineraryTabProps> = ({
     setPolls((prevPolls) =>
       prevPolls.map((poll) => {
         if (poll.id !== pollId) return poll;
-        const currentUserId = currentUser.id;
+        const currentUserId = user?.id || profile?.id || 'guest-voter';
 
         const updatedOptions = poll.options.map((opt) => {
           const hasVoted = opt.votes.includes(currentUserId);
@@ -129,7 +130,7 @@ export const ItineraryTab: React.FC<ItineraryTabProps> = ({
       notes: 'Added from trip workspace',
       mapsUrl: 'https://maps.google.com/?q=Old+Manali',
       estimatedCost: Number(newItemCost) || 0,
-      paidBy: 'Aarav (You)',
+      paidBy: profile?.display_name || user?.email?.split('@')[0] || 'You',
       isCompleted: false,
     };
     setItinerary([...itinerary, newItem]);
@@ -326,7 +327,7 @@ export const ItineraryTab: React.FC<ItineraryTabProps> = ({
                       const voteCount = option.votes.length;
                       const percentage =
                         totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0;
-                      const isUserVoted = option.votes.includes(currentUser.id);
+                      const isUserVoted = option.votes.includes(user?.id || profile?.id || 'guest-voter');
 
                       return (
                         <button

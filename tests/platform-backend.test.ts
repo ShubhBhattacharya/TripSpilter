@@ -1,0 +1,150 @@
+import crypto from 'node:crypto';
+import { describe, it, expect } from 'vitest';
+import { calculatePercentageSplit, toPaise } from '../src/lib/financial/split-engine';
+import { verifyWebhookSignature, createServerPaymentOrder } from '../src/lib/payments/gateway';
+import {
+  searchHotels,
+  searchFlights,
+  searchLivePlaces,
+} from '../src/lib/providers/travel-providers';
+import { executeAiTool } from '../src/lib/ai/tools';
+import { invokeCentralAICompanion } from '../src/lib/ai/provider';
+import { getServerIntegrationStatus } from '../src/lib/config/env';
+
+describe('Phase 5: Percentage Split Engine Invariants', () => {
+  it('distributes odd paise remainders cleanly across members to equal total exactly', () => {
+    const res = calculatePercentageSplit({
+      totalAmount: 1000,
+      percentages: [
+        { memberId: 'u1', percent: 33.33 },
+        { memberId: 'u2', percent: 33.33 },
+        { memberId: 'u3', percent: 33.34 },
+      ],
+    });
+    expect(res.isValid).toBe(true);
+    const totalPaise = res.shares.reduce((acc, s) => acc + s.amountPaise, 0);
+    expect(totalPaise).toBe(toPaise(1000));
+  });
+
+  it('rejects percentages not summing to 100%', () => {
+    const res = calculatePercentageSplit({
+      totalAmount: 500,
+      percentages: [
+        { memberId: 'u1', percent: 50 },
+        { memberId: 'u2', percent: 30 },
+      ],
+    });
+    expect(res.isValid).toBe(false);
+    expect(res.error).toContain('80.00%');
+  });
+});
+
+describe('Phase 6: Payment Gateway Order & Webhook Security', () => {
+  it('discloses WAITING FOR PAYMENT PROVIDER CREDENTIALS when gateway keys absent', async () => {
+    const res = await createServerPaymentOrder({
+      amountPaise: 120000,
+      currency: 'INR',
+      receiptRef: 'ts_test_001',
+    });
+    expect(res.configured).toBe(false);
+    expect(res.status).toBe('waiting_for_credentials');
+    expect(res.providerOrderId).toBeNull();
+  });
+
+  it('accepts valid HMAC-SHA256 webhook signature and rejects tampered payloads', () => {
+    const secret = 'test_webhook_secret_key_123';
+    const rawBody = JSON.stringify({ event: 'payment.captured', id: 'evt_1' });
+    const validSig = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+
+    expect(verifyWebhookSignature(rawBody, validSig, secret)).toBe(true);
+    expect(verifyWebhookSignature(rawBody, 'invalid_hex_signature', secret)).toBe(false);
+    expect(verifyWebhookSignature(rawBody + ' ', validSig, secret)).toBe(false);
+    expect(verifyWebhookSignature(rawBody, null, secret)).toBe(false);
+  });
+});
+
+describe('Phase 8: Live Travel API Adapters (Zero Fabricated Rates)', () => {
+  it('searchHotels reports waiting_for_credentials rather than inventing prices', async () => {
+    const res = await searchHotels({
+      city: 'Manali',
+      checkIn: '2026-12-10',
+      checkOut: '2026-12-12',
+      guests: 2,
+    });
+    expect(res.status).toBe('waiting_for_credentials');
+    expect(res.missingCredential).toBe('HOTEL_PROVIDER_API_KEY');
+    expect(res.data).toBeNull();
+  });
+
+  it('searchFlights reports waiting_for_credentials rather than inventing airfares', async () => {
+    const res = await searchFlights({
+      origin: 'DEL',
+      destination: 'GOI',
+      departureDate: '2026-12-15',
+      passengers: 2,
+    });
+    expect(res.status).toBe('waiting_for_credentials');
+    expect(res.data).toBeNull();
+  });
+
+  it('searchLivePlaces reports waiting_for_credentials when GOOGLE_MAPS_API_KEY is unset', async () => {
+    const res = await searchLivePlaces('Hadimba Temple', 'Manali');
+    expect(res.status).toBe('waiting_for_credentials');
+    expect(res.missingCredential).toBe('GOOGLE_MAPS_API_KEY');
+  });
+});
+
+describe('Phase 7: Central AI Companion & Controlled Tool Security', () => {
+  it('discloses missing AI credentials clearly when unconfigured', async () => {
+    const reply = await invokeCentralAICompanion(
+      { messages: [{ role: 'user', content: 'Plan a 3-day trip to Manali' }], language: 'en' },
+      { userId: null, supabase: null }
+    );
+    expect(reply.provider).toBe('unconfigured');
+    expect(reply.missingCredentials).toEqual(['OPENAI_API_KEY', 'GEMINI_API_KEY']);
+  });
+
+  it('searches destination catalog deterministically without hallucinating', async () => {
+    const res = await executeAiTool(
+      'search_destinations',
+      { query: 'Manali' },
+      { userId: null, supabase: null }
+    );
+    expect(res.ok).toBe(true);
+    const list = res.data as Array<{ id: string; name: string }>;
+    expect(list.some((d) => d.id === 'manali')).toBe(true);
+  });
+
+  it('enforces explicit user approval on mutation drafts', async () => {
+    const res = await executeAiTool(
+      'create_trip_draft',
+      { title: 'Manali Winter', destination: 'Manali', budget: 15000 },
+      { userId: 'usr-123', supabase: null }
+    );
+    expect(res.ok).toBe(true);
+    expect(res.requiresConfirmation?.actionType).toBe('CREATE_TRIP');
+  });
+
+  it('blocks unauthenticated DB tool access and rejects non-whitelisted tools', async () => {
+    const unauth = await executeAiTool('get_user_trips', {}, { userId: null, supabase: null });
+    expect(unauth.ok).toBe(false);
+    expect(unauth.error).toContain('Authentication required');
+
+    const badTool = await executeAiTool(
+      'execute_raw_sql',
+      { query: 'DROP TABLE trips;' },
+      { userId: 'usr-123', supabase: null }
+    );
+    expect(badTool.ok).toBe(false);
+    expect(badTool.error).toContain('not permitted');
+  });
+});
+
+describe('Phase 13: Environment Status Inventory Safety', () => {
+  it('returns strictly boolean/provider enum readiness without leaking secret strings', () => {
+    const status = getServerIntegrationStatus();
+    expect(typeof status.supabase).toBe('boolean');
+    expect(typeof status.paymentGateway).toBe('boolean');
+    expect(JSON.stringify(status)).not.toContain('placeholder');
+  });
+});

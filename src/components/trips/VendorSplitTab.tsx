@@ -42,9 +42,9 @@ interface VendorSplitTabProps {
 
 export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
   members,
-  initialVendorName = 'Cafe 1947 Manali',
-  initialVendorUpiId = 'cafe1947@okicici',
-  initialAmount = 4000,
+  initialVendorName = '',
+  initialVendorUpiId = '',
+  initialAmount = 0,
   onOpenAiScanner,
 }) => {
   const [vendorName, setVendorName] = useState(initialVendorName);
@@ -57,26 +57,7 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
 
   const [customAmounts, setCustomAmounts] = useState<{ [id: string]: number }>({});
 
-  const [itemizedList, setItemizedList] = useState<ItemizedBillItem[]>([
-    {
-      id: 'item-1',
-      name: 'Woodfired Truffle Pizza',
-      price: 1200,
-      assignedMemberIds: members.slice(0, 2).map((m) => m.id),
-    },
-    {
-      id: 'item-2',
-      name: 'Grilled Himalayan Trout',
-      price: 1400,
-      assignedMemberIds: members.slice(1, 3).map((m) => m.id),
-    },
-    {
-      id: 'item-3',
-      name: 'Cider & Beverages',
-      price: 1400,
-      assignedMemberIds: members.map((m) => m.id),
-    },
-  ]);
+  const [itemizedList, setItemizedList] = useState<ItemizedBillItem[]>([]);
   const [gstPercent, setGstPercent] = useState<number>(5);
 
   const [paymentRecords, setPaymentRecords] = useState<{
@@ -84,10 +65,7 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
       state: PaymentVerificationState;
       transactionRef?: string;
     };
-  }>({
-    [members[0]?.id || 'm1']: { state: 'verified_paid', transactionRef: 'UTR982736152' },
-    [members[1]?.id || 'm2']: { state: 'manually_reported_paid' },
-  });
+  }>({});
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
 

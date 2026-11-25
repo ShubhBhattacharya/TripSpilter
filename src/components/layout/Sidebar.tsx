@@ -17,7 +17,6 @@ import {
   Globe,
   Bell,
 } from 'lucide-react';
-import { currentUser as defaultMockUser } from '../../data/mockData';
 import { useAuth } from '../auth/AuthProvider';
 
 export const Sidebar: React.FC = () => {
@@ -28,10 +27,12 @@ export const Sidebar: React.FC = () => {
   const activeName =
     profile?.display_name ||
     user?.user_metadata?.full_name ||
-    (user?.email ? user.email.split('@')[0] : defaultMockUser.name);
-  const activeUpi = profile?.upi_id || (user ? 'Setup UPI ID' : defaultMockUser.upiId);
+    (user?.email ? user.email.split('@')[0] : 'Traveler');
+  const activeUpi = profile?.upi_id || 'Setup UPI ID';
   const activeAvatar =
-    profile?.avatar_url || user?.user_metadata?.avatar_url || defaultMockUser.avatar;
+    profile?.avatar_url ||
+    user?.user_metadata?.avatar_url ||
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80';
 
   const handleCopyUpi = () => {
     navigator.clipboard.writeText(activeUpi);

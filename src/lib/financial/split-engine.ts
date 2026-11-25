@@ -400,3 +400,71 @@ export function optimizeSettlements(
 
   return transfers;
 }
+
+export interface PercentageSplitInput {
+  totalAmount: number;
+  percentages: { memberId: string; percent: number }[];
+}
+
+/**
+ * Deterministic percentage-based split in integer paise.
+ * Percentages must sum to 100.00% (within 0.01% tolerance), and remainder paise
+ * are distributed to ensure Sum(shares) === totalAmount EXACTLY.
+ */
+export function calculatePercentageSplit(input: PercentageSplitInput): {
+  isValid: boolean;
+  shares: SplitResultShare[];
+  error?: string;
+} {
+  if (!Number.isFinite(input.totalAmount) || input.totalAmount <= 0) {
+    return { isValid: false, shares: [], error: 'Total amount must be greater than zero' };
+  }
+  if (!input.percentages || input.percentages.length === 0) {
+    return { isValid: false, shares: [], error: 'At least one member percentage is required' };
+  }
+
+  let percentSum = 0;
+  for (const p of input.percentages) {
+    if (!Number.isFinite(p.percent) || p.percent < 0 || p.percent > 100) {
+      return {
+        isValid: false,
+        shares: [],
+        error: `Invalid percentage ${p.percent} for member ${p.memberId}`,
+      };
+    }
+    percentSum += p.percent;
+  }
+
+  if (Math.abs(percentSum - 100) > 0.05) {
+    return {
+      isValid: false,
+      shares: [],
+      error: `Percentages sum to ${percentSum.toFixed(2)}% instead of 100%`,
+    };
+  }
+
+  const totalPaise = toPaise(input.totalAmount);
+  const rawShares = input.percentages.map((p) => ({
+    memberId: p.memberId,
+    paise: Math.floor((totalPaise * p.percent) / 100),
+  }));
+
+  let allocated = rawShares.reduce((acc, s) => acc + s.paise, 0);
+  let remainder = totalPaise - allocated;
+  let idx = 0;
+  while (remainder > 0 && rawShares.length > 0) {
+    rawShares[idx % rawShares.length].paise += 1;
+    remainder -= 1;
+    idx++;
+  }
+
+  return {
+    isValid: true,
+    shares: rawShares.map((s) => ({
+      memberId: s.memberId,
+      amount: toRupees(s.paise),
+      amountPaise: s.paise,
+    })),
+  };
+}
+

@@ -15,7 +15,12 @@ import { mockTrips } from '../../../data/mockData';
 
 export async function GET(request: Request) {
   if (!isSupabaseConfigured) {
-    return NextResponse.json({ trips: mockTrips, isDemo: true });
+    const allowDemo = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+    return NextResponse.json({
+      trips: allowDemo ? mockTrips : [],
+      isDemo: true,
+      configured: false,
+    });
   }
 
   try {

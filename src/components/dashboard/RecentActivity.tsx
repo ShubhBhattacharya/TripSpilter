@@ -1,14 +1,23 @@
 'use client';
 
 import React from 'react';
-import { recentActivities } from '../../data/mockData';
 import { Vote, QrCode, FileText, CheckCircle2, Clock } from 'lucide-react';
 
-interface RecentActivityProps {
-  activities?: typeof recentActivities;
+interface ActivityRecord {
+  id: string;
+  user: string;
+  action: string;
+  target: string;
+  time: string;
+  type: string;
+  avatar: string;
 }
 
-export const RecentActivity: React.FC<RecentActivityProps> = ({ activities = recentActivities }) => {
+interface RecentActivityProps {
+  activities?: ActivityRecord[];
+}
+
+export const RecentActivity: React.FC<RecentActivityProps> = ({ activities = [] }) => {
   const getIcon = (type: string) => {
     switch (type) {
       case 'poll':
