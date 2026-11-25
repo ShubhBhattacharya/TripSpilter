@@ -9,8 +9,9 @@ TripSplit is a Next.js 16 + TypeScript + Supabase + PostgreSQL travel-tech platf
 1. **Full-Screen 3D Experience & Destination Discovery (`/3d-experience`)**
    - Full-viewport responsive destination discovery across 60 Indian destinations (`All | North | South | East | West | Central | Northeast`), text + autocomplete + Hindi/English/Hinglish voice search.
    - Destination intro cards + 360° monument viewer paired with an animated 3D travel guide character and bilingual Hindi/English speech synthesis (`Play`, `Pause`, `Resume`, `Stop`, `Replay`, `Mute`, follow-up Q&A).
-2. **AI Travel Companion (`/ai-assistant` & `/api/ai/chat`)**
-   - Unified OpenAI + Google Gemini provider abstraction with automatic provider fallback, server-validated tool calling, persisted conversation history, and explicit user confirmation before mutations (`/api/ai/confirm-action`).
+2. **Global Floating AI Travel Agent & Workspace (`FloatingAiAssistant`, `/ai-assistant`, `/api/ai/chat`)**
+   - Always-accessible bottom-right cosmic AI orb mounted in `src/app/layout.tsx` across all pages (including `/3d-experience`, `/explore`, `/trips`, `/qr-split`, `/profile`) with expandable drawer / full-screen modes, Hindi/English/Hinglish voice input (`SpeechRecognition`) and TTS playback, receipt image OCR upload, conversation history & search, stop/regenerate/copy actions, and interactive structured cards (itineraries, weather, currency FX, destinations, emergency helplines, external transit links, honest credential disclosures, and explicit approval confirmations via `/api/ai/confirm-action`).
+   - Supports OpenAI GPT-4o-mini + Google Gemini tool calling with automatic fallback, plus deterministic catalog/public-adapter execution when AI keys are absent.
 3. **Expense Engine & Settlements (`/trips`, `/trips/[id]`, `/qr-split`)**
    - Deterministic integer-paise arithmetic (`src/lib/financial/split-engine.ts`) for Equal, Exact Custom, Percentage, and Itemized splits plus greedy minimum-transfer settlements (`/api/trips/[id]/settlements`).
 4. **Live Travel Data Adapters (`/api/travel`)**

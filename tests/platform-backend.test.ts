@@ -210,3 +210,85 @@ describe('Phase 13: Environment Status Inventory & API Security Route Tests', ()
     expect(res.status).toBe(503);
   });
 });
+
+describe('Phase 14: All-in-One AI Travel Agent Tools, Safety & Cards', () => {
+  it('generate_trip_plan produces catalog itinerary card without inventing hotel/flight rates', async () => {
+    const res = await executeAiTool(
+      'generate_trip_plan',
+      { destination: 'Manali', days: 3, travelers: 2, language: 'en' },
+      { userId: null, supabase: null }
+    );
+    expect(res.ok).toBe(true);
+    expect(res.card?.type).toBe('itinerary');
+    if (res.card?.type === 'itinerary') {
+      expect(res.card.destinationId).toBe('manali');
+      expect(res.card.schedule).toHaveLength(3);
+      expect(res.card.budgetEstimateInr).toBeGreaterThan(0);
+    }
+  });
+
+  it('search_transit_links returns redirect-only external links and get_travel_safety returns official Indian helplines', async () => {
+    const transit = await executeAiTool(
+      'search_transit_links',
+      { origin: 'Delhi', destination: 'Jaipur' },
+      { userId: null, supabase: null }
+    );
+    expect(transit.ok).toBe(true);
+    expect(transit.card?.type).toBe('provider_status');
+
+    const safety = await executeAiTool(
+      'get_travel_safety',
+      { language: 'en' },
+      { userId: null, supabase: null }
+    );
+    expect(safety.ok).toBe(true);
+    expect(safety.card?.type).toBe('safety');
+    if (safety.card?.type === 'safety') {
+      expect(safety.card.helplines.some((h) => h.number === '112')).toBe(true);
+      expect(safety.card.helplines.some((h) => h.number === '1363')).toBe(true);
+    }
+  });
+
+  it('enforces authentication on get_user_bookings and mutation drafts', async () => {
+    const anonBookings = await executeAiTool('get_user_bookings', {}, { userId: null, supabase: null });
+    expect(anonBookings.ok).toBe(false);
+    expect(anonBookings.error).toContain('Authentication required');
+
+    const draftBooking = await executeAiTool(
+      'create_booking_draft',
+      { tripId: 'trip-1', title: 'Snow Resort', category: 'Hotel', amount: 4500 },
+      { userId: 'usr-123', supabase: null }
+    );
+    expect(draftBooking.ok).toBe(true);
+    expect(draftBooking.requiresConfirmation?.actionType).toBe('CREATE_BOOKING_DRAFT');
+
+    const draftSettlement = await executeAiTool(
+      'create_settlement_draft',
+      { tripId: 'trip-1', toUserId: 'usr-456', amount: 1200 },
+      { userId: 'usr-123', supabase: null }
+    );
+    expect(draftSettlement.ok).toBe(true);
+    expect(draftSettlement.requiresConfirmation?.actionType).toBe('CREATE_SETTLEMENT_PROPOSAL');
+  });
+
+  it('invokeCentralAICompanion returns deterministic itinerary card & protects paid LLM in guest mode', async () => {
+    const planReply = await invokeCentralAICompanion(
+      { messages: [{ role: 'user', content: 'Plan a 3-day trip to Manali' }], language: 'en' },
+      { userId: null, supabase: null }
+    );
+    expect(planReply.provider).toBe('unconfigured');
+    expect(planReply.missingCredentials).toEqual(['OPENAI_API_KEY', 'GEMINI_API_KEY']);
+    expect(planReply.structuredCards.some((c) => c.type === 'itinerary')).toBe(true);
+
+    const guestReply = await invokeCentralAICompanion(
+      {
+        messages: [{ role: 'user', content: 'Convert 100 USD to INR' }],
+        language: 'en',
+        allowPaidLlm: false,
+      },
+      { userId: null, supabase: null }
+    );
+    expect(guestReply.model).toBe('guest-deterministic');
+    expect(guestReply.missingCredentials).toEqual([]);
+  });
+});

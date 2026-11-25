@@ -50,3 +50,22 @@ body {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
 }
+
+/* Floating AI Orb subtle glow and pulse animations */
+@keyframes ai-orb-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes ai-orb-ring {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.animate-ai-orb {
+  animation: ai-orb-float 3.6s ease-in-out infinite;
+}
+
+.animate-ai-ring {
+  animation: ai-orb-ring 12s linear infinite;
+}

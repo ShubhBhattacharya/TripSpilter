@@ -9,22 +9,25 @@ import {
   searchFlights,
 } from '../providers/travel-providers';
 import { calculateNetBalances, optimizeSettlements } from '../financial/split-engine';
+import type { PendingConfirmationAction, StructuredCard } from './types';
+import {
+  EXTENDED_AI_TOOL_DECLARATIONS,
+  executeExtendedAiTool,
+  extractStructuredCardFromTool,
+} from './tools-extended';
+
+export type { PendingConfirmationAction, StructuredCard };
 
 export interface ToolExecutionContext {
   userId: string | null;
   supabase: SupabaseClient | null;
 }
 
-export interface PendingConfirmationAction {
-  actionType: 'CREATE_TRIP' | 'CREATE_EXPENSE' | 'UPDATE_ITINERARY';
-  summary: string;
-  payload: Record<string, unknown>;
-}
-
 export interface ToolResult {
   tool: string;
   ok: boolean;
   data?: unknown;
+  card?: StructuredCard;
   error?: string;
   requiresConfirmation?: PendingConfirmationAction;
 }
@@ -190,9 +193,25 @@ export const AI_TOOL_DECLARATIONS = [
       required: ['title'],
     },
   },
+  ...EXTENDED_AI_TOOL_DECLARATIONS,
 ] as const;
 
 export async function executeAiTool(
+  toolName: string,
+  args: Record<string, unknown>,
+  ctx: ToolExecutionContext
+): Promise<ToolResult> {
+  const res = await executeBaseAiTool(toolName, args, ctx);
+  if (!res.card && res.data) {
+    const autoCard = extractStructuredCardFromTool(toolName, res.data);
+    if (autoCard) {
+      res.card = autoCard;
+    }
+  }
+  return res;
+}
+
+async function executeBaseAiTool(
   toolName: string,
   args: Record<string, unknown>,
   ctx: ToolExecutionContext
@@ -218,8 +237,13 @@ export async function executeAiTool(
           data: matches.map((d) => ({
             id: d.id,
             name: d.name,
+            state: d.state,
             region: d.region,
+            tagline: d.tagline,
+            startingPrice: d.startingPrice,
             startingPriceInr: d.startingPrice,
+            heroImage: d.heroImage,
+            spotCount: d.spots.length,
             spots: d.spots.map((s) => ({ name: s.name, costInr: s.cost, bestTime: s.bestTime })),
           })),
         };
@@ -483,8 +507,13 @@ export async function executeAiTool(
         };
       }
 
-      default:
+      default: {
+        const extended = await executeExtendedAiTool(toolName, args, ctx);
+        if (extended) {
+          return { tool: toolName, ...extended };
+        }
         return { tool: toolName, ok: false, error: `Tool "${toolName}" is not permitted.` };
+      }
     }
   } catch (err) {
     return {

@@ -11,6 +11,7 @@ const chatSchema = z.object({
   tripId: z.string().uuid().optional(),
   language: z.enum(['hi', 'en']).optional().default('en'),
   preferredProvider: z.enum(['openai', 'gemini', 'auto']).optional().default('auto'),
+  currentPath: z.string().max(120).optional(),
   messages: z
     .array(
       z.object({
@@ -75,14 +76,15 @@ export async function POST(request: Request) {
     let supabaseClient = null;
     if (isSupabaseConfigured) {
       supabaseClient = await createClient();
-      // Require authenticated user when Supabase is enabled to prevent anonymous paid LLM abuse
-      const user = await requireAuthenticatedUser(supabaseClient);
-      userId = user.id;
+      const {
+        data: { user },
+      } = await supabaseClient.auth.getUser();
+      userId = user?.id || null;
     }
 
     const rateLimit = await checkRateLimit(
       getClientIdentifier('ai_chat', request, userId),
-      userId ? 25 : 10,
+      userId ? 25 : 8,
       60000
     );
     const headers = new Headers();
@@ -100,6 +102,8 @@ export async function POST(request: Request) {
         language: parsed.data.language,
         preferredProvider: parsed.data.preferredProvider,
         tripId: parsed.data.tripId,
+        currentPath: parsed.data.currentPath,
+        allowPaidLlm: Boolean(userId || !isSupabaseConfigured),
       },
       { userId, supabase: supabaseClient }
     );

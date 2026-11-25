@@ -1,28 +1,20 @@
 import { AI_TOOL_DECLARATIONS, executeAiTool, PendingConfirmationAction, ToolExecutionContext } from './tools';
+import type {
+  AIProviderName,
+  AICompanionRequest,
+  AICompanionResponse,
+  ChatTurnMessage,
+  StructuredCard,
+} from './types';
+import { runUnconfiguredFallbackOrchestrator } from './fallback-orchestrator';
 
-export type AIProviderName = 'openai' | 'gemini' | 'unconfigured';
-
-export interface ChatTurnMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-export interface AICompanionRequest {
-  messages: ChatTurnMessage[];
-  language?: 'hi' | 'en';
-  preferredProvider?: 'openai' | 'gemini' | 'auto';
-  tripId?: string;
-}
-
-export interface AICompanionResponse {
-  reply: string;
-  provider: AIProviderName;
-  model: string;
-  fallbackUsed: boolean;
-  toolExecutions: Array<{ tool: string; ok: boolean }>;
-  pendingConfirmations: PendingConfirmationAction[];
-  missingCredentials?: string[];
-}
+export type {
+  AIProviderName,
+  AICompanionRequest,
+  AICompanionResponse,
+  ChatTurnMessage,
+  StructuredCard,
+};
 
 const SYSTEM_PROMPT = `You are TripSplit AI, an intelligent, honest Indian and international travel companion supporting both English and Hindi (Devanagari).
 Rules you MUST always follow:
@@ -69,13 +61,16 @@ async function runOpenAICompanion(
       role: 'system',
       content: `${SYSTEM_PROMPT}\nPreferred response language: ${
         req.language === 'hi' ? 'Hindi (Devanagari or easy conversational Hindi matching user)' : 'English'
-      }.${req.tripId ? `\nActive Trip Context ID: ${req.tripId}` : ''}`,
+      }.${req.tripId ? `\nActive Trip Context ID: ${req.tripId}` : ''}${
+        req.currentPath ? `\nUser is currently viewing page: ${req.currentPath}` : ''
+      }`,
     },
     ...req.messages.map((m) => ({ role: m.role, content: m.content })),
   ];
 
   const toolExecutions: Array<{ tool: string; ok: boolean }> = [];
   const pendingConfirmations: PendingConfirmationAction[] = [];
+  const structuredCards: StructuredCard[] = [];
 
   // Allow up to 3 tool-call rounds
   for (let round = 0; round < 3; round++) {
@@ -112,6 +107,7 @@ async function runOpenAICompanion(
         fallbackUsed: false,
         toolExecutions,
         pendingConfirmations,
+        structuredCards,
       };
     }
 
@@ -127,6 +123,9 @@ async function runOpenAICompanion(
 
       const result = await executeAiTool(fnName, parsedArgs, ctx);
       toolExecutions.push({ tool: fnName, ok: result.ok });
+      if (result.card) {
+        structuredCards.push(result.card);
+      }
       if (result.requiresConfirmation) {
         pendingConfirmations.push(result.requiresConfirmation);
       }
@@ -146,6 +145,7 @@ async function runOpenAICompanion(
     fallbackUsed: false,
     toolExecutions,
     pendingConfirmations,
+    structuredCards,
   };
 }
 
@@ -169,6 +169,7 @@ async function runGeminiCompanion(
 
   const toolExecutions: Array<{ tool: string; ok: boolean }> = [];
   const pendingConfirmations: PendingConfirmationAction[] = [];
+  const structuredCards: StructuredCard[] = [];
 
   for (let round = 0; round < 3; round++) {
     const res = await fetch(
@@ -182,7 +183,9 @@ async function runGeminiCompanion(
               {
                 text: `${SYSTEM_PROMPT}\nPreferred language: ${
                   req.language === 'hi' ? 'Hindi' : 'English'
-                }.${req.tripId ? ` Active Trip ID: ${req.tripId}` : ''}`,
+                }.${req.tripId ? ` Active Trip ID: ${req.tripId}` : ''}${
+                  req.currentPath ? ` Page: ${req.currentPath}` : ''
+                }`,
               },
             ],
           },
@@ -215,6 +218,7 @@ async function runGeminiCompanion(
         fallbackUsed: false,
         toolExecutions,
         pendingConfirmations,
+        structuredCards,
       };
     }
 
@@ -223,6 +227,9 @@ async function runGeminiCompanion(
 
     const result = await executeAiTool(call.name, call.args || {}, ctx);
     toolExecutions.push({ tool: call.name, ok: result.ok });
+    if (result.card) {
+      structuredCards.push(result.card);
+    }
     if (result.requiresConfirmation) {
       pendingConfirmations.push(result.requiresConfirmation);
     }
@@ -247,6 +254,7 @@ async function runGeminiCompanion(
     fallbackUsed: false,
     toolExecutions,
     pendingConfirmations,
+    structuredCards,
   };
 }
 
@@ -261,20 +269,8 @@ export async function invokeCentralAICompanion(
   const preferred = req.preferredProvider || 'auto';
   const providers = getConfiguredProviders(preferred);
 
-  if (providers.length === 0) {
-    // Still execute read-only weather/currency/destination lookup if user asks a clear query, while disclosing missing AI keys
-    return {
-      reply:
-        req.language === 'hi'
-          ? 'AI ट्रैवल असिस्टेंट (OpenAI / Gemini) अभी कॉन्फ़िगर नहीं है। सर्वर पर OPENAI_API_KEY या GEMINI_API_KEY जोड़ने के बाद मैं पूरी बातचीत, स्मार्ट ट्रिप प्लानिंग और लाइव टूल्स चला सकूँगा।'
-          : 'The AI Travel Companion is waiting for AI API credentials (`OPENAI_API_KEY` or `GEMINI_API_KEY` on the server). Configure either key to activate full conversational trip planning and multi-tool orchestration.',
-      provider: 'unconfigured',
-      model: 'none',
-      fallbackUsed: false,
-      toolExecutions: [],
-      pendingConfirmations: [],
-      missingCredentials: ['OPENAI_API_KEY', 'GEMINI_API_KEY'],
-    };
+  if (providers.length === 0 || req.allowPaidLlm === false) {
+    return runUnconfiguredFallbackOrchestrator(req, ctx, executeAiTool);
   }
 
   let lastError: string | null = null;
@@ -302,5 +298,6 @@ export async function invokeCentralAICompanion(
     fallbackUsed: true,
     toolExecutions: [],
     pendingConfirmations: [],
+    structuredCards: [],
   };
 }

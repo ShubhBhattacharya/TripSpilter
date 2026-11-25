@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "../components/auth/AuthProvider";
 import { OnboardingModal } from "../components/auth/OnboardingModal";
+import { FloatingAiAssistant } from "../components/ai/FloatingAiAssistant";
 import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
@@ -26,6 +27,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-[#F4F7FB] text-[#172B4D] font-sans selection:bg-[#1685D4]/20 selection:text-[#173B70]">
         <AuthProvider>
           {children}
+          <FloatingAiAssistant />
           <OnboardingModal />
           <Toaster
             position="top-right"
