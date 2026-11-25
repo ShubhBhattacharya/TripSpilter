@@ -69,3 +69,12 @@ body {
 .animate-ai-ring {
   animation: ai-orb-ring 12s linear infinite;
 }
+
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

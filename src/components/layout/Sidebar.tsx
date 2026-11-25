@@ -43,8 +43,13 @@ export const Sidebar: React.FC = () => {
 
   const navLinks = [
     {
-      name: 'Dashboard',
+      name: 'Travel Home',
       href: '/',
+      icon: Globe,
+    },
+    {
+      name: 'Expense Dashboard',
+      href: '/dashboard',
       icon: Compass,
     },
     {

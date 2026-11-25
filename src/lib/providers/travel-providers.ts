@@ -469,7 +469,7 @@ export async function getWeatherForLocation(
 
   try {
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,wind_speed_10m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=3&timezone=Asia%2FKolkata`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+    const res = await fetch(url, { signal: AbortSignal.timeout(3500) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const daily = data.daily || {};
@@ -537,7 +537,7 @@ export async function getCurrencyRate(
       `https://api.frankfurter.app/latest?amount=${encodeURIComponent(amount)}&from=${encodeURIComponent(
         base
       )}&to=${encodeURIComponent(target)}`,
-      { signal: AbortSignal.timeout(6000) }
+      { signal: AbortSignal.timeout(3500) }
     );
     if (!res.ok) throw new Error(`Currency feed HTTP ${res.status}`);
     const data = await res.json();

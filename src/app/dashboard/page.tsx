@@ -1,3 +1,8 @@
-import DashboardPage from '../page';
+'use client';
 
-export default DashboardPage;
+import React from 'react';
+import { ExpenseDashboardView } from '../../components/dashboard/ExpenseDashboardView';
+
+export default function DashboardPage() {
+  return <ExpenseDashboardView />;
+}

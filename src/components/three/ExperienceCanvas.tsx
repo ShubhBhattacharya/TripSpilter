@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Suspense } from 'react';
+import React, { Suspense, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { useProgress } from '@react-three/drei';
 import { TravelGuide } from './TravelGuide';
@@ -38,6 +38,17 @@ function SceneLoadingOverlay() {
 export function ExperienceCanvas() {
   const stage = useTrip3DStore((s) => s.stage);
   const currentSpot = useTrip3DStore((s) => s.getCurrentSpot());
+  const setSelectedCityId = useTrip3DStore((s) => s.setSelectedCityId);
+  const setStage = useTrip3DStore((s) => s.setStage);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const city = new URLSearchParams(window.location.search).get('city');
+    if (city) {
+      setSelectedCityId(city);
+      setStage('desk');
+    }
+  }, [setSelectedCityId, setStage]);
 
   return (
     <div className="relative w-full h-screen bg-slate-950 overflow-hidden select-none">

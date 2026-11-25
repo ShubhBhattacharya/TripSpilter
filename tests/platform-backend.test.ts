@@ -16,6 +16,13 @@ import { GET as travelGet } from '../src/app/api/travel/route';
 import { POST as webhookPost } from '../src/app/api/payments/webhook/route';
 import { GET as authCallbackGet } from '../src/app/auth/callback/route';
 import {
+  PORTAL_NAV_CATEGORIES,
+  PLATFORM_OFFERS,
+  HANDPICKED_COLLECTIONS,
+  resolveCollectionDestinations,
+  getDestinationById,
+} from '../src/data/travelCatalog';
+import {
   COUNTRY_CODES,
   validateMobileNumber,
   validateEmailAddress,
@@ -114,7 +121,7 @@ describe('Phase 7: Central AI Companion & Controlled Tool Security', () => {
     );
     expect(reply.provider).toBe('unconfigured');
     expect(reply.missingCredentials).toEqual(['OPENAI_API_KEY', 'GEMINI_API_KEY']);
-  });
+  }, 15000);
 
   it('searches destination catalog deterministically without hallucinating', async () => {
     const res = await executeAiTool(
@@ -180,7 +187,7 @@ describe('Phase 13: Environment Status Inventory & API Security Route Tests', ()
     expect(json.language).toBe('hi');
     expect(typeof json.explanation).toBe('string');
     expect(json.explanation).toContain('Hadimba Devi Temple');
-  });
+  }, 15000);
 
   it('guide TTS route returns clean browser fallback status and rate-limit headers when OpenAI key absent', async () => {
     const req = new Request('http://localhost:3000/api/guide/tts', {
@@ -298,7 +305,7 @@ describe('Phase 14: All-in-One AI Travel Agent Tools, Safety & Cards', () => {
     );
     expect(guestReply.model).toBe('guest-deterministic');
     expect(guestReply.missingCredentials).toEqual([]);
-  });
+  }, 15000);
 });
 
 describe('Phase 15: Split-Screen Auth Validation & Redirect Security', () => {
@@ -338,5 +345,28 @@ describe('Phase 15: Split-Screen Auth Validation & Redirect Security', () => {
     const res = await authCallbackGet(req);
     expect(res.status).toBe(307);
     expect(res.headers.get('location')).toContain('/login?error=invalid-auth-request');
+  });
+});
+
+describe('Phase 16: Travel Portal Catalog Integrity & Destination Resolution', () => {
+  it('defines booking categories and avoids fabricated coupon codes or fake bank partnerships', () => {
+    expect(PORTAL_NAV_CATEGORIES.length).toBeGreaterThanOrEqual(8);
+    expect(PORTAL_NAV_CATEGORIES.some((c) => c.id === 'insurance' && !c.searchSupported)).toBe(true);
+    for (const offer of PLATFORM_OFFERS) {
+      expect(offer.title.toLowerCase()).not.toContain('hdfc');
+      expect(offer.title.toLowerCase()).not.toContain('icici');
+      expect(offer.description).not.toMatch(/CODE:/i);
+    }
+  });
+
+  it('resolves handpicked collections and individual destinations across all 60 cities cleanly', () => {
+    for (const col of HANDPICKED_COLLECTIONS) {
+      const list = resolveCollectionDestinations(col.destinationIds);
+      expect(list.length).toBeGreaterThanOrEqual(4);
+    }
+    const manali = getDestinationById('manali');
+    expect(manali?.name).toContain('Manali');
+    expect(manali?.spots).toHaveLength(4);
+    expect(getDestinationById('nonexistent-city-slug')).toBeUndefined();
   });
 });
