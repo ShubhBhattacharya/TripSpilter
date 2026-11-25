@@ -1,21 +1,47 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Sidebar } from '../../components/layout/Sidebar';
 import { BottomNav } from '../../components/layout/BottomNav';
 import { TopHeader } from '../../components/layout/TopHeader';
 import { VendorSplitTab } from '../../components/trips/VendorSplitTab';
 import { ScanMerchantQrModal } from '../../components/modals/ScanMerchantQrModal';
-import { AiBillScanModal } from '../../components/modals/AiBillScanModal';
+import { AiBillScanModal, BillData } from '../../components/modals/AiBillScanModal';
 import { defaultMembers } from '../../data/mockData';
+import { useAuth } from '../../components/auth/AuthProvider';
+import { TripMember, ItemizedBillItem } from '../../types/trip';
 
-export default function QrSplitPage() {
-  const [vendorName, setVendorName] = useState('Cafe 1947 Manali');
-  const [vendorUpi, setVendorUpi] = useState('cafe1947@okicici');
-  const [amount, setAmount] = useState(4000);
+function QrSplitContent() {
+  const searchParams = useSearchParams();
+  const { user, profile, isConfigured } = useAuth();
+
+  const initialVendor = searchParams.get('vendor') || '';
+  const initialUpi = searchParams.get('upi') || '';
+  const initialAmt = Number(searchParams.get('am') || 0) || 0;
+
+  const [vendorName, setVendorName] = useState(initialVendor);
+  const [vendorUpi, setVendorUpi] = useState(initialUpi);
+  const [amount, setAmount] = useState(initialAmt);
+  const [scannedItems, setScannedItems] = useState<ItemizedBillItem[]>([]);
 
   const [isScanMerchantOpen, setIsScanMerchantOpen] = useState(false);
   const [isAiBillScanOpen, setIsAiBillScanOpen] = useState(false);
+
+  const activeMembers: TripMember[] =
+    isConfigured && user
+      ? [
+          {
+            id: user.id,
+            name: profile?.display_name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'You',
+            upiId: profile?.upi_id || '',
+            avatar:
+              profile?.avatar_url ||
+              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+            isCurrentUser: true,
+          },
+        ]
+      : defaultMembers;
 
   const handleVendorDetected = (v: { name: string; upiId: string; amount?: number }) => {
     setVendorName(v.name);
@@ -23,13 +49,17 @@ export default function QrSplitPage() {
     if (v.amount) setAmount(v.amount);
   };
 
-  const handleAiBillApplied = (billData: {
-    merchantName: string;
-    totalAmount: number;
-    items: { name: string; price: number }[];
-  }) => {
+  const handleAiBillApplied = (billData: BillData) => {
     setVendorName(billData.merchantName);
     setAmount(billData.totalAmount);
+    setScannedItems(
+      billData.items.map((it, i) => ({
+        id: `ocr-${i + 1}`,
+        name: it.name,
+        price: it.price,
+        assignedMemberIds: activeMembers.map((m) => m.id),
+      }))
+    );
   };
 
   return (
@@ -44,10 +74,12 @@ export default function QrSplitPage() {
 
         <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto w-full">
           <VendorSplitTab
-            members={defaultMembers}
+            key={`${vendorUpi}-${amount}-${scannedItems.length}`}
+            members={activeMembers}
             initialVendorName={vendorName}
             initialVendorUpiId={vendorUpi}
             initialAmount={amount}
+            initialItems={scannedItems}
             onOpenAiScanner={() => setIsAiBillScanOpen(true)}
           />
         </main>
@@ -67,5 +99,13 @@ export default function QrSplitPage() {
         onApplyBill={handleAiBillApplied}
       />
     </div>
+  );
+}
+
+export default function QrSplitPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#F4F7FB]" />}>
+      <QrSplitContent />
+    </Suspense>
   );
 }

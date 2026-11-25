@@ -33,39 +33,9 @@ const AuthContext = createContext<AuthContextType>({
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<DbProfile | null>(() => {
-    if (!isSupabaseConfigured) {
-      if (typeof window !== 'undefined' && sessionStorage.getItem('tripsplit_preview_signed_out') === 'true') {
-        return null;
-      }
-      if (typeof window !== 'undefined') {
-        const stored = localStorage.getItem('tripsplit_demo_user');
-        if (stored) {
-          try {
-            const parsed = JSON.parse(stored);
-            return {
-              id: parsed.id || mockUser.id,
-              display_name: parsed.name || 'Traveler',
-              upi_id: parsed.upiId || '',
-              avatar_url: parsed.avatar || mockUser.avatar,
-            };
-          } catch {
-            // ignore corrupted storage
-          }
-        }
-      }
-      if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') {
-        return {
-          id: mockUser.id,
-          display_name: mockUser.name,
-          upi_id: mockUser.upiId,
-          avatar_url: mockUser.avatar,
-        };
-      }
-      return null;
-    }
-    return null;
-  });
+  // Start with deterministic null SSR/first-render state to prevent React #418 hydration mismatches,
+  // then hydrate localStorage/sessionStorage demo state safely inside useEffect.
+  const [profile, setProfile] = useState<DbProfile | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(() => isSupabaseConfigured);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const router = useRouter();
@@ -103,7 +73,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) {
-      return;
+      const timer = setTimeout(() => {
+        if (typeof window !== 'undefined' && sessionStorage.getItem('tripsplit_preview_signed_out') === 'true') {
+          setIsLoading(false);
+          return;
+        }
+        if (typeof window !== 'undefined') {
+          const stored = localStorage.getItem('tripsplit_demo_user');
+          if (stored) {
+            try {
+              const parsed = JSON.parse(stored);
+              setProfile({
+                id: parsed.id || mockUser.id,
+                display_name: parsed.name || 'Traveler',
+                upi_id: parsed.upiId || '',
+                avatar_url: parsed.avatar || mockUser.avatar,
+              });
+              setIsLoading(false);
+              return;
+            } catch {
+              // ignore corrupted storage
+            }
+          }
+        }
+        if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') {
+          setProfile({
+            id: mockUser.id,
+            display_name: mockUser.name,
+            upi_id: mockUser.upiId,
+            avatar_url: mockUser.avatar,
+          });
+        }
+        setIsLoading(false);
+      }, 0);
+      return () => clearTimeout(timer);
     }
 
     const checkUser = async () => {

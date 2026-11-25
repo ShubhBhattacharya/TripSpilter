@@ -16,34 +16,62 @@ import { formatInr, generateUpiUri } from '../../lib/upi';
 import { toast } from 'sonner';
 
 interface BalancesTabProps {
+  tripId?: string;
   debts: DebtSettlement[];
   members: TripMember[];
 }
 
-export const BalancesTab: React.FC<BalancesTabProps> = ({ debts: initialDebts, members }) => {
+export const BalancesTab: React.FC<BalancesTabProps> = ({ tripId, debts: initialDebts, members }) => {
   const [debts, setDebts] = useState<DebtSettlement[]>(initialDebts);
   const [activePayDebt, setActivePayDebt] = useState<DebtSettlement | null>(null);
+  const [gatewayMsg, setGatewayMsg] = useState<string | null>(null);
 
   const getMember = (id: string): TripMember | undefined => {
     return members.find((m) => m.id === id);
   };
 
-  const handleToggleSettled = (debtId: string) => {
+  const handleToggleSettled = async (debtId: string) => {
+    const target = debts.find((d) => d.id === debtId);
+    const nextStatus = target?.status === 'SETTLED' ? 'PENDING' : 'SETTLED';
+
+    if (
+      nextStatus === 'SETTLED' &&
+      target &&
+      tripId &&
+      !tripId.startsWith('local-') &&
+      !tripId.startsWith('trip-')
+    ) {
+      try {
+        const res = await fetch(`/api/trips/${tripId}/settlements`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fromUserId: target.fromMemberId,
+            toUserId: target.toMemberId,
+            amount: target.amount,
+          }),
+        });
+        if (!res.ok) {
+          toast.info('Marked settled locally (server verification requires valid trip member UUIDs).');
+        }
+      } catch {
+        // ignore network error in offline mode
+      }
+    }
+
     setDebts((prevDebts) =>
       prevDebts.map((d) => {
         if (d.id !== debtId) return d;
-        const newStatus = d.status === 'SETTLED' ? 'PENDING' : 'SETTLED';
-
-        if (newStatus === 'SETTLED') {
+        if (nextStatus === 'SETTLED') {
           const from = getMember(d.fromMemberId)?.name?.split(' ')[0] || 'Member';
           const to = getMember(d.toMemberId)?.name?.split(' ')[0] || 'Member';
-          toast.success('Debt Settled via UPI! 🎉', {
-            description: `${from} paid ${to} ${formatInr(d.amount)}.`,
+          toast.success('Settlement recorded as Manually Settled', {
+            description: `${from} -> ${to} (${formatInr(d.amount)}). Bank/gateway confirmation happens only via webhook.`,
           });
           try {
             confetti({
-              particleCount: 50,
-              spread: 60,
+              particleCount: 40,
+              spread: 55,
               origin: { y: 0.6 },
               colors: ['#0A9B78', '#1685D4'],
             });
@@ -56,11 +84,29 @@ export const BalancesTab: React.FC<BalancesTabProps> = ({ debts: initialDebts, m
 
         return {
           ...d,
-          status: newStatus,
-          settledAt: newStatus === 'SETTLED' ? 'Just now' : undefined,
+          status: nextStatus,
+          settledAt: nextStatus === 'SETTLED' ? 'Self-Reported' : undefined,
         };
       })
     );
+  };
+
+  const handleGatewayOrderCheck = async (amount: number) => {
+    setGatewayMsg(null);
+    try {
+      const res = await fetch('/api/payments/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...(tripId && !tripId.startsWith('local-') && !tripId.startsWith('trip-') ? { tripId } : {}),
+          amountInr: amount,
+        }),
+      });
+      const data = await res.json();
+      setGatewayMsg(data.disclaimer || data.error || 'Payment gateway checked.');
+    } catch {
+      setGatewayMsg('Unable to check payment gateway status.');
+    }
   };
 
   const pendingDebts = debts.filter((d) => d.status === 'PENDING');
@@ -248,51 +294,79 @@ export const BalancesTab: React.FC<BalancesTabProps> = ({ debts: initialDebts, m
               const payee = getMember(activePayDebt.toMemberId);
               if (!payee) return null;
 
-              const upiUri = generateUpiUri({
-                payeeVpa: payee.upiId,
-                payeeName: payee.name,
-                amount: activePayDebt.amount,
-                transactionNote: `TripSplit Settlement to ${payee.name}`,
-              });
+              let upiUri: string | null = null;
+              let vpaError: string | null = null;
+              try {
+                upiUri = generateUpiUri({
+                  payeeVpa: payee.upiId,
+                  payeeName: payee.name,
+                  amount: activePayDebt.amount,
+                  transactionNote: `TripSplit Settlement to ${payee.name}`,
+                });
+              } catch (err) {
+                vpaError = err instanceof Error ? err.message : 'Member has not set a valid UPI ID yet.';
+              }
 
               return (
                 <div className="space-y-4 text-center">
                   <div>
                     <span className="text-xs text-[#64748B]">Paying directly to:</span>
                     <h4 className="text-base font-bold text-[#172B4D]">{payee.name}</h4>
-                    <p className="text-xs text-[#1685D4] font-mono">{payee.upiId}</p>
+                    <p className="text-xs text-[#1685D4] font-mono">{payee.upiId || 'No UPI ID set'}</p>
                   </div>
 
                   <div className="text-2xl font-bold text-[#172B4D] num-inr">
                     {formatInr(activePayDebt.amount)}
                   </div>
 
-                  {/* Scannable QR Code */}
-                  <div className="flex flex-col items-center justify-center p-4 rounded-lg bg-[#F4F7FB] border border-[#E5EAF1] mx-auto w-48 shadow-inner">
-                    <QRCodeSVG value={upiUri} size={150} level="M" />
-                    <span className="text-[9px] text-[#64748B] font-medium mt-1.5">
-                      Scan via GPay / PhonePe / Paytm
-                    </span>
-                  </div>
+                  {/* Scannable QR Code or VPA Warning */}
+                  {upiUri ? (
+                    <div className="flex flex-col items-center justify-center p-4 rounded-lg bg-[#F4F7FB] border border-[#E5EAF1] mx-auto w-48 shadow-inner">
+                      <QRCodeSVG value={upiUri} size={150} level="M" />
+                      <span className="text-[9px] text-[#64748B] font-medium mt-1.5">
+                        Scan via GPay / PhonePe / Paytm
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
+                      {vpaError}
+                    </div>
+                  )}
+
+                  {gatewayMsg && (
+                    <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                      {gatewayMsg}
+                    </p>
+                  )}
 
                   <div className="space-y-2">
-                    <a
-                      href={upiUri}
-                      className="w-full py-2.5 px-4 rounded-lg bg-[#1685D4] hover:bg-[#126bb0] text-white font-semibold text-xs flex items-center justify-center gap-1.5 shadow-xs active:scale-95"
+                    {upiUri && (
+                      <a
+                        href={upiUri}
+                        className="w-full py-2.5 px-4 rounded-lg bg-[#1685D4] hover:bg-[#126bb0] text-white font-semibold text-xs flex items-center justify-center gap-1.5 shadow-xs active:scale-95"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Open in UPI App</span>
+                      </a>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => void handleGatewayOrderCheck(activePayDebt.amount)}
+                      className="w-full py-2 px-4 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-200"
                     >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      <span>Open in UPI App</span>
-                    </a>
+                      Check Gateway Online Checkout
+                    </button>
 
                     <button
                       type="button"
                       onClick={() => {
-                        handleToggleSettled(activePayDebt.id);
+                        void handleToggleSettled(activePayDebt.id);
                         setActivePayDebt(null);
                       }}
                       className="w-full py-2 px-4 rounded-lg bg-[#F4F7FB] hover:bg-[#E5EAF1] text-[#0A9B78] text-xs font-semibold transition-colors border border-[#E5EAF1]"
                     >
-                      Mark as Paid & Settled ✅
+                      Mark as Reported Settled (Manual)
                     </button>
                   </div>
                 </div>

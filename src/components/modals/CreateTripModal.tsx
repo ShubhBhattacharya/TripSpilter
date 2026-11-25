@@ -1,11 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, MapPin, Calendar, Plus } from 'lucide-react';
 
 interface CreateTripModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialTitle?: string;
+  initialDestination?: string;
+  initialBudget?: number;
   onCreate: (tripData: {
     title: string;
     destination: string;
@@ -18,24 +21,49 @@ interface CreateTripModalProps {
 export const CreateTripModal: React.FC<CreateTripModalProps> = ({
   isOpen,
   onClose,
+  initialTitle = '',
+  initialDestination = '',
+  initialBudget = 35000,
   onCreate,
 }) => {
-  const [title, setTitle] = useState('');
-  const [destination, setDestination] = useState('');
-  const [dateRange, setDateRange] = useState('');
-  const [budget, setBudget] = useState('35000');
+  const [title, setTitle] = useState(initialTitle);
+  const [destination, setDestination] = useState(initialDestination);
+  const [startDate, setStartDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(
+    () => new Date(Date.now() + 4 * 86400000).toISOString().split('T')[0]
+  );
+  const [budget, setBudget] = useState(String(initialBudget || 35000));
+  const [dateError, setDateError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      const t = setTimeout(() => {
+        if (initialTitle) setTitle(initialTitle);
+        if (initialDestination) setDestination(initialDestination);
+        if (initialBudget) setBudget(String(initialBudget));
+        setDateError(null);
+      }, 0);
+      return () => clearTimeout(t);
+    }
+  }, [isOpen, initialTitle, initialDestination, initialBudget]);
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !destination) return;
+    setDateError(null);
+    if (!title.trim() || !destination.trim()) return;
+    if (endDate < startDate) {
+      setDateError('End date cannot be earlier than start date.');
+      return;
+    }
+
     onCreate({
-      title,
-      destination,
-      startDate: dateRange.split('-')[0]?.trim() || '10 Dec 2026',
-      endDate: dateRange.split('-')[1]?.trim() || '15 Dec 2026',
-      budget: Number(budget) || 30000,
+      title: title.trim(),
+      destination: destination.trim(),
+      startDate,
+      endDate,
+      budget: Math.max(0, Number(budget) || 0),
     });
     onClose();
   };
@@ -63,6 +91,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close create trip modal"
             className="p-1.5 rounded-lg text-[#64748B] hover:text-[#172B4D] hover:bg-[#F4F7FB] transition-colors"
           >
             <X className="w-5 h-5" />
@@ -78,6 +107,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
             <input
               type="text"
               required
+              minLength={2}
               placeholder="e.g., Rishikesh Rafting & Camping Weekend"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -94,6 +124,7 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
               <input
                 type="text"
                 required
+                minLength={2}
                 placeholder="e.g., Rishikesh, Uttarakhand"
                 value={destination}
                 onChange={(e) => setDestination(e.target.value)}
@@ -102,29 +133,43 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-semibold text-[#172B4D] mb-1">
-                Dates
+                Start Date
               </label>
               <div className="relative">
-                <Calendar className="w-4 h-4 text-[#94A3B8] absolute left-3 top-2.5" />
+                <Calendar className="w-3.5 h-3.5 text-[#94A3B8] absolute left-2.5 top-2.5 pointer-events-none" />
                 <input
-                  type="text"
-                  placeholder="10 Dec - 15 Dec"
-                  value={dateRange}
-                  onChange={(e) => setDateRange(e.target.value)}
-                  className="w-full bg-[#F4F7FB] border border-[#E5EAF1] focus:border-[#1685D4] rounded-lg pl-9 pr-3 py-2 text-xs text-[#172B4D] placeholder-slate-400 focus:outline-none"
+                  type="date"
+                  required
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full bg-[#F4F7FB] border border-[#E5EAF1] focus:border-[#1685D4] rounded-lg pl-8 pr-2 py-2 text-xs text-[#172B4D] focus:outline-none"
                 />
               </div>
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-[#172B4D] mb-1">
-                Estimated Budget (₹)
+                End Date
+              </label>
+              <input
+                type="date"
+                required
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-full bg-[#F4F7FB] border border-[#E5EAF1] focus:border-[#1685D4] rounded-lg px-2.5 py-2 text-xs text-[#172B4D] focus:outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[#172B4D] mb-1">
+                Budget (₹)
               </label>
               <input
                 type="number"
+                min={0}
                 placeholder="35000"
                 value={budget}
                 onChange={(e) => setBudget(e.target.value)}
@@ -133,10 +178,14 @@ export const CreateTripModal: React.FC<CreateTripModalProps> = ({
             </div>
           </div>
 
+          {dateError && (
+            <p className="text-xs text-[#DC3545] font-medium">{dateError}</p>
+          )}
+
           {/* Quick Suggestions */}
           <div>
             <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider block mb-1.5">
-              Popular Destinations
+              Popular Templates
             </span>
             <div className="space-y-1.5">
               {sampleSuggestions.map((item) => (

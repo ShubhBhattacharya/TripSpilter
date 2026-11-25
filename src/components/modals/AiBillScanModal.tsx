@@ -42,17 +42,12 @@ export const AiBillScanModal: React.FC<AiBillScanModalProps> = ({
   const [scanning, setScanning] = useState(false);
   const [ocrWarning, setOcrWarning] = useState<string | null>(null);
 
-  // Editable bill state
-  const [merchantName, setMerchantName] = useState('Cafe 1947 Riverside Manali');
-  const [invoiceNumber, setInvoiceNumber] = useState('INV-8821');
-  const [items, setItems] = useState<BillItem[]>([
-    { name: 'Woodfired Funghi Pizza', price: 950 },
-    { name: 'Grilled Rainbow Trout', price: 1100 },
-    { name: 'Penne Alfredo Pasta', price: 650 },
-    { name: 'Apple Cider & Drinks', price: 900 },
-  ]);
+  // Clean empty editable bill state (never pre-populate fake restaurant charges)
+  const [merchantName, setMerchantName] = useState('');
+  const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [items, setItems] = useState<BillItem[]>([{ name: '', price: 0 }]);
   const [gstPercent, setGstPercent] = useState<number>(5);
-  const [serviceCharge, setServiceCharge] = useState<number>(200);
+  const [serviceCharge, setServiceCharge] = useState<number>(0);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 

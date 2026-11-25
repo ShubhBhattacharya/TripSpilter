@@ -14,7 +14,8 @@ import { BalancesTab } from '../../../components/trips/BalancesTab';
 import { ScanMerchantQrModal } from '../../../components/modals/ScanMerchantQrModal';
 import { AiBillScanModal } from '../../../components/modals/AiBillScanModal';
 import { defaultMembers, mockTrips } from '../../../data/mockData';
-import { BookingVaultItem, Trip } from '../../../types/trip';
+import { BookingVaultItem, ItemizedBillItem, Trip } from '../../../types/trip';
+import { calculateNetBalances, optimizeSettlements } from '../../../lib/financial/split-engine';
 import { Loader2, MapPinOff, ArrowLeft } from 'lucide-react';
 import { createClient, isSupabaseConfigured } from '../../../lib/supabase/client';
 
@@ -30,10 +31,11 @@ function TripWorkspaceContent() {
   // Tab state
   const activeTab = searchParams.get('tab') || 'itinerary';
 
-  // Split state overrides (e.g. from booking split or scanner)
-  const [splitVendorName, setSplitVendorName] = useState<string>('Cafe 1947 Manali');
-  const [splitVendorUpi, setSplitVendorUpi] = useState<string>('cafe1947@okicici');
-  const [splitAmount, setSplitAmount] = useState<number>(4000);
+  // Split state overrides (start empty unless user clicks Split Booking or scans a receipt)
+  const [splitVendorName, setSplitVendorName] = useState<string>('');
+  const [splitVendorUpi, setSplitVendorUpi] = useState<string>('');
+  const [splitAmount, setSplitAmount] = useState<number>(0);
+  const [scannedItems, setScannedItems] = useState<ItemizedBillItem[]>([]);
 
   // Modals state
   const [isScanMerchantOpen, setIsScanMerchantOpen] = useState(false);
@@ -114,6 +116,65 @@ function TripWorkspaceContent() {
             const rawItinerary = (dbTrip.itinerary_items || []) as unknown as DbItineraryItem[];
             const rawBookings = (dbTrip.bookings || []) as unknown as DbBooking[];
 
+            // Also fetch persisted expenses & settlements to compute real balances in Postgres trips
+            const [{ data: dbExpenses }, { data: dbSettlements }] = await Promise.all([
+              supabase
+                .from('expenses')
+                .select('id, paid_by, total_amount, expense_splits(id, user_id, amount_owed, status)')
+                .eq('trip_id', tripId),
+              supabase
+                .from('settlements')
+                .select('id, from_user_id, to_user_id, amount, status, settled_at')
+                .eq('trip_id', tripId),
+            ]);
+
+            const typedExpenses = (dbExpenses || []) as Array<{
+              id: string;
+              paid_by: string;
+              total_amount: number;
+              expense_splits?: Array<{ id: string; user_id: string; amount_owed: number; status: string }>;
+            }>;
+            const typedSettlements = (dbSettlements || []) as Array<{
+              id: string;
+              from_user_id: string;
+              to_user_id: string;
+              amount: number;
+              status: string;
+              settled_at?: string;
+            }>;
+
+            const memberIds = mappedMembers.map((m) => m.id);
+            const { balances, totalTripSpend } = calculateNetBalances({
+              memberIds,
+              expenses: typedExpenses.map((e) => ({
+                id: e.id,
+                paidBy: e.paid_by,
+                totalAmount: Number(e.total_amount),
+              })),
+              splits: typedExpenses.flatMap((e) =>
+                (e.expense_splits || []).map((sp) => ({
+                  expenseId: e.id,
+                  userId: sp.user_id,
+                  amountOwed: Number(sp.amount_owed),
+                  status: sp.status,
+                }))
+              ),
+              settlements: typedSettlements.map((st) => ({
+                id: st.id,
+                fromUserId: st.from_user_id,
+                toUserId: st.to_user_id,
+                amount: Number(st.amount),
+                status: st.status,
+              })),
+            });
+            const optimizedDebts = optimizeSettlements(balances).map((t, idx) => ({
+              id: `opt-${idx + 1}`,
+              fromMemberId: t.fromUserId,
+              toMemberId: t.toUserId,
+              amount: t.amount,
+              status: 'PENDING' as const,
+            }));
+
             const mappedTrip: Trip = {
               id: dbTrip.id,
               title: dbTrip.title,
@@ -125,7 +186,7 @@ function TripWorkspaceContent() {
               startDate: dbTrip.start_date,
               endDate: dbTrip.end_date,
               budget: Number(dbTrip.budget) || 0,
-              totalSpend: 0,
+              totalSpend: totalTripSpend,
               status: dbTrip.status || 'ACTIVE',
               members: mappedMembers.length > 0 ? mappedMembers : defaultMembers,
               itinerary: rawItinerary.map((it) => ({
@@ -148,12 +209,12 @@ function TripWorkspaceContent() {
                 bookingRef: b.booking_ref,
                 date: dbTrip.start_date,
                 totalAmount: Number(b.amount) || 0,
-                bookedBy: 'Admin',
-                status: (b.status as BookingVaultItem['status']) || 'Confirmed',
+                bookedBy: 'Member',
+                status: (b.status as BookingVaultItem['status']) || 'Pending Split',
                 documentType: 'PDF',
               })),
               vendorSplits: [],
-              debts: [],
+              debts: optimizedDebts,
             };
 
             if (isMounted) {
@@ -266,13 +327,7 @@ function TripWorkspaceContent() {
 
   const handleSplitBooking = (booking: BookingVaultItem) => {
     setSplitVendorName(booking.vendorName);
-    setSplitVendorUpi(
-      booking.category === 'Hotel'
-        ? 'zostel.manali@hdfcbank'
-        : booking.category === 'Bus'
-        ? 'zingbus.manali@icici'
-        : 'cafe1947@okicici'
-    );
+    setSplitVendorUpi('');
     setSplitAmount(booking.totalAmount);
     handleTabChange('split');
   };
@@ -291,6 +346,16 @@ function TripWorkspaceContent() {
   }) => {
     setSplitVendorName(billData.merchantName);
     setSplitAmount(billData.totalAmount);
+    if (trip) {
+      setScannedItems(
+        billData.items.map((it, idx) => ({
+          id: `bill-item-${idx + 1}`,
+          name: it.name,
+          price: it.price,
+          assignedMemberIds: trip.members.map((m) => m.id),
+        }))
+      );
+    }
     handleTabChange('split');
   };
 
@@ -364,6 +429,7 @@ function TripWorkspaceContent() {
 
             {activeTab === 'bookings' && (
               <BookingsVaultTab
+                tripId={trip.id}
                 bookings={trip.bookings}
                 onSplitBooking={handleSplitBooking}
               />
@@ -371,17 +437,20 @@ function TripWorkspaceContent() {
 
             {activeTab === 'split' && (
               <VendorSplitTab
-                key={`${splitVendorUpi}-${splitAmount}`}
+                key={`${splitVendorUpi}-${splitAmount}-${scannedItems.length}`}
+                tripId={trip.id}
                 members={trip.members}
                 initialVendorName={splitVendorName}
                 initialVendorUpiId={splitVendorUpi}
                 initialAmount={splitAmount}
+                initialItems={scannedItems}
                 onOpenAiScanner={() => setIsAiBillScanOpen(true)}
               />
             )}
 
             {activeTab === 'balances' && (
               <BalancesTab
+                tripId={trip.id}
                 debts={trip.debts}
                 members={trip.members}
               />

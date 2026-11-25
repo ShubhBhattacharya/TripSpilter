@@ -2,7 +2,6 @@
 
 import React, { useState, useMemo } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import confetti from 'canvas-confetti';
 import {
   CheckCircle2,
   Clock,
@@ -19,6 +18,7 @@ import { formatInr } from '../../lib/upi';
 import {
   calculateEqualSplit,
   validateAndCalculateExactSplit,
+  calculatePercentageSplit,
   calculateItemizedSplit,
   ItemizedBillItem,
   toRupees,
@@ -33,32 +33,45 @@ import {
 import { toast } from 'sonner';
 
 interface VendorSplitTabProps {
+  tripId?: string;
   members: TripMember[];
   initialVendorName?: string;
   initialVendorUpiId?: string;
   initialAmount?: number;
+  initialItems?: ItemizedBillItem[];
   onOpenAiScanner?: () => void;
 }
 
 export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
+  tripId,
   members,
   initialVendorName = '',
   initialVendorUpiId = '',
   initialAmount = 0,
+  initialItems = [],
   onOpenAiScanner,
 }) => {
   const [vendorName, setVendorName] = useState(initialVendorName);
   const [vendorUpiId, setVendorUpiId] = useState(initialVendorUpiId);
   const [billAmount, setBillAmount] = useState<number>(initialAmount);
-  const [splitMode, setSplitMode] = useState<SplitMode>('EQUAL');
+  const [splitMode, setSplitMode] = useState<SplitMode>(initialItems.length > 0 ? 'ITEMIZED' : 'EQUAL');
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>(
     members.map((m) => m.id)
   );
 
   const [customAmounts, setCustomAmounts] = useState<{ [id: string]: number }>({});
+  const [customPercents, setCustomPercents] = useState<{ [id: string]: number }>(() => {
+    const base = members.length > 0 ? Math.floor(10000 / members.length) / 100 : 100;
+    const init: { [id: string]: number } = {};
+    members.forEach((m, idx) => {
+      init[m.id] = idx === 0 && members.length > 0 ? Number((100 - base * (members.length - 1)).toFixed(2)) : base;
+    });
+    return init;
+  });
 
-  const [itemizedList, setItemizedList] = useState<ItemizedBillItem[]>([]);
+  const [itemizedList, setItemizedList] = useState<ItemizedBillItem[]>(initialItems);
   const [gstPercent, setGstPercent] = useState<number>(5);
+  const [isSavingExpense, setIsSavingExpense] = useState(false);
 
   const [paymentRecords, setPaymentRecords] = useState<{
     [memberId: string]: {
@@ -106,6 +119,21 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
       return map;
     }
 
+    if (splitMode === 'PERCENTAGE') {
+      const pctRes = calculatePercentageSplit({
+        totalAmount: billAmount,
+        percentages: selectedMemberIds.map((id) => ({
+          memberId: id,
+          percent: customPercents[id] ?? 0,
+        })),
+      });
+      const map: { [id: string]: number } = {};
+      pctRes.shares.forEach((s) => {
+        map[s.memberId] = s.amount;
+      });
+      return map;
+    }
+
     if (splitMode === 'ITEMIZED') {
       try {
         const res = calculateItemizedSplit({
@@ -123,7 +151,18 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
     }
 
     return {};
-  }, [splitMode, billAmount, selectedMemberIds, customAmounts, itemizedList, gstPercent]);
+  }, [splitMode, billAmount, selectedMemberIds, customAmounts, customPercents, itemizedList, gstPercent]);
+
+  const percentSplitStats = useMemo(() => {
+    if (splitMode !== 'PERCENTAGE') return null;
+    return calculatePercentageSplit({
+      totalAmount: billAmount,
+      percentages: selectedMemberIds.map((id) => ({
+        memberId: id,
+        percent: customPercents[id] ?? 0,
+      })),
+    });
+  }, [splitMode, billAmount, selectedMemberIds, customPercents]);
 
   const exactSplitStats = useMemo(() => {
     if (splitMode !== 'EXACT') return null;
@@ -146,51 +185,73 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
 
   const handleAdvanceStatus = (memberId: string) => {
     const current = paymentRecords[memberId]?.state || 'pending';
-    let nextState: PaymentVerificationState = 'manually_reported_paid';
-
-    if (current === 'pending' || current === 'payment_initiated') {
-      nextState = 'manually_reported_paid';
-    } else if (current === 'manually_reported_paid' || current === 'awaiting_confirmation') {
-      nextState = 'verified_paid';
-    } else {
-      nextState = 'pending';
-    }
+    // Clients can mark payment initiated or manually reported paid; verified_paid comes strictly from server/webhook confirmation
+    const nextState: PaymentVerificationState =
+      current === 'pending' || current === 'payment_initiated'
+        ? 'manually_reported_paid'
+        : 'pending';
 
     setPaymentRecords((prev) => ({
       ...prev,
       [memberId]: {
         ...prev[memberId],
         state: nextState,
-        transactionRef:
-          nextState === 'verified_paid'
-            ? prev[memberId]?.transactionRef || `TXN${Date.now().toString().slice(-6)}`
-            : prev[memberId]?.transactionRef,
       },
     }));
 
     const member = members.find((m) => m.id === memberId);
     const name = member?.name?.split(' ')[0] || 'Member';
 
-    if (nextState === 'verified_paid') {
-      toast.success(`${name}'s share is Verified Paid! ✅`, {
-        description: `${formatInr(computedShares[memberId] || 0)} settled directly to ${vendorName}.`,
-      });
-      try {
-        confetti({
-          particleCount: 50,
-          spread: 60,
-          origin: { y: 0.6 },
-          colors: ['#0A9B78', '#1685D4'],
-        });
-      } catch {
-        // fallback
-      }
-    } else if (nextState === 'manually_reported_paid') {
-      toast.info(`${name} marked as Paid (Self-Reported) 📝`, {
-        description: 'Waiting for payee/admin acknowledgement.',
+    if (nextState === 'manually_reported_paid') {
+      toast.info(`${name} marked as Reported Paid (Manual)`, {
+        description: 'Gateway webhook verification required for official settlement confirmation.',
       });
     } else {
       toast.info(`${name}'s status reset to Pending`);
+    }
+  };
+
+  const handleSaveExpenseToTrip = async () => {
+    if (!tripId || tripId.startsWith('local-') || tripId.startsWith('trip-')) {
+      toast.info('Save Trip to cloud account first to persist shared expenses in PostgreSQL.');
+      return;
+    }
+    if (!vendorName.trim() || !UPI_VPA_REGEX.test(vendorUpiId.trim()) || targetTotal <= 0) {
+      toast.error('Provide valid merchant name, UPI VPA, and positive amount before saving.');
+      return;
+    }
+
+    setIsSavingExpense(true);
+    try {
+      const splits = selectedMemberIds.map((uid) => ({
+        userId: uid,
+        amountOwed: computedShares[uid] || 0,
+      }));
+      const res = await fetch('/api/expenses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'idempotency-key': `exp_${tripId}_${vendorUpiId.trim()}_${toPaise(targetTotal)}`,
+        },
+        body: JSON.stringify({
+          tripId,
+          vendorName: vendorName.trim(),
+          vendorUpiId: vendorUpiId.trim(),
+          totalAmount: targetTotal,
+          splitType: splitMode === 'PERCENTAGE' ? 'PERCENTAGE' : splitMode,
+          splits,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'Unable to save expense');
+        return;
+      }
+      toast.success('Expense and splits saved to PostgreSQL!');
+    } catch {
+      toast.error('Failed to persist expense to server.');
+    } finally {
+      setIsSavingExpense(false);
     }
   };
 
@@ -329,7 +390,7 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
           </div>
 
           <div className="flex items-center gap-1 p-1 rounded-lg bg-[#F4F7FB] border border-[#E5EAF1] text-xs">
-            {(['EQUAL', 'EXACT', 'ITEMIZED'] as SplitMode[]).map((mode) => (
+            {(['EQUAL', 'PERCENTAGE', 'EXACT', 'ITEMIZED'] as SplitMode[]).map((mode) => (
               <button
                 key={mode}
                 type="button"
@@ -340,8 +401,9 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
                     : 'text-[#64748B] hover:text-[#172B4D]'
                 }`}
               >
-                {mode === 'EQUAL' && 'Equal Split'}
-                {mode === 'EXACT' && 'Exact Custom'}
+                {mode === 'EQUAL' && 'Equal'}
+                {mode === 'PERCENTAGE' && 'Percent %'}
+                {mode === 'EXACT' && 'Custom ₹'}
                 {mode === 'ITEMIZED' && 'Itemized'}
               </button>
             ))}
@@ -371,12 +433,76 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
             </div>
           </div>
 
-          <div className="text-[10px] text-[#64748B] mt-2 flex items-center gap-1">
-            <ShieldCheck className="w-3.5 h-3.5 text-[#0A9B78]" />
-            <span>Direct to merchant account</span>
+          <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-[#E5EAF1]">
+            <div className="text-[10px] text-[#64748B] flex items-center gap-1">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#0A9B78]" />
+              <span>Direct to merchant</span>
+            </div>
+            {tripId && (
+              <button
+                type="button"
+                onClick={() => void handleSaveExpenseToTrip()}
+                disabled={isSavingExpense}
+                className="px-2.5 py-1 rounded-md bg-[#173B70] hover:bg-[#1685D4] text-white text-[10px] font-bold disabled:opacity-50"
+              >
+                {isSavingExpense ? 'Saving...' : 'Save Expense'}
+              </button>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Percentage Sub-Panel */}
+      {splitMode === 'PERCENTAGE' && (
+        <div className="p-4 rounded-xl bg-white border border-[#E5EAF1] space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-[#172B4D] uppercase tracking-wider">
+              Split by Percentage (Must sum to 100%)
+            </span>
+            {percentSplitStats && !percentSplitStats.isValid && (
+              <span className="text-xs font-semibold text-[#DC3545] flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5" />
+                <span>{percentSplitStats.error}</span>
+              </span>
+            )}
+            {percentSplitStats && percentSplitStats.isValid && (
+              <span className="text-xs font-semibold text-[#0A9B78] flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>100% allocated</span>
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {selectedMemberIds.map((memberId) => {
+              const member = members.find((m) => m.id === memberId);
+              return (
+                <div key={memberId} className="p-2.5 rounded-lg bg-[#F4F7FB] border border-[#E5EAF1]">
+                  <p className="text-[11px] font-semibold text-[#172B4D] mb-1 truncate">
+                    {member?.name || memberId}
+                  </p>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={customPercents[memberId] ?? 0}
+                      onChange={(e) =>
+                        setCustomPercents((prev) => ({
+                          ...prev,
+                          [memberId]: Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)),
+                        }))
+                      }
+                      className="w-full bg-white border border-[#E5EAF1] rounded-md pl-2.5 pr-6 py-1 text-xs text-[#172B4D] font-mono"
+                    />
+                    <span className="absolute right-2.5 top-1.5 text-[#64748B] text-xs">%</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Exact Custom Sub-Panel */}
       {splitMode === 'EXACT' && (
@@ -560,16 +686,25 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
               rejected: 'bg-slate-100 text-slate-700 border-slate-200',
             };
 
-            const upiUri = buildVerifiedUpiUri({
-              payeeVpa: vendorUpiId,
-              payeeName: vendorName,
-              amount: share,
-              transactionNote: `TripSplit ${member.name.split(' ')[0]} - ${vendorName}`,
-            });
+            let upiUri = '';
+            try {
+              if (UPI_VPA_REGEX.test(vendorUpiId.trim()) && share > 0) {
+                upiUri = buildVerifiedUpiUri({
+                  payeeVpa: vendorUpiId,
+                  payeeName: vendorName || 'Merchant',
+                  amount: share,
+                  transactionNote: `TripSplit ${member.name.split(' ')[0]} - ${vendorName || 'Bill'}`,
+                });
+              }
+            } catch {
+              upiUri = '';
+            }
 
-            const whatsappShareText = encodeURIComponent(
-              `Hi ${member.name.split(' ')[0]}! Pay your exact ₹${share} share for ${vendorName} directly via UPI:\n${upiUri}`
-            );
+            const whatsappShareText = upiUri
+              ? encodeURIComponent(
+                  `Hi ${member.name.split(' ')[0]}! Pay your exact ₹${share} share for ${vendorName || 'Merchant'} directly via UPI:\n${upiUri}`
+                )
+              : '';
 
             return (
               <div
@@ -624,35 +759,55 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
                   )}
                 </div>
 
-                {/* Scannable QR Code */}
-                <div className="flex flex-col items-center justify-center p-3 rounded-lg bg-white border border-[#E5EAF1] shadow-inner mb-3">
-                  <QRCodeSVG
-                    value={upiUri}
-                    size={135}
-                    level="M"
-                    includeMargin={false}
-                    className="rounded"
-                  />
-                  <div className="mt-1.5 flex items-center gap-1 text-[9px] text-[#64748B] font-medium">
-                    <span>Pay {vendorName.slice(0, 18)}</span>
-                  </div>
+                {/* Scannable QR Code or Setup Prompt */}
+                <div className="flex flex-col items-center justify-center p-3 rounded-lg bg-white border border-[#E5EAF1] shadow-inner mb-3 min-h-[168px]">
+                  {upiUri ? (
+                    <>
+                      <QRCodeSVG
+                        value={upiUri}
+                        size={135}
+                        level="M"
+                        includeMargin={false}
+                        className="rounded"
+                      />
+                      <div className="mt-1.5 flex items-center gap-1 text-[9px] text-[#64748B] font-medium">
+                        <span>Pay {(vendorName || 'Merchant').slice(0, 18)}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-[11px] text-center text-[#64748B] px-2">
+                      Enter a valid Merchant UPI ID and amount above to generate this QR.
+                    </p>
+                  )}
                 </div>
 
                 {/* Action Buttons */}
                 <div className="space-y-1.5">
-                  <a
-                    href={upiUri}
-                    className="w-full py-2 px-3 rounded-lg bg-[#1685D4] hover:bg-[#126bb0] text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs active:scale-95 transition-all text-center"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    <span>Pay via UPI App</span>
-                  </a>
+                  {upiUri ? (
+                    <a
+                      href={upiUri}
+                      className="w-full py-2 px-3 rounded-lg bg-[#1685D4] hover:bg-[#126bb0] text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs active:scale-95 transition-all text-center"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Pay via UPI App</span>
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      className="w-full py-2 px-3 rounded-lg bg-slate-200 text-slate-500 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-not-allowed"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Valid UPI & Amount Required</span>
+                    </button>
+                  )}
 
                   <div className="flex gap-1.5">
                     <button
                       type="button"
+                      disabled={!upiUri}
                       onClick={() => handleCopyUri(upiUri, member.id)}
-                      className="flex-1 py-1.5 px-2 rounded-lg bg-[#F4F7FB] hover:bg-[#E5EAF1] text-[#172B4D] text-[11px] font-medium flex items-center justify-center gap-1 transition-colors border border-[#E5EAF1]"
+                      className="flex-1 py-1.5 px-2 rounded-lg bg-[#F4F7FB] hover:bg-[#E5EAF1] disabled:opacity-50 text-[#172B4D] text-[11px] font-medium flex items-center justify-center gap-1 transition-colors border border-[#E5EAF1]"
                     >
                       {copiedId === member.id ? (
                         <>
@@ -667,15 +822,17 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
                       )}
                     </button>
 
-                    <a
-                      href={`https://wa.me/?text=${whatsappShareText}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="py-1.5 px-2.5 rounded-lg bg-[#0A9B78]/10 hover:bg-[#0A9B78]/20 text-[#0A9B78] text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors border border-[#0A9B78]/30"
-                      title="Share link on WhatsApp"
-                    >
-                      <Share2 className="w-3.5 h-3.5" />
-                    </a>
+                    {whatsappShareText && (
+                      <a
+                        href={`https://wa.me/?text=${whatsappShareText}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="py-1.5 px-2.5 rounded-lg bg-[#0A9B78]/10 hover:bg-[#0A9B78]/20 text-[#0A9B78] text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors border border-[#0A9B78]/30"
+                        title="Share link on WhatsApp"
+                      >
+                        <Share2 className="w-3.5 h-3.5" />
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>

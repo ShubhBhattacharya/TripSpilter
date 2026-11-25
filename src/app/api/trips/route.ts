@@ -104,6 +104,7 @@ export async function POST(request: Request) {
     if (!isSupabaseConfigured) {
       return NextResponse.json(
         {
+          isDemo: true,
           message: 'Trip created in demo mode',
           trip: {
             id: `trip-${Date.now()}`,

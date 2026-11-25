@@ -73,7 +73,7 @@ export interface BookingVaultItem {
   notes?: string;
 }
 
-export type SplitMode = 'EQUAL' | 'EXACT' | 'ITEMIZED';
+export type SplitMode = 'EQUAL' | 'EXACT' | 'PERCENTAGE' | 'ITEMIZED';
 
 export interface ItemizedBillItem {
   id: string;

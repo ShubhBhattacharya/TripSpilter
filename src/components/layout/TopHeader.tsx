@@ -86,11 +86,17 @@ export const TopHeader: React.FC<TopHeaderProps> = ({ onScanClick, title, youOwe
               }}
               title={`${activeName} (Click to Sign Out)`}
             >
-              <img
-                src={activeAvatar}
-                alt={activeName}
-                className="w-8 h-8 rounded-full object-cover ring-2 ring-[#E5EAF1] hover:ring-[#1685D4] transition-all cursor-pointer"
-              />
+              {activeAvatar ? (
+                <img
+                  src={activeAvatar}
+                  alt={activeName}
+                  className="w-8 h-8 rounded-full object-cover ring-2 ring-[#E5EAF1] hover:ring-[#1685D4] transition-all cursor-pointer"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-[#173B70] text-white font-bold text-xs flex items-center justify-center ring-2 ring-[#E5EAF1] hover:ring-[#1685D4] transition-all cursor-pointer">
+                  {activeName.charAt(0).toUpperCase()}
+                </div>
+              )}
             </button>
           </div>
         </div>

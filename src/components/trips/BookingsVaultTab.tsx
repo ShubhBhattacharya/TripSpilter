@@ -19,15 +19,115 @@ import { formatInr } from '../../lib/upi';
 import { toast } from 'sonner';
 
 interface BookingsVaultTabProps {
+  tripId?: string;
   bookings: BookingVaultItem[];
   onSplitBooking: (booking: BookingVaultItem) => void;
+  onBookingAdded?: (booking: BookingVaultItem) => void;
 }
 
 export const BookingsVaultTab: React.FC<BookingsVaultTabProps> = ({
-  bookings,
+  tripId,
+  bookings: initialBookings,
   onSplitBooking,
+  onBookingAdded,
 }) => {
+  const [bookings, setBookings] = useState<BookingVaultItem[]>(initialBookings);
   const [selectedPreview, setSelectedPreview] = useState<BookingVaultItem | null>(null);
+  const [showAddBooking, setShowAddBooking] = useState(false);
+  const [titleInput, setTitleInput] = useState('');
+  const [vendorInput, setVendorInput] = useState('');
+  const [refInput, setRefInput] = useState('');
+  const [categoryInput, setCategoryInput] = useState<'Hotel' | 'Flight' | 'Bus' | 'Train' | 'Rental' | 'Activity' | 'Other'>('Hotel');
+  const [amountInput, setAmountInput] = useState('');
+  const [isSavingBooking, setIsSavingBooking] = useState(false);
+
+  const handleDownloadVoucher = (booking: BookingVaultItem) => {
+    const content = [
+      'TRIPSPLIT BOOKING VOUCHER RECORD',
+      '=================================',
+      `Title: ${booking.title}`,
+      `Category: ${booking.category}`,
+      `Vendor: ${booking.vendorName}`,
+      `Reference / PNR: ${booking.bookingRef}`,
+      `Date: ${booking.date}`,
+      `Amount: INR ${booking.totalAmount}`,
+      `Status: ${booking.status}`,
+      `Booked By: ${booking.bookedBy}`,
+      booking.notes ? `Notes: ${booking.notes}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${booking.bookingRef || 'voucher'}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success('Voucher text receipt downloaded.');
+  };
+
+  const handleAddBookingDraft = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!titleInput.trim() || !vendorInput.trim()) return;
+
+    const amt = Math.max(0, Number(amountInput) || 0);
+    setIsSavingBooking(true);
+    let createdItem: BookingVaultItem = {
+      id: `bk-${Date.now()}`,
+      title: titleInput.trim(),
+      vendorName: vendorInput.trim(),
+      bookingRef: refInput.trim() || `DRAFT-${Date.now().toString(36).toUpperCase()}`,
+      category: categoryInput === 'Rental' || categoryInput === 'Other' ? 'Hotel' : categoryInput === 'Activity' ? 'Activity Pass' : categoryInput,
+      date: new Date().toISOString().split('T')[0],
+      totalAmount: amt,
+      bookedBy: 'You',
+      status: 'Pending Split',
+      documentType: 'PDF',
+    };
+
+    try {
+      if (tripId && !tripId.startsWith('local-') && !tripId.startsWith('trip-')) {
+        const res = await fetch('/api/bookings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tripId,
+            title: titleInput.trim(),
+            vendorName: vendorInput.trim(),
+            category: categoryInput,
+            amount: amt,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.booking) {
+            createdItem = {
+              ...createdItem,
+              id: data.booking.id,
+              bookingRef: data.booking.booking_ref,
+            };
+          }
+        }
+      }
+    } catch {
+      // fallback cleanly to local draft state
+    } finally {
+      setIsSavingBooking(false);
+    }
+
+    setBookings((prev) => [createdItem, ...prev]);
+    onBookingAdded?.(createdItem);
+    setTitleInput('');
+    setVendorInput('');
+    setRefInput('');
+    setAmountInput('');
+    setShowAddBooking(false);
+    toast.success('Booking draft added to vault!');
+  };
 
   const getCategoryIcon = (category: BookingVaultItem['category']) => {
     switch (category) {
@@ -74,11 +174,11 @@ export const BookingsVaultTab: React.FC<BookingsVaultTabProps> = ({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => toast.info('Voucher upload ready. Select a ticket PDF or PNG image.')}
+            onClick={() => setShowAddBooking(true)}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#F4F7FB] hover:bg-[#E5EAF1] text-[#172B4D] text-xs font-semibold border border-[#E5EAF1] transition-colors"
           >
             <Plus className="w-4 h-4 text-[#1685D4]" />
-            <span>Upload Ticket / Voucher</span>
+            <span>Add Booking Draft</span>
           </button>
         </div>
       </div>
@@ -198,11 +298,11 @@ export const BookingsVaultTab: React.FC<BookingsVaultTabProps> = ({
             <div className="flex justify-end gap-2 pt-2">
               <button
                 type="button"
-                onClick={() => toast.success('Voucher downloaded! 📄')}
+                onClick={() => handleDownloadVoucher(selectedPreview)}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#F4F7FB] hover:bg-[#E5EAF1] text-[#172B4D] text-xs font-semibold border border-[#E5EAF1]"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>Download PDF</span>
+                <span>Download Voucher</span>
               </button>
               <button
                 type="button"
@@ -218,6 +318,87 @@ export const BookingsVaultTab: React.FC<BookingsVaultTabProps> = ({
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {/* Add Booking Draft Modal */}
+      {showAddBooking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <form
+            onSubmit={handleAddBookingDraft}
+            className="w-full max-w-md bg-white border border-[#E5EAF1] rounded-xl p-5 space-y-3.5 shadow-xl"
+          >
+            <div className="flex items-center justify-between border-b border-[#E5EAF1] pb-2.5">
+              <h4 className="text-sm font-bold text-[#172B4D]">Add Booking Record</h4>
+              <button
+                type="button"
+                onClick={() => setShowAddBooking(false)}
+                className="text-[#64748B] hover:text-[#172B4D]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <input
+              type="text"
+              required
+              placeholder="Booking title (e.g. Hotel Stay 2 Nights)"
+              value={titleInput}
+              onChange={(e) => setTitleInput(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg bg-[#F4F7FB] border border-[#E5EAF1] text-xs"
+            />
+            <input
+              type="text"
+              required
+              placeholder="Vendor / Airline / Property name"
+              value={vendorInput}
+              onChange={(e) => setVendorInput(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg bg-[#F4F7FB] border border-[#E5EAF1] text-xs"
+            />
+            <div className="grid grid-cols-2 gap-2.5">
+              <select
+                value={categoryInput}
+                onChange={(e) => setCategoryInput(e.target.value as typeof categoryInput)}
+                className="px-3 py-2 rounded-lg bg-[#F4F7FB] border border-[#E5EAF1] text-xs"
+              >
+                <option value="Hotel">Hotel</option>
+                <option value="Flight">Flight</option>
+                <option value="Bus">Bus</option>
+                <option value="Train">Train</option>
+                <option value="Activity">Activity</option>
+              </select>
+              <input
+                type="number"
+                min={0}
+                required
+                placeholder="Amount (₹)"
+                value={amountInput}
+                onChange={(e) => setAmountInput(e.target.value)}
+                className="px-3 py-2 rounded-lg bg-[#F4F7FB] border border-[#E5EAF1] text-xs"
+              />
+            </div>
+            <input
+              type="text"
+              placeholder="External Reference / PNR (optional)"
+              value={refInput}
+              onChange={(e) => setRefInput(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg bg-[#F4F7FB] border border-[#E5EAF1] text-xs font-mono"
+            />
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowAddBooking(false)}
+                className="px-3 py-2 text-xs text-[#64748B]"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSavingBooking}
+                className="px-4 py-2 rounded-lg bg-[#173B70] text-white text-xs font-semibold disabled:opacity-50"
+              >
+                {isSavingBooking ? 'Saving...' : 'Save Booking'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

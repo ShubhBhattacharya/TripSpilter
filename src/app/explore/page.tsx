@@ -110,6 +110,11 @@ export default function ExplorePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreateTripOpen, setIsCreateTripOpen] = useState(false);
   const [isScanMerchantOpen, setIsScanMerchantOpen] = useState(false);
+  const [planDefaults, setPlanDefaults] = useState<{ title: string; destination: string; budget: number }>({
+    title: '',
+    destination: '',
+    budget: 25000,
+  });
 
   const filteredDestinations = featuredDestinations.filter((dest) => {
     const matchesCategory = selectedFilter === 'all' || dest.category === selectedFilter;
@@ -121,7 +126,11 @@ export default function ExplorePage() {
   });
 
   const handlePlanDestination = (destination: DestinationItem) => {
-    toast.success(`Starting trip planner for ${destination.name}!`);
+    setPlanDefaults({
+      title: `${destination.name} Group Outing`,
+      destination: `${destination.name}, ${destination.state}`,
+      budget: destination.avgBudgetPerHead * 4,
+    });
     setIsCreateTripOpen(true);
   };
 
@@ -272,8 +281,40 @@ export default function ExplorePage() {
       <CreateTripModal
         isOpen={isCreateTripOpen}
         onClose={() => setIsCreateTripOpen(false)}
-        onCreate={(tripData) => {
-          toast.success(`Outing "${tripData.title}" created! 🚀`);
+        initialTitle={planDefaults.title}
+        initialDestination={planDefaults.destination}
+        initialBudget={planDefaults.budget}
+        onCreate={async (tripData) => {
+          let persistedToCloud = false;
+          try {
+            const res = await fetch('/api/trips', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(tripData),
+            });
+            if (res.ok) {
+              const json = await res.json();
+              persistedToCloud = !json.isDemo;
+            }
+          } catch {
+            // fallback to local draft below
+          }
+          if (!persistedToCloud) {
+            try {
+              const existing = JSON.parse(localStorage.getItem('tripsplit_custom_trips') || '[]');
+              existing.unshift({
+                name: tripData.title,
+                destination: tripData.destination,
+                startDate: tripData.startDate,
+                totalBudget: tripData.budget,
+                spots: [],
+              });
+              localStorage.setItem('tripsplit_custom_trips', JSON.stringify(existing));
+            } catch {
+              // ignore storage errors
+            }
+          }
+          toast.success(`Outing "${tripData.title}" created!`);
           router.push('/trips');
         }}
       />
