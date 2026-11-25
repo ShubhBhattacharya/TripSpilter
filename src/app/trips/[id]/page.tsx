@@ -13,7 +13,7 @@ import { VendorSplitTab } from '../../../components/trips/VendorSplitTab';
 import { BalancesTab } from '../../../components/trips/BalancesTab';
 import { ScanMerchantQrModal } from '../../../components/modals/ScanMerchantQrModal';
 import { AiBillScanModal } from '../../../components/modals/AiBillScanModal';
-import { defaultMembers } from '../../../data/mockData';
+import { defaultMembers, mockTrips } from '../../../data/mockData';
 import { BookingVaultItem, Trip } from '../../../types/trip';
 import { Loader2, MapPinOff, ArrowLeft } from 'lucide-react';
 import { createClient, isSupabaseConfigured } from '../../../lib/supabase/client';
@@ -163,8 +163,69 @@ function TripWorkspaceContent() {
             return;
           }
         } catch {
-          // fallback to not found
+          // fallback to localStorage or mock
         }
+      }
+
+      // Check localStorage for user-created custom trips (e.g. from 3D experience)
+      try {
+        const rawLocalTrips = typeof window !== 'undefined' ? localStorage.getItem('tripsplit_custom_trips') : null;
+        if (rawLocalTrips) {
+          const parsed = JSON.parse(rawLocalTrips);
+          if (Array.isArray(parsed)) {
+            const foundIdx = parsed.findIndex(
+              (ct: any, idx: number) => ct.id === tripId || `local-3d-${idx}` === tripId
+            );
+            if (foundIdx !== -1) {
+              const ct = parsed[foundIdx];
+              const localMembers = Array.isArray(ct.members) && ct.members.length > 0 ? ct.members : defaultMembers;
+              const mappedTrip: Trip = {
+                id: tripId,
+                title: ct.name || `${ct.destination} 3D Outing`,
+                tagline: `Interactive 3D itinerary for ${ct.destination}`,
+                destination: ct.destination,
+                coverImage:
+                  ct.coverImage ||
+                  'https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?auto=format&fit=crop&w=1200&q=80',
+                startDate: ct.startDate || new Date().toISOString().split('T')[0],
+                endDate: ct.endDate || new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0],
+                budget: Number(ct.totalBudget) || 0,
+                totalSpend: 0,
+                status: 'ACTIVE',
+                members: localMembers,
+                itinerary: (ct.spots || []).map((s: any, sIdx: number) => ({
+                  id: `itin-${sIdx}`,
+                  day: 1,
+                  time: '10:00 AM',
+                  title: s.name,
+                  category: 'Activity',
+                  cost: Number(s.cost) || 0,
+                  location: ct.destination,
+                  notes: 'Saved from 3D Virtual Tour',
+                })),
+                polls: [],
+                bookings: [],
+                vendorSplits: [],
+                debts: [],
+              };
+              if (isMounted) {
+                setTrip(mappedTrip);
+                setIsDbLoading(false);
+              }
+              return;
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+
+      // Check if it's a known demo trip (e.g. trip-manali-2026 or trip-1)
+      const foundMock = mockTrips.find((m) => m.id === tripId);
+      if (foundMock && isMounted) {
+        setTrip(foundMock);
+        setIsDbLoading(false);
+        return;
       }
 
       // Not found anywhere

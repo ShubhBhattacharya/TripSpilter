@@ -347,16 +347,16 @@ export function OverlayUI() {
             </div>
 
             {/* Region Filter Pills */}
-            <div className="flex items-center gap-1 overflow-x-auto pb-1 mb-2.5 scrollbar-none text-[10px]">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-2.5 scrollbar-none">
               {(['All', 'North', 'South', 'West', 'East', 'Central', 'Northeast'] as const).map((r) => (
                 <button
                   key={r}
                   type="button"
                   onClick={() => setSelectedRegion(r)}
-                  className={`cursor-pointer px-2.5 py-1 rounded-lg font-bold whitespace-nowrap transition-all ${
+                  className={`cursor-pointer px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
                     selectedRegion === r
-                      ? 'bg-amber-500 text-white shadow-sm'
-                      : 'bg-white/5 text-slate-300 hover:text-white hover:bg-white/10'
+                      ? 'bg-amber-500 text-white shadow-md shadow-amber-500/30'
+                      : 'bg-white/10 text-slate-300 hover:text-white hover:bg-white/20 border border-white/10'
                   }`}
                 >
                   {r}
@@ -365,23 +365,23 @@ export function OverlayUI() {
             </div>
 
             {/* Scrollable Destination Selection Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 p-1 rounded-2xl bg-white/5 border border-white/10 mb-3 max-h-36 overflow-y-auto">
+            <div className="grid grid-cols-2 gap-2 p-2 rounded-2xl bg-white/5 border border-white/10 mb-3 min-h-[148px] max-h-44 overflow-y-auto">
               {filteredDestinations.map((d) => {
                 const isSelected = selectedCityId === d.id;
+                const shortState = d.state.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
                 return (
                   <button
                     key={d.id}
                     type="button"
                     onClick={() => setSelectedCityId(d.id)}
-                    className={`cursor-pointer py-1.5 px-2 rounded-xl text-left text-xs font-bold transition-all truncate border ${
+                    className={`cursor-pointer py-2 px-3 rounded-xl text-left text-xs font-bold transition-all border ${
                       isSelected
-                        ? 'bg-amber-500 text-white border-amber-400 shadow-md shadow-amber-500/30 scale-[1.02]'
-                        : 'border-transparent text-slate-300 hover:text-white hover:bg-white/10'
+                        ? 'bg-amber-500/90 text-white border-amber-400 shadow-lg shadow-amber-500/40 ring-1 ring-amber-300/50'
+                        : 'border-white/10 text-slate-300 hover:text-white hover:bg-white/15'
                     }`}
                     title={d.name}
                   >
-                    <span className="block truncate">{d.name.split(',')[0]}</span>
-                    <span className="block text-[9px] opacity-75 truncate">{d.state}</span>
+                    <span className="block leading-tight font-extrabold">{d.name.split(',')[0]}{shortState ? `, ${shortState}` : ''}</span>
                   </button>
                 );
               })}
