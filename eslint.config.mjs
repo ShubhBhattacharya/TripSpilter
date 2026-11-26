@@ -19,6 +19,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "TripSpilter/**",
+    "temp_office_extract/**",
   ]),
 ]);
 

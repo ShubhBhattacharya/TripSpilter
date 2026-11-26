@@ -97,3 +97,71 @@ export function verifyWebhookSignature(
 
   return crypto.timingSafeEqual(Buffer.from(expectedHex, 'utf8'), Buffer.from(provided, 'utf8'));
 }
+
+export interface CreateGatewayRefundInput {
+  providerPaymentId: string;
+  amountPaise: number;
+  reason?: string;
+}
+
+export interface CreateGatewayRefundResult {
+  configured: boolean;
+  provider: 'razorpay' | 'unconfigured';
+  providerRefundId: string | null;
+  status: 'processed' | 'pending' | 'waiting_for_credentials';
+  missingCredentials?: string[];
+  disclaimer: string;
+}
+
+/**
+ * Authorized Server-Side Payment Refund Initiation (Razorpay Refunds API).
+ * Returns waiting_for_credentials if provider keys are not configured.
+ */
+export async function createServerPaymentRefund(
+  input: CreateGatewayRefundInput
+): Promise<CreateGatewayRefundResult> {
+  const keyId = process.env.PAYMENT_PROVIDER_API_KEY?.trim();
+  const keySecret = process.env.PAYMENT_PROVIDER_API_SECRET?.trim();
+
+  if (!keyId || !keySecret) {
+    return {
+      configured: false,
+      provider: 'unconfigured',
+      providerRefundId: null,
+      status: 'waiting_for_credentials',
+      missingCredentials: ['PAYMENT_PROVIDER_API_KEY', 'PAYMENT_PROVIDER_API_SECRET'],
+      disclaimer:
+        'WAITING FOR PAYMENT PROVIDER CREDENTIALS: Live gateway refund execution requires Razorpay API keys.',
+    };
+  }
+
+  const basicAuth = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
+  const res = await fetch(
+    `https://api.razorpay.com/v1/payments/${encodeURIComponent(input.providerPaymentId)}/refund`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${basicAuth}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        amount: input.amountPaise,
+        notes: input.reason ? { reason: input.reason.slice(0, 140) } : undefined,
+      }),
+      signal: AbortSignal.timeout(10000),
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error(`Payment provider rejected refund request (HTTP ${res.status}).`);
+  }
+
+  const refund = await res.json();
+  return {
+    configured: true,
+    provider: 'razorpay',
+    providerRefundId: String(refund.id),
+    status: refund.status === 'processed' ? 'processed' : 'pending',
+    disclaimer: 'Refund initiated with Razorpay. Final status reconciles via webhook.',
+  };
+}

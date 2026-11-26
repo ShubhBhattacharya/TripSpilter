@@ -6,6 +6,7 @@ import {
   buildTravelSafetyCard,
 } from './travel-planner';
 import { getWeatherForLocation } from '../providers/travel-providers';
+import { calculateNetBalances, optimizeSettlements } from '../financial/split-engine';
 
 export interface ExtendedToolResult {
   ok: boolean;
@@ -133,6 +134,33 @@ export const EXTENDED_AI_TOOL_DECLARATIONS = [
         preferredCurrency: { type: 'string' },
         autoNarrate: { type: 'boolean' },
       },
+    },
+  },
+  {
+    name: 'get_trip_balances',
+    description:
+      'Compute exact zero-sum member net balances and optimal greedy settlement transfers for a trip.',
+    parameters: {
+      type: 'object',
+      properties: {
+        tripId: { type: 'string', description: 'Trip UUID' },
+      },
+      required: ['tripId'],
+    },
+  },
+  {
+    name: 'add_trip_member_draft',
+    description:
+      'Prepare a confirmation card before adding an existing registered TripSplit user to a trip.',
+    parameters: {
+      type: 'object',
+      properties: {
+        tripId: { type: 'string' },
+        memberUserId: { type: 'string', description: 'Target user UUID (or provide memberName/handle)' },
+        displayName: { type: 'string' },
+        role: { type: 'string', enum: ['member', 'admin'] },
+      },
+      required: ['tripId', 'memberUserId'],
     },
   },
 ] as const;
@@ -319,6 +347,85 @@ export async function executeExtendedAiTool(
       };
     }
 
+    case 'get_trip_balances': {
+      if (!ctx.userId || !ctx.supabase) {
+        return { ok: false, error: 'Authentication required to inspect live trip settlement balances.' };
+      }
+      const tripId = String(args.tripId || '').trim();
+      if (!tripId) return { ok: false, error: 'tripId is required' };
+
+      const { data: memberCheck } = await ctx.supabase
+        .from('trip_members')
+        .select('role')
+        .eq('trip_id', tripId)
+        .eq('user_id', ctx.userId)
+        .maybeSingle();
+
+      if (!memberCheck) {
+        return { ok: false, error: 'Access denied: you are not a member of this trip.' };
+      }
+
+      const [{ data: members }, { data: expenses }, { data: settlements }] = await Promise.all([
+        ctx.supabase.from('trip_members').select('user_id, profiles(display_name, full_name)').eq('trip_id', tripId),
+        ctx.supabase.from('expenses').select('id, paid_by, total_amount, expense_splits(user_id, amount_owed, status)').eq('trip_id', tripId),
+        ctx.supabase.from('settlements').select('id, from_user_id, to_user_id, amount, status').eq('trip_id', tripId),
+      ]);
+
+      const memberIds = Array.from(new Set((members || []).map((m) => String(m.user_id))));
+      const rawExpenses = (expenses || []).map((e) => ({
+        id: String(e.id),
+        paidBy: String(e.paid_by),
+        totalAmount: Number(e.total_amount),
+      }));
+      const rawSplits = (expenses || []).flatMap((e) =>
+        (e.expense_splits || []).map((sp: { user_id: string; amount_owed: number; status: string }) => ({
+          expenseId: String(e.id),
+          userId: String(sp.user_id),
+          amountOwed: Number(sp.amount_owed),
+          status: String(sp.status),
+        }))
+      );
+      const rawSettlements = (settlements || []).map((st) => ({
+        id: String(st.id),
+        fromUserId: String(st.from_user_id),
+        toUserId: String(st.to_user_id),
+        amount: Number(st.amount),
+        status: String(st.status),
+      }));
+
+      const { balances, isZeroSum, totalTripSpend } = calculateNetBalances({
+        memberIds,
+        expenses: rawExpenses,
+        splits: rawSplits,
+        settlements: rawSettlements,
+      });
+      const transfers = optimizeSettlements(balances);
+
+      return {
+        ok: true,
+        data: { tripId, totalTripSpend, isZeroSum, balances: Object.values(balances), suggestedTransfers: transfers },
+      };
+    }
+
+    case 'add_trip_member_draft': {
+      if (!ctx.userId) return { ok: false, error: 'Authentication required to add trip members.' };
+      const tripId = String(args.tripId || '').trim();
+      const memberUserId = String(args.memberUserId || '').trim();
+      if (!tripId || !memberUserId) {
+        return { ok: false, error: 'tripId and memberUserId are required.' };
+      }
+      const role = args.role === 'admin' ? 'admin' : 'member';
+      const label = args.displayName ? String(args.displayName) : memberUserId;
+      return {
+        ok: true,
+        requiresConfirmation: {
+          actionType: 'ADD_TRIP_MEMBER',
+          summary: `Add ${label} (${role}) to trip ${tripId.slice(0, 8)}...`,
+          payload: { tripId, memberUserId, role },
+        },
+      };
+    }
+
     default:
       return null;
   }
@@ -457,8 +564,14 @@ export function extractStructuredCardFromTool(
     }
   }
 
-  if (toolName === 'get_user_trips' && Array.isArray(data)) {
-    const trips = (data as Array<Record<string, unknown>>).map((t) => ({
+  const rawTripsList = Array.isArray(data)
+    ? data
+    : Array.isArray((data as { trips?: unknown[] }).trips)
+      ? (data as { trips: unknown[] }).trips
+      : null;
+
+  if (toolName === 'get_user_trips' && rawTripsList) {
+    const trips = (rawTripsList as Array<Record<string, unknown>>).map((t) => ({
       id: String(t.id || ''),
       title: String(t.title || ''),
       destination: String(t.destination || ''),

@@ -330,10 +330,13 @@ describe('OCR & Upload Security (Task 5)', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects unsupported MIME types (e.g. svg, pdf)', () => {
+  it('rejects unsupported unsafe MIME types (e.g. svg, html) while allowing PDF receipts', () => {
+    const svgDataUri = 'data:image/svg+xml;base64,PHN2Zz4=';
+    const htmlDataUri = 'data:text/html;base64,PGh0bWw+';
     const pdfDataUri = 'data:application/pdf;base64,JVBERi0xLjQK';
-    const result = ocrUploadSchema.safeParse({ image: pdfDataUri });
-    expect(result.success).toBe(false);
+    expect(ocrUploadSchema.safeParse({ image: svgDataUri }).success).toBe(false);
+    expect(ocrUploadSchema.safeParse({ image: htmlDataUri }).success).toBe(false);
+    expect(ocrUploadSchema.safeParse({ image: pdfDataUri }).success).toBe(true);
   });
 
   it('rejects empty image payloads', () => {

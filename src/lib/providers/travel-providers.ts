@@ -75,6 +75,7 @@ export interface HotelOffer {
   priceTotal: number;
   currency: string;
   refundable?: boolean;
+  cancellationPolicy?: string;
   bookingRedirectUrl: string;
   bookingMode: 'direct_provider_api' | 'redirect_only';
 }
@@ -94,6 +95,9 @@ export interface FlightOffer {
   arrivalTime: string;
   totalPrice: number;
   currency: string;
+  fareClass?: string;
+  checkedBaggage?: string;
+  refundable?: boolean;
   bookingRedirectUrl: string;
   bookingMode: 'direct_provider_api' | 'redirect_only';
 }

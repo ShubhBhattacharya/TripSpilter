@@ -468,3 +468,46 @@ export function calculatePercentageSplit(input: PercentageSplitInput): {
   };
 }
 
+/**
+ * Evaluates whether a trip member can be safely removed without orphaning active debts,
+ * and filters remaining participants while preserving integer-paise equality on future splits.
+ */
+export function evaluateMemberRemovalSafety(params: {
+  memberIdToRemove: string;
+  memberIds: string[];
+  expenses: RawExpense[];
+  splits: RawSplit[];
+  settlements: RawSettlement[];
+}): {
+  canRemoveSafely: boolean;
+  outstandingNetRupees: number;
+  reason?: string;
+} {
+  const { balances } = calculateNetBalances({
+    memberIds: params.memberIds,
+    expenses: params.expenses,
+    splits: params.splits,
+    settlements: params.settlements,
+  });
+
+  const memberBalance = balances[params.memberIdToRemove];
+  if (!memberBalance) {
+    return { canRemoveSafely: true, outstandingNetRupees: 0 };
+  }
+
+  const netPaise = toPaise(memberBalance.netBalance);
+  if (Math.abs(netPaise) > 1) {
+    return {
+      canRemoveSafely: false,
+      outstandingNetRupees: memberBalance.netBalance,
+      reason:
+        memberBalance.netBalance > 0
+          ? `Member is owed ₹${memberBalance.netBalance.toFixed(2)} — record settlement before removing.`
+          : `Member owes ₹${Math.abs(memberBalance.netBalance).toFixed(2)} — settle dues before removing.`,
+    };
+  }
+
+  return { canRemoveSafely: true, outstandingNetRupees: 0 };
+}
+
+

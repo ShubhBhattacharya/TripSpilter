@@ -105,5 +105,31 @@ export async function POST(request: Request) {
     }
   }
 
+  // Handle Razorpay refund.processed / refund.failed events
+  const refundEntity = (
+    payload.payload as { refund?: { entity?: { id?: string; payment_id?: string; status?: string } } }
+  )?.refund?.entity;
+
+  if (refundEntity?.id && (eventType === 'refund.processed' || eventType === 'refund.failed')) {
+    const nextRefundStatus = eventType === 'refund.processed' ? 'processed' : 'failed';
+    await adminClient
+      .from('payment_refunds')
+      .update({
+        status: nextRefundStatus,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('provider_refund_id', refundEntity.id);
+
+    if (eventType === 'refund.processed' && refundEntity.payment_id) {
+      await adminClient
+        .from('payment_orders')
+        .update({
+          status: 'refunded',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('provider_payment_id', refundEntity.payment_id);
+    }
+  }
+
   return NextResponse.json({ received: true, verified: true, eventId });
 }

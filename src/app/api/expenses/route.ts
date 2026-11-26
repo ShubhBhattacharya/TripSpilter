@@ -14,6 +14,7 @@ import {
   ForbiddenError,
 } from '../../../lib/security/auth-guards';
 import { toPaise } from '../../../lib/financial/split-engine';
+import { dispatchTripNotifications, recordTripActivity } from '../../../lib/notifications/server';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -231,6 +232,26 @@ export async function POST(request: Request) {
       const isReplay = rpcResult.isIdempotentReplay;
       if (isReplay) {
         headers.set('X-Idempotent-Replay', 'true');
+      } else {
+        await Promise.all([
+          dispatchTripNotifications({
+            supabase,
+            tripId,
+            recipientUserIds: splits.map((s) => s.userId),
+            title: `New expense: ${vendorName}`,
+            message: `₹${totalAmount.toLocaleString('en-IN')} added for ${vendorName} (${splitType}).`,
+            type: 'expense',
+            actorUserId: user.id,
+          }),
+          recordTripActivity({
+            supabase,
+            tripId,
+            userId: user.id,
+            actionType: 'EXPENSE_CREATED',
+            description: `Added expense "${vendorName}" (₹${totalAmount.toLocaleString('en-IN')})`,
+            metadata: { vendorName, totalAmountPaise, splitType },
+          }),
+        ]);
       }
       return NextResponse.json(
         {

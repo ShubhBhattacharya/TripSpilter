@@ -36,6 +36,7 @@ interface WeatherSummary {
   temperatureC: number;
   windKmh: number;
   source: string;
+  lastUpdated?: string;
   forecast3Day?: Array<{ date: string; minC: number; maxC: number }>;
 }
 
@@ -68,6 +69,7 @@ export const DestinationDetailView: React.FC<DestinationDetailViewProps> = ({
               temperatureC: Number(json.data.temperatureC ?? 0),
               windKmh: Number(json.data.windKmh ?? 0),
               source: String(json.source || 'Open-Meteo Public Feed'),
+              lastUpdated: json.lastUpdated ? String(json.lastUpdated) : undefined,
               forecast3Day: json.data.forecast3Day,
             });
           }
@@ -262,7 +264,10 @@ export const DestinationDetailView: React.FC<DestinationDetailViewProps> = ({
                     ))}
                   </div>
                 )}
-                <p className="text-[10px] text-[#64748B]">Source: {weather.source}</p>
+                <p className="text-[10px] text-[#64748B]">
+                  Source: {weather.source}
+                  {weather.lastUpdated ? ` • Updated ${new Date(weather.lastUpdated).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
+                </p>
               </>
             ) : (
               <p className="text-xs text-[#64748B]">Fetching Open-Meteo coordinates telemetry...</p>
@@ -339,8 +344,23 @@ export const DestinationDetailView: React.FC<DestinationDetailViewProps> = ({
           </div>
         </section>
 
-        {/* Curated 4 Local Spots */}
+          {/* Curated 4 Local Spots + Package Scope */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white rounded-3xl border border-[#E5EAF1] p-5 shadow-xs">
+            <div className="space-y-1.5">
+              <p className="text-xs font-extrabold text-[#047857] uppercase tracking-wider">Catalog Estimate Inclusions</p>
+              <p className="text-xs text-[#64748B] leading-relaxed">
+                Curated local sightseeing route, baseline daily stay/dining estimate (₹{destination.startingPrice.toLocaleString('en-IN')}/day), interactive 360° spot exploration, and group expense ledger setup.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-xs font-extrabold text-amber-700 uppercase tracking-wider">Not Included / Supplier-Verified Separately</p>
+              <p className="text-xs text-[#64748B] leading-relaxed">
+                Live flight fares, confirmed hotel room inventory, rail/bus tickets, and travel insurance require connected supplier providers or external partner checkout.
+              </p>
+            </div>
+          </div>
+
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-extrabold text-[#172B4D]">

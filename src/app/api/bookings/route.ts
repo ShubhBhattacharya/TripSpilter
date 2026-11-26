@@ -73,7 +73,7 @@ export async function POST(request: Request) {
         category: parsed.data.category,
         amount: parsed.data.amount,
         amount_paise: toPaise(parsed.data.amount),
-        status: 'Pending Split',
+        status: 'Draft',
         provider_name: parsed.data.providerName || 'Direct / External Provider',
         provider_status: 'DRAFT',
         external_url: parsed.data.externalUrl || null,

@@ -1,7 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { PendingActionType } from './types';
-import { requireTripMembership } from '../security/auth-guards';
+import { requireTripMembership, requireTripAdmin } from '../security/auth-guards';
 import { calculateEqualSplit, toPaise } from '../financial/split-engine';
+import { dispatchTripNotifications, recordTripActivity } from '../notifications/server';
 
 const ALLOWED_BOOKING_CATEGORIES = new Set([
   'Hotel',
@@ -62,7 +63,70 @@ export async function executeConfirmedAction(params: {
         { onConflict: 'trip_id,user_id' }
       );
 
+      await recordTripActivity({
+        supabase,
+        tripId: trip.id,
+        userId,
+        actionType: 'AI_TRIP_CREATED',
+        description: `Created trip "${trip.title}" via AI Assistant`,
+        metadata: { destination, budget },
+      });
+
       return { ok: true, message: `Trip "${trip.title}" created`, data: trip };
+    }
+
+    case 'ADD_TRIP_MEMBER': {
+      const tripId = String(payload.tripId || '').trim();
+      const memberUserId = String(payload.memberUserId || '').trim();
+      const role = payload.role === 'admin' ? 'admin' : 'member';
+      if (!tripId || !memberUserId) {
+        return { ok: false, status: 400, error: 'tripId and memberUserId are required.' };
+      }
+
+      await requireTripAdmin(supabase, tripId, userId);
+
+      const { data: profileExists } = await supabase
+        .from('profiles')
+        .select('id, display_name')
+        .eq('id', memberUserId)
+        .maybeSingle();
+
+      if (!profileExists) {
+        return { ok: false, status: 404, error: 'Target user profile does not exist.' };
+      }
+
+      const { data: memberRow, error } = await supabase
+        .from('trip_members')
+        .upsert(
+          { trip_id: tripId, user_id: memberUserId, role },
+          { onConflict: 'trip_id,user_id' }
+        )
+        .select('*')
+        .single();
+
+      if (error) return { ok: false, status: 500, error: error.message };
+
+      await Promise.all([
+        recordTripActivity({
+          supabase,
+          tripId,
+          userId,
+          actionType: 'AI_MEMBER_ADDED',
+          description: `Added ${profileExists.display_name || memberUserId} (${role}) to trip`,
+          metadata: { memberUserId, role },
+        }),
+        dispatchTripNotifications({
+          supabase,
+          tripId,
+          recipientUserIds: [memberUserId],
+          title: 'Added to TripSplit trip',
+          message: `You were added as a ${role} to a group trip.`,
+          type: 'invite',
+          actorUserId: userId,
+        }),
+      ]);
+
+      return { ok: true, message: `Added ${profileExists.display_name || 'member'} to trip`, data: memberRow };
     }
 
     case 'UPDATE_TRIP': {
@@ -156,6 +220,25 @@ export async function executeConfirmedAction(params: {
       });
 
       if (error) return { ok: false, status: 500, error: error.message };
+      await Promise.all([
+        recordTripActivity({
+          supabase,
+          tripId,
+          userId,
+          actionType: 'AI_EXPENSE_CREATED',
+          description: `Added AI expense "${vendorName}" (₹${amount.toLocaleString('en-IN')})`,
+          metadata: { vendorName, amount },
+        }),
+        dispatchTripNotifications({
+          supabase,
+          tripId,
+          recipientUserIds: memberIds,
+          title: `New AI-split expense: ${vendorName}`,
+          message: `₹${amount.toLocaleString('en-IN')} split equally across ${memberIds.length} member(s).`,
+          type: 'expense',
+          actorUserId: userId,
+        }),
+      ]);
       return { ok: true, message: `Expense "${vendorName}" (₹${amount}) split equally`, data };
     }
 

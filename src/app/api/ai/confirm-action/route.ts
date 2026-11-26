@@ -12,6 +12,7 @@ const confirmSchema = z.object({
     'CREATE_TRIP',
     'UPDATE_ITINERARY',
     'UPDATE_TRIP',
+    'ADD_TRIP_MEMBER',
     'CREATE_EXPENSE',
     'CREATE_SETTLEMENT_PROPOSAL',
     'CREATE_BOOKING_DRAFT',

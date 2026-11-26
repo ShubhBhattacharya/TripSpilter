@@ -9,6 +9,7 @@ import {
   ForbiddenError,
 } from '../../../../../lib/security/auth-guards';
 import { calculateNetBalances, optimizeSettlements, toPaise } from '../../../../../lib/financial/split-engine';
+import { dispatchTripNotifications, recordTripActivity } from '../../../../../lib/notifications/server';
 
 const createSettlementSchema = z.object({
   fromUserId: z.string().uuid(),
@@ -108,6 +109,19 @@ export async function POST(
     if (parsed.data.fromUserId !== user.id && parsed.data.toUserId !== user.id) {
       return NextResponse.json({ error: 'Settlement must involve the authenticated user.' }, { status: 403 });
     }
+    if (parsed.data.fromUserId === parsed.data.toUserId) {
+      return NextResponse.json({ error: 'Payer and recipient cannot be the same user.' }, { status: 400 });
+    }
+
+    const { data: participants } = await supabase
+      .from('trip_members')
+      .select('user_id')
+      .eq('trip_id', tripId)
+      .in('user_id', [parsed.data.fromUserId, parsed.data.toUserId]);
+
+    if (!participants || participants.length < 2) {
+      return NextResponse.json({ error: 'Both settlement participants must be active members of this trip.' }, { status: 400 });
+    }
 
     const { data, error } = await supabase
       .from('settlements')
@@ -124,6 +138,27 @@ export async function POST(
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    await Promise.all([
+      dispatchTripNotifications({
+        supabase,
+        tripId,
+        recipientUserIds: [parsed.data.fromUserId, parsed.data.toUserId],
+        title: `Settlement reported: ₹${parsed.data.amount.toLocaleString('en-IN')}`,
+        message: 'A peer-to-peer settlement transfer was marked as manually paid and awaits recipient verification.',
+        type: 'settlement',
+        actorUserId: user.id,
+      }),
+      recordTripActivity({
+        supabase,
+        tripId,
+        userId: user.id,
+        actionType: 'SETTLEMENT_REPORTED',
+        description: `Settlement of ₹${parsed.data.amount.toLocaleString('en-IN')} reported`,
+        metadata: { settlementId: data.id, amount: parsed.data.amount },
+      }),
+    ]);
+
     return NextResponse.json({ settlement: data }, { status: 201 });
   } catch (err) {
     if (err instanceof UnauthorizedError) return NextResponse.json({ error: err.message }, { status: 401 });

@@ -41,6 +41,10 @@ export const AiBillScanModal: React.FC<AiBillScanModalProps> = ({
 }) => {
   const [scanning, setScanning] = useState(false);
   const [ocrWarning, setOcrWarning] = useState<string | null>(null);
+  const [ocrConfidence, setOcrConfidence] = useState<'high' | 'medium' | 'low' | null>(null);
+  const [ocrExtractedWarnings, setOcrExtractedWarnings] = useState<string[]>([]);
+  const [hasReviewedExtraction, setHasReviewedExtraction] = useState<boolean>(false);
+  const [needsReviewGate, setNeedsReviewGate] = useState<boolean>(false);
 
   // Clean empty editable bill state (never pre-populate fake restaurant charges)
   const [merchantName, setMerchantName] = useState('');
@@ -86,7 +90,11 @@ export const AiBillScanModal: React.FC<AiBillScanModalProps> = ({
           if (data.invoiceNumber) setInvoiceNumber(data.invoiceNumber);
           setItems(data.items);
           if (data.serviceCharge !== undefined) setServiceCharge(data.serviceCharge);
-          toast.success('Receipt scanned & parsed successfully! 🧾');
+          setOcrConfidence(data.confidence || 'medium');
+          setOcrExtractedWarnings(Array.isArray(data.warnings) ? data.warnings : []);
+          setNeedsReviewGate(Boolean(data.reviewRequired ?? true));
+          setHasReviewedExtraction(false);
+          toast.success('Receipt parsed — please verify amounts before splitting.');
         } else if (data.error) {
           setOcrWarning(data.error);
         }
@@ -125,6 +133,10 @@ export const AiBillScanModal: React.FC<AiBillScanModalProps> = ({
   const handleConfirm = () => {
     if (items.length === 0 || totalAmount <= 0) {
       toast.error('Bill must contain at least one item with a valid price.');
+      return;
+    }
+    if (needsReviewGate && !hasReviewedExtraction) {
+      toast.error('Please verify the OCR extracted amounts before applying to expense split.');
       return;
     }
 
@@ -188,7 +200,7 @@ export const AiBillScanModal: React.FC<AiBillScanModalProps> = ({
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,application/pdf"
               onChange={handleFileUpload}
               className="hidden"
             />
@@ -208,6 +220,38 @@ export const AiBillScanModal: React.FC<AiBillScanModalProps> = ({
               )}
             </button>
           </div>
+
+          {/* OCR Confidence & Mandatory Review Banner */}
+          {needsReviewGate && (
+            <div className="p-3.5 rounded-xl bg-sky-50 border border-sky-200 text-xs space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold text-[#172B4D]">OCR Verification Required</span>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                    ocrConfidence === 'high'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : ocrConfidence === 'low'
+                        ? 'bg-rose-100 text-rose-700'
+                        : 'bg-amber-100 text-amber-700'
+                  }`}
+                >
+                  Confidence: {ocrConfidence || 'medium'}
+                </span>
+              </div>
+              {ocrExtractedWarnings.map((w, idx) => (
+                <p key={idx} className="text-[11px] text-amber-800">{w}</p>
+              ))}
+              <label className="flex items-center gap-2 text-[11px] font-semibold text-[#172B4D] cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={hasReviewedExtraction}
+                  onChange={(e) => setHasReviewedExtraction(e.target.checked)}
+                  className="rounded border-slate-300"
+                />
+                I have reviewed extracted line items &amp; bill totals before splitting.
+              </label>
+            </div>
+          )}
 
           {/* OCR Notice */}
           {ocrWarning && (

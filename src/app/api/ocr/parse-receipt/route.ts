@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { image: imageBase64 } = validation.data;
+    const { image: imageBase64, mimeTypeHint } = validation.data;
 
     // 4. API Key Check
     const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY;
@@ -64,6 +64,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           configured: false,
+          reviewRequired: true,
           error:
             'AI OCR Vision requires GEMINI_API_KEY configured in server environment. Please enter line items manually.',
         },
@@ -71,12 +72,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Extract clean base64 data and MIME type
-    const matches = imageBase64.match(/^data:(image\/(jpeg|jpg|png|webp));base64,(.+)$/);
-    const mimeType = matches ? matches[1] : 'image/jpeg';
-    const cleanBase64 = matches ? matches[3] : imageBase64;
+    // Extract clean base64 data and MIME type (supports JPEG, PNG, WEBP, and PDF)
+    const matches = imageBase64.match(
+      /^data:(image\/(?:jpeg|jpg|png|webp)|application\/pdf);base64,(.+)$/
+    );
+    const detectedMime = matches ? matches[1] : mimeTypeHint || 'image/jpeg';
+    const mimeType = detectedMime === 'image/jpg' ? 'image/jpeg' : detectedMime;
+    const cleanBase64 = matches ? matches[2] : imageBase64;
 
-    const prompt = `Analyze this Indian restaurant/hotel receipt or bill.
+    const prompt = `Analyze this Indian restaurant/hotel/travel receipt or PDF bill.
 Extract the following information as strict JSON:
 {
   "merchantName": "Name of the restaurant/vendor",
@@ -88,12 +92,13 @@ Extract the following information as strict JSON:
   "subtotal": 0.00,
   "gstAmount": 0.00,
   "serviceCharge": 0.00,
-  "totalAmount": 0.00
+  "totalAmount": 0.00,
+  "confidence": "high" | "medium" | "low"
 }
-Return ONLY valid JSON with no markdown backticks or commentary.`;
+Use "low" if numbers or text are blurry/partially missing. Return ONLY valid JSON with no markdown backticks or commentary.`;
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -148,13 +153,29 @@ Return ONLY valid JSON with no markdown backticks or commentary.`;
     try {
       const parsedRaw = JSON.parse(textOutput);
       const validatedData = ocrParsedReceiptSchema.parse(parsedRaw);
+      const computedSum =
+        validatedData.items.reduce((acc, it) => acc + it.price, 0) +
+        validatedData.gstAmount +
+        validatedData.serviceCharge;
+      const warnings: string[] = [];
+      if (validatedData.totalAmount > 0 && Math.abs(computedSum - validatedData.totalAmount) > 5) {
+        warnings.push(
+          `Extracted items + taxes (₹${computedSum.toFixed(2)}) differ from bill total (₹${validatedData.totalAmount.toFixed(2)}). Please review before splitting.`
+        );
+      }
+      if (validatedData.items.length === 0) {
+        warnings.push('No individual line items extracted; verify manually.');
+      }
 
       return NextResponse.json(
         {
           configured: true,
           ...validatedData,
+          confidence: warnings.length > 0 ? 'low' : validatedData.confidence,
+          warnings,
           isAiExtracted: true,
           isVerified: false,
+          reviewRequired: true,
           requiresUserConfirmation: true,
         },
         { headers }

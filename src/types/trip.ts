@@ -67,7 +67,17 @@ export interface BookingVaultItem {
   date: string;
   totalAmount: number;
   bookedBy: string;
-  status: 'Confirmed' | 'Pending Split' | 'Settled';
+  status:
+    | 'Draft'
+    | 'Pending confirmation'
+    | 'Confirmed by supplier'
+    | 'Failed'
+    | 'Cancelled'
+    | 'Refund pending'
+    | 'Refunded'
+    | 'Confirmed'
+    | 'Pending Split'
+    | 'Settled';
   documentType: 'PDF' | 'PNG' | 'Pass';
   attachmentUrl?: string;
   notes?: string;

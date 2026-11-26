@@ -23,6 +23,62 @@ Rules you MUST always follow:
 3. For sensitive mutations (creating trips, modifying expenses, updating itineraries), always prepare a draft tool call (create_trip_draft, create_expense_draft, update_itinerary_draft) and explicitly ask the user to confirm. Never claim an action is saved until the user confirms.
 4. Detect user's language (Hindi/Hinglish/English) or follow the requested language parameter cleanly.`;
 
+async function fetchWithAiRetry(
+  url: string,
+  init: RequestInit,
+  maxRetries = 1
+): Promise<Response> {
+  let attempt = 0;
+  let lastResponse: Response | null = null;
+  while (attempt <= maxRetries) {
+    try {
+      const res = await fetch(url, {
+        ...init,
+        signal: AbortSignal.timeout(18000),
+      });
+      if (res.ok || (res.status !== 429 && res.status < 500)) {
+        return res;
+      }
+      lastResponse = res;
+    } catch (err) {
+      if (attempt === maxRetries) throw err;
+    }
+    attempt++;
+    await new Promise((r) => setTimeout(r, 400 * attempt));
+  }
+  return lastResponse!;
+}
+
+async function logAiUsageTelemetry(params: {
+  ctx: ToolExecutionContext;
+  provider: AIProviderName;
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+  latencyMs: number;
+  status: 'success' | 'fallback' | 'timeout' | 'error';
+}): Promise<void> {
+  if (!params.ctx.userId || !params.ctx.supabase) return;
+  // Rough indicative blended cost rate per 1K tokens in INR for budget observability
+  const costInr = Number(
+    (((params.promptTokens * 0.00015 + params.completionTokens * 0.0006) / 1000) * 85).toFixed(4)
+  );
+  try {
+    await params.ctx.supabase.from('ai_usage_logs').insert({
+      user_id: params.ctx.userId,
+      provider: params.provider,
+      model: params.model,
+      prompt_tokens: params.promptTokens,
+      completion_tokens: params.completionTokens,
+      estimated_cost_inr: costInr,
+      latency_ms: Math.max(0, Math.round(params.latencyMs)),
+      status: params.status,
+    });
+  } catch {
+    // Telemetry should never disrupt user responses
+  }
+}
+
 function getConfiguredProviders(preferred: 'openai' | 'gemini' | 'auto'): Array<'openai' | 'gemini'> {
   const hasOpenAI = Boolean(process.env.OPENAI_API_KEY?.trim());
   const hasGemini = Boolean((process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY)?.trim());
@@ -72,9 +128,13 @@ async function runOpenAICompanion(
   const pendingConfirmations: PendingConfirmationAction[] = [];
   const structuredCards: StructuredCard[] = [];
 
-  // Allow up to 3 tool-call rounds
+  // Allow up to 3 tool-call rounds with bounded retry & latency tracking
+  const startedAt = Date.now();
+  let promptTokens = 0;
+  let completionTokens = 0;
+
   for (let round = 0; round < 3; round++) {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    const res = await fetchWithAiRetry('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -87,7 +147,6 @@ async function runOpenAICompanion(
         tools,
         tool_choice: 'auto',
       }),
-      signal: AbortSignal.timeout(18000),
     });
 
     if (!res.ok) {
@@ -95,11 +154,22 @@ async function runOpenAICompanion(
     }
 
     const json = await res.json();
+    promptTokens += Number(json.usage?.prompt_tokens || 0);
+    completionTokens += Number(json.usage?.completion_tokens || 0);
     const message = json.choices?.[0]?.message;
     if (!message) throw new Error('Empty response from OpenAI');
 
     const calls = message.tool_calls;
     if (!calls || calls.length === 0) {
+      void logAiUsageTelemetry({
+        ctx,
+        provider: 'openai',
+        model,
+        promptTokens,
+        completionTokens,
+        latencyMs: Date.now() - startedAt,
+        status: 'success',
+      });
       return {
         reply: message.content || 'Done.',
         provider: 'openai',
@@ -171,8 +241,12 @@ async function runGeminiCompanion(
   const pendingConfirmations: PendingConfirmationAction[] = [];
   const structuredCards: StructuredCard[] = [];
 
+  const startedAt = Date.now();
+  let promptTokens = 0;
+  let completionTokens = 0;
+
   for (let round = 0; round < 3; round++) {
-    const res = await fetch(
+    const res = await fetchWithAiRetry(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
       {
         method: 'POST',
@@ -193,7 +267,6 @@ async function runGeminiCompanion(
           tools: [{ functionDeclarations }],
           generationConfig: { temperature: 0.3 },
         }),
-        signal: AbortSignal.timeout(18000),
       }
     );
 
@@ -202,10 +275,21 @@ async function runGeminiCompanion(
     }
 
     const json = await res.json();
+    promptTokens += Number(json.usageMetadata?.promptTokenCount || 0);
+    completionTokens += Number(json.usageMetadata?.candidatesTokenCount || 0);
     const parts = json.candidates?.[0]?.content?.parts || [];
     const fnCallPart = parts.find((p: { functionCall?: unknown }) => Boolean(p.functionCall));
 
     if (!fnCallPart) {
+      void logAiUsageTelemetry({
+        ctx,
+        provider: 'gemini',
+        model,
+        promptTokens,
+        completionTokens,
+        latencyMs: Date.now() - startedAt,
+        status: 'success',
+      });
       const text = parts
         .filter((p: { text?: string }) => typeof p.text === 'string')
         .map((p: { text: string }) => p.text)

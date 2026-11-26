@@ -16,6 +16,7 @@ import {
   validatePaymentStateTransition,
   PaymentVerificationState,
 } from '../../../../../lib/financial/payment-state-machine';
+import { dispatchTripNotifications, recordTripActivity } from '../../../../../lib/notifications/server';
 
 export async function PATCH(
   request: Request,
@@ -180,6 +181,26 @@ export async function PATCH(
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 500, headers });
     }
+
+    await Promise.all([
+      dispatchTripNotifications({
+        supabase,
+        tripId,
+        recipientUserIds: [debtorId, creditorId],
+        title: `Split payment updated: ${finalStatus.replace(/_/g, ' ')}`,
+        message: `Share of ₹${Number(typedRecord.amount_owed).toLocaleString('en-IN')} moved to "${finalStatus}".`,
+        type: 'settlement',
+        actorUserId: user.id,
+      }),
+      recordTripActivity({
+        supabase,
+        tripId,
+        userId: user.id,
+        actionType: 'SPLIT_STATUS_UPDATED',
+        description: `Split ${splitId.slice(0, 8)} status -> ${finalStatus}`,
+        metadata: { splitId, finalStatus, transactionRef },
+      }),
+    ]);
 
     return NextResponse.json(
       {

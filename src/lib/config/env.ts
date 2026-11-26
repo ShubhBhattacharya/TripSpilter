@@ -12,6 +12,7 @@ export interface PublicConfigStatus {
 export interface ServerIntegrationStatus {
   supabase: boolean;
   supabaseServiceRole: boolean;
+  phoneOtpEnabled: boolean;
   openai: boolean;
   gemini: boolean;
   googleMapsPlaces: boolean;
@@ -79,6 +80,7 @@ export function getServerIntegrationStatus(): ServerIntegrationStatus {
   return {
     supabase: isValidSupabaseConfig(),
     supabaseServiceRole: isNonPlaceholder(process.env.SUPABASE_SERVICE_ROLE_KEY),
+    phoneOtpEnabled: process.env.NEXT_PUBLIC_SUPABASE_PHONE_ENABLED === 'true',
     openai: isNonPlaceholder(process.env.OPENAI_API_KEY),
     gemini: isNonPlaceholder(process.env.GEMINI_API_KEY || process.env.GOOGLE_GENAI_API_KEY),
     googleMapsPlaces: isNonPlaceholder(process.env.GOOGLE_MAPS_API_KEY),

@@ -155,12 +155,13 @@ export const MAX_OCR_IMAGE_BYTES = 5 * 1024 * 1024;
 export const ocrUploadSchema = z.object({
   image: z
     .string()
-    .min(1, 'Image data is required')
+    .min(1, 'Receipt file data is required')
     .refine((data) => {
-      // Must start with valid image data URI or clean base64
-      const isDataUri = /^data:image\/(jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(data);
+      // Must start with valid image/PDF data URI or clean base64 (max 5 MB)
+      const isDataUri = /^data:(image\/(jpeg|jpg|png|webp)|application\/pdf);base64,[A-Za-z0-9+/=]+$/.test(
+        data
+      );
       if (isDataUri) {
-        // Approximate byte size of base64
         const base64Data = data.split(',')[1] || '';
         const byteSize = (base64Data.length * 3) / 4;
         return byteSize <= MAX_OCR_IMAGE_BYTES;
@@ -172,7 +173,8 @@ export const ocrUploadSchema = z.object({
         return byteSize <= MAX_OCR_IMAGE_BYTES;
       }
       return false;
-    }, 'Invalid image format or image exceeds maximum 5MB size limit (allowed: JPEG, PNG, WEBP)'),
+    }, 'Invalid file format or exceeds 5MB limit (allowed: JPEG, PNG, WEBP, PDF)'),
+  mimeTypeHint: z.enum(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']).optional(),
 });
 
 export const ocrParsedReceiptSchema = z.object({
@@ -192,4 +194,5 @@ export const ocrParsedReceiptSchema = z.object({
   gstAmount: z.number().min(0).optional().default(0),
   serviceCharge: z.number().min(0).optional().default(0),
   totalAmount: z.number().min(0).optional().default(0),
+  confidence: z.enum(['high', 'medium', 'low']).optional().default('medium'),
 });

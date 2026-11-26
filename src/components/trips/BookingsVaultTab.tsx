@@ -85,7 +85,7 @@ export const BookingsVaultTab: React.FC<BookingsVaultTabProps> = ({
       date: new Date().toISOString().split('T')[0],
       totalAmount: amt,
       bookedBy: 'You',
-      status: 'Pending Split',
+      status: 'Draft',
       documentType: 'PDF',
     };
 
@@ -147,10 +147,20 @@ export const BookingsVaultTab: React.FC<BookingsVaultTabProps> = ({
   const getStatusBadge = (status: BookingVaultItem['status']) => {
     switch (status) {
       case 'Settled':
-        return 'bg-emerald-50 text-[#047857] border border-emerald-200';
-      case 'Pending Split':
-        return 'bg-amber-50 text-amber-700 border border-amber-200';
+      case 'Confirmed by supplier':
       case 'Confirmed':
+        return 'bg-emerald-50 text-[#047857] border border-emerald-200';
+      case 'Refunded':
+        return 'bg-teal-50 text-teal-700 border border-teal-200';
+      case 'Cancelled':
+      case 'Failed':
+        return 'bg-rose-50 text-rose-700 border border-rose-200';
+      case 'Pending confirmation':
+      case 'Pending Split':
+      case 'Refund pending':
+        return 'bg-amber-50 text-amber-700 border border-amber-200';
+      case 'Draft':
+      default:
         return 'bg-blue-50 text-[#1685D4] border border-blue-200';
     }
   };

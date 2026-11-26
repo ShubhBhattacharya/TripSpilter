@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { createClient } from '../../../../../lib/supabase/server';
 import { isSupabaseConfigured } from '../../../../../lib/supabase/client';
 import { requireAuthenticatedUser, requireTripMembership, UnauthorizedError, ForbiddenError } from '../../../../../lib/security/auth-guards';
+import { recordTripActivity } from '../../../../../lib/notifications/server';
 
 const confirmBookingSchema = z.object({
   userApprovedTerms: z.literal(true),
@@ -48,13 +49,22 @@ export async function POST(
         .from('bookings')
         .update({
           provider_status: 'CONTINUE_TO_PROVIDER',
-          status: 'Pending Split',
+          status: 'Pending confirmation',
+          updated_at: new Date().toISOString(),
         })
         .eq('id', bookingId)
         .select()
         .single();
 
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      await recordTripActivity({
+        supabase,
+        tripId: booking.trip_id,
+        userId: user.id,
+        actionType: 'BOOKING_PENDING_CONFIRMATION',
+        description: `Booking "${booking.title}" moved to Pending confirmation (external provider redirect)`,
+        metadata: { bookingId },
+      });
       return NextResponse.json({
         booking: updated,
         label: 'Continue to provider to book',
@@ -66,7 +76,7 @@ export async function POST(
 
     if (!parsed.data.providerConfirmationRef) {
       return NextResponse.json(
-        { error: 'Verified provider confirmation reference is required to mark Confirmed.' },
+        { error: 'Verified provider confirmation reference is required to mark Confirmed by supplier.' },
         { status: 400 }
       );
     }
@@ -76,13 +86,22 @@ export async function POST(
       .update({
         booking_ref: parsed.data.providerConfirmationRef,
         provider_status: 'PROVIDER_CONFIRMED',
-        status: 'Confirmed',
+        status: 'Confirmed by supplier',
+        updated_at: new Date().toISOString(),
       })
       .eq('id', bookingId)
       .select()
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await recordTripActivity({
+      supabase,
+      tripId: booking.trip_id,
+      userId: user.id,
+      actionType: 'BOOKING_CONFIRMED_SUPPLIER',
+      description: `Booking "${booking.title}" confirmed by supplier (${parsed.data.providerConfirmationRef})`,
+      metadata: { bookingId, ref: parsed.data.providerConfirmationRef },
+    });
     return NextResponse.json({ booking: confirmed, confirmedByProvider: true });
   } catch (err) {
     if (err instanceof UnauthorizedError) return NextResponse.json({ error: err.message }, { status: 401 });
