@@ -2,23 +2,33 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createClient } from '../../../../../lib/supabase/server';
 import { isSupabaseConfigured } from '../../../../../lib/supabase/client';
-import { requireAuthenticatedUser, requireTripMembership, UnauthorizedError, ForbiddenError } from '../../../../../lib/security/auth-guards';
+import {
+  requireAuthenticatedUser,
+  requireTripMembership,
+  UnauthorizedError,
+  ForbiddenError,
+} from '../../../../../lib/security/auth-guards';
 import { recordTripActivity } from '../../../../../lib/notifications/server';
 import {
-  isValidSupplierConfirmationRef,
   normalizeBookingLifecycleStatus,
+  validateBookingTransition,
 } from '../../../../../lib/financial/booking-state-machine';
+
+const FORBIDDEN_CLIENT_SUPPLIER_KEYS = [
+  'providerConfirmationRef',
+  'supplierPayload',
+  'verificationSource',
+];
 
 const confirmBookingSchema = z.object({
   userApprovedTerms: z.literal(true),
   bookingMode: z.enum(['redirect_only', 'provider_api']).default('redirect_only'),
-  providerConfirmationRef: z.string().max(120).optional(),
-  supplierPayload: z.record(z.string(), z.unknown()).optional(),
 });
 
 /**
- * Revalidates booking draft and records user approval.
- * Never fabricates a "Confirmed" status when only redirect-to-provider is supported.
+ * Records explicit user approval to proceed to external provider portal.
+ * Client requests NEVER self-confirm a booking as Confirmed by supplier — that requires
+ * an authenticated server-to-supplier ticketing response or cryptographically verified webhook (/api/bookings/webhook).
  */
 export async function POST(
   request: Request,
@@ -30,8 +40,18 @@ export async function POST(
   }
 
   try {
-    const body = await request.json();
-    const parsed = confirmBookingSchema.safeParse(body);
+    const rawBody = (await request.json()) as Record<string, unknown>;
+    if (FORBIDDEN_CLIENT_SUPPLIER_KEYS.some((k) => k in rawBody && rawBody[k] !== undefined)) {
+      return NextResponse.json(
+        {
+          error:
+            'Forbidden: Client requests cannot submit supplier confirmation references or supplier payloads. Confirmation occurs only via authenticated provider webhook.',
+        },
+        { status: 403 }
+      );
+    }
+
+    const parsed = confirmBookingSchema.safeParse(rawBody);
     if (!parsed.success) {
       return NextResponse.json({ error: 'Explicit user approval of final price & terms is required.' }, { status: 400 });
     }
@@ -43,103 +63,81 @@ export async function POST(
     if (!booking) return NextResponse.json({ error: 'Booking draft not found' }, { status: 404 });
 
     const membership = await requireTripMembership(supabase, booking.trip_id, user.id);
-    if (booking.booked_by !== user.id && !membership.isAdmin) {
+    const isOwnerOrAdmin = booking.booked_by === user.id || membership.isAdmin;
+
+    const transition = validateBookingTransition({
+      currentStatus: String(booking.status || 'Draft'),
+      targetStatus: 'Pending confirmation',
+      actorType: 'user',
+      isBookingOwnerOrAdmin: isOwnerOrAdmin,
+    });
+    if (!transition.allowed) {
+      return NextResponse.json({ error: transition.error }, { status: 403 });
+    }
+
+    if (parsed.data.bookingMode === 'provider_api') {
       return NextResponse.json(
-        { error: 'Only the booking creator or trip admin can confirm this booking.' },
-        { status: 403 }
+        {
+          confirmedByProvider: false,
+          status: 'waiting_for_supplier_ticketing',
+          error:
+            'Instant automated ticketing API is not enabled. Use redirect_only or await verified supplier confirmation via /api/bookings/webhook.',
+        },
+        { status: 503 }
       );
     }
 
     const previousLifecycle = normalizeBookingLifecycleStatus(String(booking.status || 'Draft'));
-
-    // If booking provider only supports search/redirect or keys aren't connected, never pretend booking succeeded
-    const hasProviderCredentials = Boolean(
-      process.env.HOTEL_PROVIDER_API_KEY || process.env.FLIGHT_PROVIDER_API_KEY
-    );
-
-    if (parsed.data.bookingMode === 'redirect_only' || !hasProviderCredentials) {
-      const { data: updated, error } = await supabase
-        .from('bookings')
-        .update({
-          provider_status: 'CONTINUE_TO_PROVIDER',
-          status: 'Pending confirmation',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', bookingId)
-        .select()
-        .single();
-
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-      await recordTripActivity({
-        supabase,
-        tripId: booking.trip_id,
-        userId: user.id,
-        actionType: 'BOOKING_PENDING_CONFIRMATION',
-        description: `Booking "${booking.title}" moved to Pending confirmation (external provider redirect)`,
-        metadata: { bookingId },
-      });
-      return NextResponse.json({
-        booking: updated,
-        label: 'Continue to provider to book',
-        confirmedByProvider: false,
-        disclaimer:
-          'Direct instant provider ticketing requires live provider booking credentials. Complete reservation on provider portal.',
-      });
-    }
-
-    if (
-      !isValidSupplierConfirmationRef(parsed.data.providerConfirmationRef) ||
-      !parsed.data.supplierPayload ||
-      Object.keys(parsed.data.supplierPayload).length === 0
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            'Verified non-draft supplier confirmation reference and non-empty supplierPayload are required to mark Confirmed by supplier.',
-        },
-        { status: 400 }
-      );
-    }
-
-    const { data: confirmed, error } = await supabase
+    const { data: updated, error } = await supabase
       .from('bookings')
       .update({
-        booking_ref: parsed.data.providerConfirmationRef!.trim(),
-        provider_status: 'PROVIDER_CONFIRMED',
-        status: 'Confirmed by supplier',
-        supplier_payload: parsed.data.supplierPayload,
+        provider_status: 'CONTINUE_TO_PROVIDER',
+        status: 'Pending confirmation',
         updated_at: new Date().toISOString(),
       })
       .eq('id', bookingId)
+      .eq('status', booking.status)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!updated) {
+      return NextResponse.json({ error: 'Concurrent booking update detected. Retry cleanly.' }, { status: 409 });
+    }
+
     try {
       await supabase.from('booking_status_history').insert({
         booking_id: bookingId,
         trip_id: booking.trip_id,
         previous_status: previousLifecycle,
-        new_status: 'Confirmed by supplier',
+        new_status: 'Pending confirmation',
         changed_by: user.id,
-        source: 'provider_api',
-        supplier_ref: parsed.data.providerConfirmationRef!.trim(),
+        source: 'redirect',
+        notes: 'User approved terms for external supplier redirect',
       });
     } catch {
-      // Safe when history table migration hasn't been run yet
+      // Safe if history table is pending migration
     }
+
     await recordTripActivity({
       supabase,
       tripId: booking.trip_id,
       userId: user.id,
-      actionType: 'BOOKING_CONFIRMED_SUPPLIER',
-      description: `Booking "${booking.title}" confirmed by supplier (${parsed.data.providerConfirmationRef})`,
-      metadata: { bookingId, ref: parsed.data.providerConfirmationRef },
+      actionType: 'BOOKING_PENDING_CONFIRMATION',
+      description: `Booking "${booking.title}" moved to Pending confirmation (external provider redirect)`,
+      metadata: { bookingId },
     });
-    return NextResponse.json({ booking: confirmed, confirmedByProvider: true });
+
+    return NextResponse.json({
+      booking: updated,
+      label: 'Continue to provider to book',
+      confirmedByProvider: false,
+      disclaimer:
+        'Supplier confirmation happens only via verified provider callback/webhook. Complete reservation on external portal.',
+    });
   } catch (err) {
     if (err instanceof UnauthorizedError) return NextResponse.json({ error: err.message }, { status: 401 });
     if (err instanceof ForbiddenError) return NextResponse.json({ error: err.message }, { status: 403 });
-    return NextResponse.json({ error: 'Booking confirmation failed' }, { status: 400 });
+    return NextResponse.json({ error: 'Booking confirmation workflow failed' }, { status: 400 });
   }
 }

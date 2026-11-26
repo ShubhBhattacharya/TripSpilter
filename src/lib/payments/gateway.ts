@@ -98,6 +98,22 @@ export function verifyWebhookSignature(
   return crypto.timingSafeEqual(Buffer.from(expectedHex, 'utf8'), Buffer.from(provided, 'utf8'));
 }
 
+export function validateWebhookTimestamp(
+  timestampHeader: string | null,
+  maxSkewSeconds: number = 300,
+  nowMs: number = Date.now()
+): boolean {
+  if (!timestampHeader) return false;
+  const numeric = Number(timestampHeader);
+  const parsedMs = Number.isFinite(numeric)
+    ? numeric < 1e12
+      ? numeric * 1000
+      : numeric
+    : Date.parse(timestampHeader);
+  if (!Number.isFinite(parsedMs)) return false;
+  return Math.abs(nowMs - parsedMs) <= maxSkewSeconds * 1000;
+}
+
 export interface CreateGatewayRefundInput {
   providerPaymentId: string;
   amountPaise: number;

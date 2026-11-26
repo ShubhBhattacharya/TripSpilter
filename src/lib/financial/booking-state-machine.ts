@@ -1,7 +1,8 @@
 /**
  * TripSplit Booking Lifecycle State Machine
- * Strictly enforces honest supplier booking & refund transitions:
- * Draft -> Pending confirmation -> Confirmed by supplier / Failed -> Cancelled -> Refund pending -> Refunded
+ * Strictly separates user-initiated lifecycle changes from trusted server/webhook supplier transitions:
+ * - User actions: Draft, Pending confirmation, Cancelled, Refund pending
+ * - Trusted supplier/webhook actions: Confirmed by supplier, Failed, Refunded
  */
 
 export type BookingLifecycleStatus =
@@ -12,6 +13,20 @@ export type BookingLifecycleStatus =
   | 'Cancelled'
   | 'Refund pending'
   | 'Refunded';
+
+export type BookingTransitionActor = 'user' | 'trusted_supplier_server';
+
+export const USER_ALLOWED_TARGET_STATUSES: readonly BookingLifecycleStatus[] = [
+  'Draft',
+  'Pending confirmation',
+  'Cancelled',
+  'Refund pending',
+] as const;
+
+export const SUPPLIER_ONLY_TARGET_STATUSES: readonly BookingLifecycleStatus[] = [
+  'Confirmed by supplier',
+  'Refunded',
+] as const;
 
 const LEGACY_STATUS_MAP: Record<string, BookingLifecycleStatus> = {
   draft: 'Draft',
@@ -31,7 +46,7 @@ const ALLOWED_TRANSITIONS: Record<BookingLifecycleStatus, readonly BookingLifecy
   'Pending confirmation': ['Confirmed by supplier', 'Failed', 'Cancelled'],
   'Confirmed by supplier': ['Cancelled', 'Refund pending'],
   Failed: ['Draft', 'Pending confirmation', 'Cancelled'],
-  Cancelled: ['Refund pending'],
+  Cancelled: ['Refund pending', 'Refunded'],
   'Refund pending': ['Refunded', 'Cancelled'],
   Refunded: [],
 };
@@ -51,18 +66,29 @@ export function normalizeBookingLifecycleStatus(status: string): BookingLifecycl
 export function validateBookingTransition(params: {
   currentStatus: string;
   targetStatus: BookingLifecycleStatus;
+  actorType?: BookingTransitionActor;
   providerConfirmationRef?: string | null;
   hasVerifiedSupplierPayload?: boolean;
-  hasSupplierConfirmationRef?: boolean; // Backward compat flag
+  refundReconciled?: boolean;
   isBookingOwnerOrAdmin: boolean;
 }): { allowed: boolean; normalizedCurrent: BookingLifecycleStatus; error?: string } {
+  const actorType: BookingTransitionActor = params.actorType || 'user';
   const normalizedCurrent = normalizeBookingLifecycleStatus(params.currentStatus);
 
-  if (!params.isBookingOwnerOrAdmin) {
+  if (!params.isBookingOwnerOrAdmin && actorType !== 'trusted_supplier_server') {
     return {
       allowed: false,
       normalizedCurrent,
       error: 'Only the trip admin or booking creator can update booking lifecycle status.',
+    };
+  }
+
+  // Strictly block normal users from self-confirming supplier bookings or marking refunded
+  if (actorType === 'user' && SUPPLIER_ONLY_TARGET_STATUSES.includes(params.targetStatus)) {
+    return {
+      allowed: false,
+      normalizedCurrent,
+      error: `Forbidden: Users cannot directly set booking status to "${params.targetStatus}". Supplier confirmation and refund completion require an authenticated server/webhook verification.`,
     };
   }
 
@@ -80,10 +106,7 @@ export function validateBookingTransition(params: {
   }
 
   if (params.targetStatus === 'Confirmed by supplier') {
-    const refOk = params.providerConfirmationRef
-      ? isValidSupplierConfirmationRef(params.providerConfirmationRef)
-      : Boolean(params.hasSupplierConfirmationRef);
-    if (!refOk) {
+    if (!isValidSupplierConfirmationRef(params.providerConfirmationRef)) {
       return {
         allowed: false,
         normalizedCurrent,
@@ -91,14 +114,22 @@ export function validateBookingTransition(params: {
           'A valid supplier confirmation reference (non-draft PNR/reference >= 4 alphanumeric chars) is required for Confirmed by supplier.',
       };
     }
-    if (params.hasVerifiedSupplierPayload === false) {
+    if (!params.hasVerifiedSupplierPayload) {
       return {
         allowed: false,
         normalizedCurrent,
         error:
-          'Confirmed by supplier requires a verified provider response or webhook payload; an API key alone cannot confirm bookings.',
+          'Confirmed by supplier requires a verified provider response or authenticated webhook payload.',
       };
     }
+  }
+
+  if (params.targetStatus === 'Refunded' && params.refundReconciled === false) {
+    return {
+      allowed: false,
+      normalizedCurrent,
+      error: 'Booking cannot transition to Refunded before payment provider refund reconciliation completes.',
+    };
   }
 
   return { allowed: true, normalizedCurrent };

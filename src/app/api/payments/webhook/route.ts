@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
-import { verifyWebhookSignature } from '../../../../lib/payments/gateway';
+import { verifyWebhookSignature, validateWebhookTimestamp } from '../../../../lib/payments/gateway';
 import { getServerServiceRoleKey, isValidSupabaseConfig } from '../../../../lib/config/env';
 import { computeReconciledOrderStatus } from '../../../../lib/financial/refund-engine';
 
@@ -30,6 +30,11 @@ export async function POST(request: Request) {
 
   if (!verifyWebhookSignature(rawBody, signature, webhookSecret)) {
     return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 401 });
+  }
+
+  const tsHeader = request.headers.get('x-webhook-timestamp');
+  if (tsHeader && !validateWebhookTimestamp(tsHeader)) {
+    return NextResponse.json({ error: 'Expired webhook replay timestamp window' }, { status: 401 });
   }
 
   let payload: Record<string, unknown>;
@@ -67,8 +72,11 @@ export async function POST(request: Request) {
     payload,
   });
 
-  if (insertEventErr && insertEventErr.code === '23505') {
-    return NextResponse.json({ received: true, duplicateReplay: true });
+  if (insertEventErr) {
+    if (insertEventErr.code === '23505') {
+      return NextResponse.json({ received: true, duplicateReplay: true });
+    }
+    return NextResponse.json({ error: insertEventErr.message }, { status: 500 });
   }
 
   // Handle Razorpay payment.captured / payment.failed events

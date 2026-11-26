@@ -24,6 +24,13 @@ const refundSchema = z.object({
   idempotencyKey: z.string().min(4).max(100).optional(),
 });
 
+function isMissingRpcError(err: { code?: string; message?: string } | null): boolean {
+  if (!err) return false;
+  const code = err.code || '';
+  const msg = (err.message || '').toLowerCase();
+  return code === 'PGRST202' || code === '42883' || msg.includes('reserve_payment_refund') || msg.includes('could not find the function');
+}
+
 export async function GET(request: Request) {
   if (!isSupabaseConfigured) {
     return NextResponse.json({ refunds: [], configured: false });
@@ -37,6 +44,7 @@ export async function GET(request: Request) {
     const supabase = await createClient();
     const user = await requireAuthenticatedUser(supabase);
 
+    let orderAmountPaise: number | null = null;
     let query = supabase
       .from('payment_refunds')
       .select('*')
@@ -44,6 +52,25 @@ export async function GET(request: Request) {
       .limit(50);
 
     if (paymentOrderId) {
+      const { data: orderRow, error: orderErr } = await supabase
+        .from('payment_orders')
+        .select('id, user_id, trip_id, amount_paise')
+        .eq('id', paymentOrderId)
+        .maybeSingle();
+
+      if (orderErr || !orderRow) {
+        return NextResponse.json({ error: 'Payment order not found' }, { status: 404 });
+      }
+      if (orderRow.user_id !== user.id) {
+        if (!orderRow.trip_id) {
+          return NextResponse.json(
+            { error: 'Unauthorized: you cannot access refund history for another user.' },
+            { status: 403 }
+          );
+        }
+        await requireTripMembership(supabase, orderRow.trip_id, user.id);
+      }
+      orderAmountPaise = Number(orderRow.amount_paise);
       query = query.eq('payment_order_id', paymentOrderId);
     } else if (tripId) {
       await requireTripMembership(supabase, tripId, user.id);
@@ -60,7 +87,10 @@ export async function GET(request: Request) {
       rows.map((r) => ({ id: String(r.id), amountPaise: Number(r.amount_paise), status: String(r.status) }))
     );
 
-    return NextResponse.json({ refunds: rows, summary, configured: true });
+    const remainingRefundablePaise =
+      orderAmountPaise !== null ? Math.max(0, orderAmountPaise - summary.reservedTotalPaise) : null;
+
+    return NextResponse.json({ refunds: rows, summary, remainingRefundablePaise, configured: true });
   } catch (err) {
     if (err instanceof UnauthorizedError) return NextResponse.json({ error: err.message }, { status: 401 });
     if (err instanceof ForbiddenError) return NextResponse.json({ error: err.message }, { status: 403 });
@@ -117,10 +147,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: existingRefundRows } = await supabase
+    const { data: existingRefundRows, error: existingErr } = await supabase
       .from('payment_refunds')
       .select('id, amount_paise, status, idempotency_key')
       .eq('payment_order_id', order.id);
+
+    if (existingErr) {
+      return NextResponse.json({ error: existingErr.message }, { status: 500, headers });
+    }
 
     const existingList = (existingRefundRows || []).map((r) => ({
       id: String(r.id),
@@ -128,7 +162,6 @@ export async function POST(request: Request) {
       status: String(r.status),
     }));
 
-    // Idempotency replay check before attempting mutation
     if (idempotencyKey) {
       const replay = (existingRefundRows || []).find((r) => r.idempotency_key === idempotencyKey);
       if (replay) {
@@ -160,8 +193,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // 2. Atomic DB Reservation BEFORE calling external payment provider
-    let reservedRefund: Record<string, unknown> | null = null;
+    // 2. FAIL-CLOSED Atomic Row-Locked DB Reservation BEFORE calling external payment provider
+    // Never bypass row locking with a non-atomic direct INSERT fallback!
     const { data: rpcReserve, error: rpcReserveErr } = await supabase.rpc('reserve_payment_refund', {
       p_payment_order_id: order.id,
       p_amount_paise: refundPaise,
@@ -169,45 +202,38 @@ export async function POST(request: Request) {
       p_idempotency_key: idempotencyKey || null,
     });
 
-    if (!rpcReserveErr && rpcReserve) {
-      if (rpcReserve.isIdempotentReplay) {
-        headers.set('X-Idempotent-Replay', 'true');
+    if (rpcReserveErr || !rpcReserve) {
+      if (isMissingRpcError(rpcReserveErr)) {
         return NextResponse.json(
-          { refund: rpcReserve.refund, idempotentReplay: true },
-          { status: 200, headers }
+          {
+            error:
+              'Refunds BLOCKED: atomic reserve_payment_refund RPC is not deployed on the database. Apply migration 20261126_95_market_readiness_final.sql first.',
+            status: 'blocked_missing_rpc',
+            migrationRequired: 'supabase/migrations/20261126_95_market_readiness_final.sql',
+          },
+          { status: 503, headers }
         );
       }
-      reservedRefund = rpcReserve.refund as Record<string, unknown>;
-    } else {
-      // Fallback durable pending record if migration RPC is not yet applied
-      const { data: insertedPending, error: insertPendingErr } = await supabase
-        .from('payment_refunds')
-        .insert({
-          payment_order_id: order.id,
-          user_id: user.id,
-          trip_id: order.trip_id,
-          provider: order.provider,
-          amount_paise: refundPaise,
-          currency: order.currency || 'INR',
-          status: 'pending',
-          reason: parsed.data.reason || null,
-          ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}),
-        })
-        .select('*')
-        .maybeSingle();
-
-      if (insertPendingErr || !insertedPending) {
-        return NextResponse.json(
-          { error: insertPendingErr?.message || 'Unable to reserve pending refund row.' },
-          { status: 409, headers }
-        );
-      }
-      reservedRefund = insertedPending as Record<string, unknown>;
+      const code = rpcReserveErr?.code;
+      const status = code === '42501' ? 403 : code === 'P0002' ? 404 : code === '22003' || code === '22000' ? 409 : 500;
+      return NextResponse.json(
+        { error: rpcReserveErr?.message || 'Atomic refund reservation rejected' },
+        { status, headers }
+      );
     }
 
+    if (rpcReserve.isIdempotentReplay) {
+      headers.set('X-Idempotent-Replay', 'true');
+      return NextResponse.json(
+        { refund: rpcReserve.refund, idempotentReplay: true },
+        { status: 200, headers }
+      );
+    }
+
+    const reservedRefund = rpcReserve.refund as Record<string, unknown>;
     const refundId = String(reservedRefund.id);
 
-    // 3. Call external payment provider after durable reservation exists
+    // 3. Call external payment provider after durable row-locked reservation exists
     let gatewayRefund;
     try {
       gatewayRefund = await createServerPaymentRefund({
@@ -217,7 +243,6 @@ export async function POST(request: Request) {
         idempotencyKey,
       });
     } catch (gatewayErr) {
-      // Provider rejected or failed — release reservation cleanly by marking failed
       const errMsg = gatewayErr instanceof Error ? gatewayErr.message : 'Provider call failed';
       await supabase.rpc('finalize_payment_refund', {
         p_refund_id: refundId,
@@ -249,11 +274,12 @@ export async function POST(request: Request) {
       p_reconciliation_status: 'matched',
     });
 
-    if (finalizeErr) {
-      // Critical mismatch: Provider executed refund, DB finalization failed -> surface reconciliation state cleanly
+    if (finalizeErr || !finalizedRow) {
       return NextResponse.json(
         {
-          error: 'Provider accepted refund but database reconciliation failed. Manual/webhook reconciliation required.',
+          error:
+            finalizeErr?.message ||
+            'Provider accepted refund but database reconciliation failed. Manual/webhook reconciliation required.',
           reconciliationRequired: true,
           refundId,
           providerRefundId: gatewayRefund.providerRefundId,

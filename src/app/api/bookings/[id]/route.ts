@@ -11,11 +11,20 @@ import {
 import {
   validateBookingTransition,
   normalizeBookingLifecycleStatus,
+  BookingLifecycleStatus,
 } from '../../../../lib/financial/booking-state-machine';
 import { dispatchTripNotifications, recordTripActivity } from '../../../../lib/notifications/server';
 import { toPaise } from '../../../../lib/financial/split-engine';
 
-const updateBookingStatusSchema = z.object({
+const FORBIDDEN_CLIENT_SUPPLIER_KEYS = [
+  'verificationSource',
+  'supplierPayload',
+  'providerConfirmationRef',
+  'provider_status',
+  'booking_ref',
+];
+
+const userBookingPatchSchema = z.object({
   status: z.enum([
     'Draft',
     'Pending confirmation',
@@ -25,9 +34,6 @@ const updateBookingStatusSchema = z.object({
     'Refund pending',
     'Refunded',
   ]),
-  providerConfirmationRef: z.string().max(120).optional(),
-  verificationSource: z.enum(['user_action', 'redirect', 'provider_api', 'webhook']).default('user_action'),
-  supplierPayload: z.record(z.string(), z.unknown()).optional(),
   refundAmountInr: z.number().min(0).max(10000000).optional(),
   notes: z.string().max(240).optional(),
 });
@@ -72,6 +78,11 @@ export async function GET(
   }
 }
 
+/**
+ * User-initiated booking lifecycle endpoint ONLY.
+ * Strictly blocks client-submitted verificationSource / supplierPayload / providerConfirmationRef
+ * and rejects attempts to self-mark Confirmed by supplier or Refunded.
+ */
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -82,8 +93,20 @@ export async function PATCH(
   }
 
   try {
-    const body = await request.json();
-    const parsed = updateBookingStatusSchema.safeParse(body);
+    const rawBody = (await request.json()) as Record<string, unknown>;
+
+    // Immediately reject forged client-supplied supplier proof fields
+    if (FORBIDDEN_CLIENT_SUPPLIER_KEYS.some((k) => k in rawBody && rawBody[k] !== undefined)) {
+      return NextResponse.json(
+        {
+          error:
+            'Forbidden: Supplier verification fields (verificationSource, supplierPayload, providerConfirmationRef) cannot be supplied by client requests.',
+        },
+        { status: 403 }
+      );
+    }
+
+    const parsed = userBookingPatchSchema.safeParse(rawBody);
     if (!parsed.success) {
       return NextResponse.json(
         { error: parsed.error.issues[0]?.message || 'Invalid booking lifecycle update' },
@@ -105,17 +128,10 @@ export async function PATCH(
     const membership = await requireTripMembership(supabase, booking.trip_id, user.id);
     const isOwnerOrAdmin = booking.booked_by === user.id || membership.isAdmin;
 
-    const hasVerifiedSupplierPayload =
-      parsed.data.status !== 'Confirmed by supplier'
-        ? true
-        : (parsed.data.verificationSource === 'provider_api' || parsed.data.verificationSource === 'webhook') &&
-          Boolean(parsed.data.supplierPayload && Object.keys(parsed.data.supplierPayload).length > 0);
-
     const transition = validateBookingTransition({
       currentStatus: String(booking.status || 'Draft'),
-      targetStatus: parsed.data.status,
-      providerConfirmationRef: parsed.data.providerConfirmationRef,
-      hasVerifiedSupplierPayload,
+      targetStatus: parsed.data.status as BookingLifecycleStatus,
+      actorType: 'user',
       isBookingOwnerOrAdmin: isOwnerOrAdmin,
     });
 
@@ -123,53 +139,42 @@ export async function PATCH(
       return NextResponse.json({ error: transition.error }, { status: 403 });
     }
 
-    if (parsed.data.status === 'Confirmed by supplier') {
-      const hasProviderCredentials = Boolean(
-        process.env.HOTEL_PROVIDER_API_KEY || process.env.FLIGHT_PROVIDER_API_KEY
-      );
-      if (!hasProviderCredentials) {
-        return NextResponse.json(
-          {
-            error:
-              'Confirmed by supplier requires live supplier credentials and a verified provider/webhook response.',
-          },
-          { status: 503 }
-        );
-      }
-    }
-
     const patch: Record<string, unknown> = {
       status: parsed.data.status,
       updated_at: new Date().toISOString(),
     };
-    if (parsed.data.providerConfirmationRef) {
-      patch.booking_ref = parsed.data.providerConfirmationRef.trim();
-      patch.provider_status = 'PROVIDER_CONFIRMED';
-    }
-    if (parsed.data.supplierPayload) {
-      patch.supplier_payload = parsed.data.supplierPayload;
-    }
+
     if (parsed.data.status === 'Cancelled') {
       patch.cancelled_at = new Date().toISOString();
       patch.provider_status = 'CANCELLED';
     }
-    if (parsed.data.status === 'Refund pending' || parsed.data.status === 'Refunded') {
-      patch.provider_status = parsed.data.status.toUpperCase().replace(/\s+/g, '_');
+    if (parsed.data.status === 'Pending confirmation') {
+      patch.provider_status = 'CONTINUE_TO_PROVIDER';
+    }
+    if (parsed.data.status === 'Refund pending') {
+      patch.provider_status = 'REFUND_PENDING';
       if (parsed.data.refundAmountInr !== undefined) {
         patch.refund_amount_paise = toPaise(parsed.data.refundAmountInr);
       }
     }
 
+    // Atomic optimistic CAS update prevents concurrent status-change race conditions
     const { data: updated, error } = await supabase
       .from('bookings')
       .update(patch)
       .eq('id', bookingId)
+      .eq('status', booking.status)
       .select('*')
-      .single();
+      .maybeSingle();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!updated) {
+      return NextResponse.json(
+        { error: 'Concurrent booking update detected. Refresh booking state and retry.' },
+        { status: 409 }
+      );
+    }
 
-    // Record booking status history & audit logs safely
     try {
       await supabase.from('booking_status_history').insert({
         booking_id: bookingId,
@@ -177,12 +182,11 @@ export async function PATCH(
         previous_status: transition.normalizedCurrent,
         new_status: parsed.data.status,
         changed_by: user.id,
-        source: parsed.data.verificationSource,
-        supplier_ref: parsed.data.providerConfirmationRef || null,
+        source: 'user_action',
         notes: parsed.data.notes || null,
       });
     } catch {
-      // Safe when history table migration hasn't run yet
+      // Safe if audit history migration is pending
     }
 
     await Promise.all([
@@ -192,7 +196,7 @@ export async function PATCH(
         userId: user.id,
         actionType: 'BOOKING_STATUS_UPDATED',
         description: `Booking "${booking.title}" moved from "${transition.normalizedCurrent}" -> "${parsed.data.status}"`,
-        metadata: { bookingId, status: parsed.data.status, source: parsed.data.verificationSource },
+        metadata: { bookingId, status: parsed.data.status },
       }),
       dispatchTripNotifications({
         supabase,

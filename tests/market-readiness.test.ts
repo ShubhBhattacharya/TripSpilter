@@ -37,13 +37,26 @@ describe('Market-Readiness Lifecycle, Financial, OCR, Notifications & AI Safety 
       const toPending = validateBookingTransition({
         currentStatus: 'Draft',
         targetStatus: 'Pending confirmation',
+        actorType: 'user',
         isBookingOwnerOrAdmin: true,
       });
       expect(toPending.allowed).toBe(true);
 
+      // Client ('user') cannot self-confirm even with ref/payload
+      const userSelfConfirm = validateBookingTransition({
+        currentStatus: 'Pending confirmation',
+        targetStatus: 'Confirmed by supplier',
+        actorType: 'user',
+        providerConfirmationRef: 'PNR89342XK',
+        hasVerifiedSupplierPayload: true,
+        isBookingOwnerOrAdmin: true,
+      });
+      expect(userSelfConfirm.allowed).toBe(false);
+
       const withoutRef = validateBookingTransition({
         currentStatus: 'Pending confirmation',
         targetStatus: 'Confirmed by supplier',
+        actorType: 'trusted_supplier_server',
         hasVerifiedSupplierPayload: true,
         isBookingOwnerOrAdmin: true,
       });
@@ -52,6 +65,7 @@ describe('Market-Readiness Lifecycle, Financial, OCR, Notifications & AI Safety 
       const forgedDraftRef = validateBookingTransition({
         currentStatus: 'Pending confirmation',
         targetStatus: 'Confirmed by supplier',
+        actorType: 'trusted_supplier_server',
         providerConfirmationRef: 'DRAFT-12345',
         hasVerifiedSupplierPayload: true,
         isBookingOwnerOrAdmin: true,
@@ -61,6 +75,7 @@ describe('Market-Readiness Lifecycle, Financial, OCR, Notifications & AI Safety 
       const unverifiedPayload = validateBookingTransition({
         currentStatus: 'Pending confirmation',
         targetStatus: 'Confirmed by supplier',
+        actorType: 'trusted_supplier_server',
         providerConfirmationRef: 'AMADEUS-PNR-9Z8X',
         hasVerifiedSupplierPayload: false,
         isBookingOwnerOrAdmin: true,
@@ -70,6 +85,7 @@ describe('Market-Readiness Lifecycle, Financial, OCR, Notifications & AI Safety 
       const withVerifiedSupplier = validateBookingTransition({
         currentStatus: 'Pending confirmation',
         targetStatus: 'Confirmed by supplier',
+        actorType: 'trusted_supplier_server',
         providerConfirmationRef: 'PNR89342XK',
         hasVerifiedSupplierPayload: true,
         isBookingOwnerOrAdmin: true,
