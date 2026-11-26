@@ -8,7 +8,10 @@ import {
   UnauthorizedError,
   ForbiddenError,
 } from '../../../../lib/security/auth-guards';
-import { validateBookingTransition } from '../../../../lib/financial/booking-state-machine';
+import {
+  validateBookingTransition,
+  normalizeBookingLifecycleStatus,
+} from '../../../../lib/financial/booking-state-machine';
 import { dispatchTripNotifications, recordTripActivity } from '../../../../lib/notifications/server';
 import { toPaise } from '../../../../lib/financial/split-engine';
 
@@ -23,8 +26,51 @@ const updateBookingStatusSchema = z.object({
     'Refunded',
   ]),
   providerConfirmationRef: z.string().max(120).optional(),
+  verificationSource: z.enum(['user_action', 'redirect', 'provider_api', 'webhook']).default('user_action'),
+  supplierPayload: z.record(z.string(), z.unknown()).optional(),
   refundAmountInr: z.number().min(0).max(10000000).optional(),
+  notes: z.string().max(240).optional(),
 });
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id: bookingId } = await params;
+  if (!isSupabaseConfigured) {
+    return NextResponse.json({ error: 'Loading booking history requires Supabase configuration' }, { status: 503 });
+  }
+
+  try {
+    const supabase = await createClient();
+    const user = await requireAuthenticatedUser(supabase);
+
+    const { data: booking } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('id', bookingId)
+      .maybeSingle();
+
+    if (!booking) return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
+    await requireTripMembership(supabase, booking.trip_id, user.id);
+
+    const { data: history } = await supabase
+      .from('booking_status_history')
+      .select('*')
+      .eq('booking_id', bookingId)
+      .order('created_at', { ascending: true });
+
+    return NextResponse.json({
+      booking,
+      lifecycleStatus: normalizeBookingLifecycleStatus(String(booking.status)),
+      history: history || [],
+    });
+  } catch (err) {
+    if (err instanceof UnauthorizedError) return NextResponse.json({ error: err.message }, { status: 401 });
+    if (err instanceof ForbiddenError) return NextResponse.json({ error: err.message }, { status: 403 });
+    return NextResponse.json({ error: 'Unable to load booking details' }, { status: 500 });
+  }
+}
 
 export async function PATCH(
   request: Request,
@@ -59,10 +105,17 @@ export async function PATCH(
     const membership = await requireTripMembership(supabase, booking.trip_id, user.id);
     const isOwnerOrAdmin = booking.booked_by === user.id || membership.isAdmin;
 
+    const hasVerifiedSupplierPayload =
+      parsed.data.status !== 'Confirmed by supplier'
+        ? true
+        : (parsed.data.verificationSource === 'provider_api' || parsed.data.verificationSource === 'webhook') &&
+          Boolean(parsed.data.supplierPayload && Object.keys(parsed.data.supplierPayload).length > 0);
+
     const transition = validateBookingTransition({
       currentStatus: String(booking.status || 'Draft'),
       targetStatus: parsed.data.status,
-      hasSupplierConfirmationRef: Boolean(parsed.data.providerConfirmationRef?.trim()),
+      providerConfirmationRef: parsed.data.providerConfirmationRef,
+      hasVerifiedSupplierPayload,
       isBookingOwnerOrAdmin: isOwnerOrAdmin,
     });
 
@@ -70,7 +123,6 @@ export async function PATCH(
       return NextResponse.json({ error: transition.error }, { status: 403 });
     }
 
-    // Never mark Confirmed by supplier without live provider credentials configured
     if (parsed.data.status === 'Confirmed by supplier') {
       const hasProviderCredentials = Boolean(
         process.env.HOTEL_PROVIDER_API_KEY || process.env.FLIGHT_PROVIDER_API_KEY
@@ -79,7 +131,7 @@ export async function PATCH(
         return NextResponse.json(
           {
             error:
-              'Confirmed by supplier status requires connected provider API credentials (HOTEL_PROVIDER_API_KEY or FLIGHT_PROVIDER_API_KEY).',
+              'Confirmed by supplier requires live supplier credentials and a verified provider/webhook response.',
           },
           { status: 503 }
         );
@@ -93,6 +145,9 @@ export async function PATCH(
     if (parsed.data.providerConfirmationRef) {
       patch.booking_ref = parsed.data.providerConfirmationRef.trim();
       patch.provider_status = 'PROVIDER_CONFIRMED';
+    }
+    if (parsed.data.supplierPayload) {
+      patch.supplier_payload = parsed.data.supplierPayload;
     }
     if (parsed.data.status === 'Cancelled') {
       patch.cancelled_at = new Date().toISOString();
@@ -114,6 +169,22 @@ export async function PATCH(
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+    // Record booking status history & audit logs safely
+    try {
+      await supabase.from('booking_status_history').insert({
+        booking_id: bookingId,
+        trip_id: booking.trip_id,
+        previous_status: transition.normalizedCurrent,
+        new_status: parsed.data.status,
+        changed_by: user.id,
+        source: parsed.data.verificationSource,
+        supplier_ref: parsed.data.providerConfirmationRef || null,
+        notes: parsed.data.notes || null,
+      });
+    } catch {
+      // Safe when history table migration hasn't run yet
+    }
+
     await Promise.all([
       recordTripActivity({
         supabase,
@@ -121,12 +192,13 @@ export async function PATCH(
         userId: user.id,
         actionType: 'BOOKING_STATUS_UPDATED',
         description: `Booking "${booking.title}" moved from "${transition.normalizedCurrent}" -> "${parsed.data.status}"`,
-        metadata: { bookingId, status: parsed.data.status },
+        metadata: { bookingId, status: parsed.data.status, source: parsed.data.verificationSource },
       }),
       dispatchTripNotifications({
         supabase,
         tripId: booking.trip_id,
-        recipientUserIds: [booking.booked_by].filter(Boolean),
+        recipientUserIds: booking.booked_by ? [booking.booked_by] : [],
+        includeActor: true,
         title: `Booking ${parsed.data.status}: ${booking.title}`,
         message: `Lifecycle state updated to "${parsed.data.status}".`,
         type: 'booking',

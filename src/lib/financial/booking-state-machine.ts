@@ -36,6 +36,13 @@ const ALLOWED_TRANSITIONS: Record<BookingLifecycleStatus, readonly BookingLifecy
   Refunded: [],
 };
 
+const SUPPLIER_REF_REGEX = /^(?!DRAFT-|MOCK-|FAKE-|TEST-)[A-Z0-9][A-Z0-9_-]{3,63}$/i;
+
+export function isValidSupplierConfirmationRef(ref?: string | null): boolean {
+  if (!ref) return false;
+  return SUPPLIER_REF_REGEX.test(ref.trim());
+}
+
 export function normalizeBookingLifecycleStatus(status: string): BookingLifecycleStatus {
   const key = (status || '').trim().toLowerCase();
   return LEGACY_STATUS_MAP[key] || 'Draft';
@@ -44,7 +51,9 @@ export function normalizeBookingLifecycleStatus(status: string): BookingLifecycl
 export function validateBookingTransition(params: {
   currentStatus: string;
   targetStatus: BookingLifecycleStatus;
-  hasSupplierConfirmationRef?: boolean;
+  providerConfirmationRef?: string | null;
+  hasVerifiedSupplierPayload?: boolean;
+  hasSupplierConfirmationRef?: boolean; // Backward compat flag
   isBookingOwnerOrAdmin: boolean;
 }): { allowed: boolean; normalizedCurrent: BookingLifecycleStatus; error?: string } {
   const normalizedCurrent = normalizeBookingLifecycleStatus(params.currentStatus);
@@ -70,12 +79,26 @@ export function validateBookingTransition(params: {
     };
   }
 
-  if (params.targetStatus === 'Confirmed by supplier' && !params.hasSupplierConfirmationRef) {
-    return {
-      allowed: false,
-      normalizedCurrent,
-      error: 'Supplier confirmation reference is required to mark booking as Confirmed by supplier.',
-    };
+  if (params.targetStatus === 'Confirmed by supplier') {
+    const refOk = params.providerConfirmationRef
+      ? isValidSupplierConfirmationRef(params.providerConfirmationRef)
+      : Boolean(params.hasSupplierConfirmationRef);
+    if (!refOk) {
+      return {
+        allowed: false,
+        normalizedCurrent,
+        error:
+          'A valid supplier confirmation reference (non-draft PNR/reference >= 4 alphanumeric chars) is required for Confirmed by supplier.',
+      };
+    }
+    if (params.hasVerifiedSupplierPayload === false) {
+      return {
+        allowed: false,
+        normalizedCurrent,
+        error:
+          'Confirmed by supplier requires a verified provider response or webhook payload; an API key alone cannot confirm bookings.',
+      };
+    }
   }
 
   return { allowed: true, normalizedCurrent };

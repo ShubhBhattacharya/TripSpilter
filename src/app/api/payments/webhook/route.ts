@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
 import { verifyWebhookSignature } from '../../../../lib/payments/gateway';
 import { getServerServiceRoleKey, isValidSupabaseConfig } from '../../../../lib/config/env';
+import { computeReconciledOrderStatus } from '../../../../lib/financial/refund-engine';
 
 export const runtime = 'nodejs';
 
@@ -105,29 +106,62 @@ export async function POST(request: Request) {
     }
   }
 
-  // Handle Razorpay refund.processed / refund.failed events
+  // Handle Razorpay refund.created / refund.processed / refund.failed events cumulatively
   const refundEntity = (
     payload.payload as { refund?: { entity?: { id?: string; payment_id?: string; status?: string } } }
   )?.refund?.entity;
 
-  if (refundEntity?.id && (eventType === 'refund.processed' || eventType === 'refund.failed')) {
-    const nextRefundStatus = eventType === 'refund.processed' ? 'processed' : 'failed';
+  if (
+    refundEntity?.id &&
+    (eventType === 'refund.created' || eventType === 'refund.processed' || eventType === 'refund.failed')
+  ) {
+    const nextRefundStatus =
+      eventType === 'refund.processed'
+        ? 'processed'
+        : eventType === 'refund.failed'
+          ? 'failed'
+          : 'pending';
+
     await adminClient
       .from('payment_refunds')
       .update({
         status: nextRefundStatus,
+        reconciliation_status: 'matched',
         updated_at: new Date().toISOString(),
       })
       .eq('provider_refund_id', refundEntity.id);
 
     if (eventType === 'refund.processed' && refundEntity.payment_id) {
-      await adminClient
+      const { data: parentOrder } = await adminClient
         .from('payment_orders')
-        .update({
-          status: 'refunded',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('provider_payment_id', refundEntity.payment_id);
+        .select('id, amount_paise')
+        .eq('provider_payment_id', refundEntity.payment_id)
+        .maybeSingle();
+
+      if (parentOrder) {
+        const { data: processedRows } = await adminClient
+          .from('payment_refunds')
+          .select('amount_paise')
+          .eq('payment_order_id', parentOrder.id)
+          .eq('status', 'processed');
+
+        const cumulativeProcessed = (processedRows || []).reduce(
+          (sum, row) => sum + Number(row.amount_paise || 0),
+          0
+        );
+        const nextOrderStatus = computeReconciledOrderStatus({
+          orderAmountPaise: Number(parentOrder.amount_paise),
+          processedRefundsPaise: cumulativeProcessed,
+        });
+
+        await adminClient
+          .from('payment_orders')
+          .update({
+            status: nextOrderStatus,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', parentOrder.id);
+      }
     }
   }
 

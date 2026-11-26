@@ -4,11 +4,16 @@ import { createClient } from '../../../../../lib/supabase/server';
 import { isSupabaseConfigured } from '../../../../../lib/supabase/client';
 import { requireAuthenticatedUser, requireTripMembership, UnauthorizedError, ForbiddenError } from '../../../../../lib/security/auth-guards';
 import { recordTripActivity } from '../../../../../lib/notifications/server';
+import {
+  isValidSupplierConfirmationRef,
+  normalizeBookingLifecycleStatus,
+} from '../../../../../lib/financial/booking-state-machine';
 
 const confirmBookingSchema = z.object({
   userApprovedTerms: z.literal(true),
   bookingMode: z.enum(['redirect_only', 'provider_api']).default('redirect_only'),
   providerConfirmationRef: z.string().max(120).optional(),
+  supplierPayload: z.record(z.string(), z.unknown()).optional(),
 });
 
 /**
@@ -37,7 +42,15 @@ export async function POST(
     const { data: booking } = await supabase.from('bookings').select('*').eq('id', bookingId).maybeSingle();
     if (!booking) return NextResponse.json({ error: 'Booking draft not found' }, { status: 404 });
 
-    await requireTripMembership(supabase, booking.trip_id, user.id);
+    const membership = await requireTripMembership(supabase, booking.trip_id, user.id);
+    if (booking.booked_by !== user.id && !membership.isAdmin) {
+      return NextResponse.json(
+        { error: 'Only the booking creator or trip admin can confirm this booking.' },
+        { status: 403 }
+      );
+    }
+
+    const previousLifecycle = normalizeBookingLifecycleStatus(String(booking.status || 'Draft'));
 
     // If booking provider only supports search/redirect or keys aren't connected, never pretend booking succeeded
     const hasProviderCredentials = Boolean(
@@ -74,9 +87,16 @@ export async function POST(
       });
     }
 
-    if (!parsed.data.providerConfirmationRef) {
+    if (
+      !isValidSupplierConfirmationRef(parsed.data.providerConfirmationRef) ||
+      !parsed.data.supplierPayload ||
+      Object.keys(parsed.data.supplierPayload).length === 0
+    ) {
       return NextResponse.json(
-        { error: 'Verified provider confirmation reference is required to mark Confirmed by supplier.' },
+        {
+          error:
+            'Verified non-draft supplier confirmation reference and non-empty supplierPayload are required to mark Confirmed by supplier.',
+        },
         { status: 400 }
       );
     }
@@ -84,9 +104,10 @@ export async function POST(
     const { data: confirmed, error } = await supabase
       .from('bookings')
       .update({
-        booking_ref: parsed.data.providerConfirmationRef,
+        booking_ref: parsed.data.providerConfirmationRef!.trim(),
         provider_status: 'PROVIDER_CONFIRMED',
         status: 'Confirmed by supplier',
+        supplier_payload: parsed.data.supplierPayload,
         updated_at: new Date().toISOString(),
       })
       .eq('id', bookingId)
@@ -94,6 +115,19 @@ export async function POST(
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    try {
+      await supabase.from('booking_status_history').insert({
+        booking_id: bookingId,
+        trip_id: booking.trip_id,
+        previous_status: previousLifecycle,
+        new_status: 'Confirmed by supplier',
+        changed_by: user.id,
+        source: 'provider_api',
+        supplier_ref: parsed.data.providerConfirmationRef!.trim(),
+      });
+    } catch {
+      // Safe when history table migration hasn't been run yet
+    }
     await recordTripActivity({
       supabase,
       tripId: booking.trip_id,

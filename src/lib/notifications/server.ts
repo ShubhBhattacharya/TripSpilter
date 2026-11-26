@@ -22,35 +22,53 @@ export async function dispatchTripNotifications(params: {
   type: NotificationCategory;
   link?: string;
   actorUserId?: string;
+  includeActor?: boolean;
   metadata?: Record<string, unknown>;
-}): Promise<void> {
+}): Promise<{ dispatched: number; fallbackUsed: boolean }> {
   const uniqueRecipients = Array.from(
-    new Set(params.recipientUserIds.filter((id) => Boolean(id) && id !== params.actorUserId))
+    new Set(
+      params.recipientUserIds.filter(
+        (id) => Boolean(id) && (params.includeActor === true || id !== params.actorUserId)
+      )
+    )
   );
-  if (uniqueRecipients.length === 0) return;
+  if (uniqueRecipients.length === 0) {
+    return { dispatched: 0, fallbackUsed: false };
+  }
+
+  const link = params.link || (params.tripId ? `/trips/${params.tripId}` : '/notifications');
 
   try {
-    const { error } = await params.supabase.rpc('dispatch_trip_notification', {
+    const { data, error } = await params.supabase.rpc('dispatch_trip_notification', {
       p_trip_id: params.tripId,
       p_recipient_ids: uniqueRecipients,
       p_title: params.title.slice(0, 140),
       p_message: params.message.slice(0, 500),
       p_type: params.type,
-      p_link: params.link || (params.tripId ? `/trips/${params.tripId}` : '/notifications'),
+      p_link: link,
       p_metadata: params.metadata || {},
     });
 
-    if (error && params.actorUserId && uniqueRecipients.includes(params.actorUserId)) {
-      await params.supabase.from('notifications').insert({
+    if (!error) {
+      return { dispatched: typeof data === 'number' ? data : uniqueRecipients.length, fallbackUsed: false };
+    }
+
+    // Reachable fallback when RPC migration isn't applied yet: insert self-scoped row under RLS (user_id = auth.uid())
+    if (params.actorUserId && params.recipientUserIds.includes(params.actorUserId)) {
+      const { error: fallbackErr } = await params.supabase.from('notifications').insert({
         user_id: params.actorUserId,
         title: params.title.slice(0, 140),
         message: params.message.slice(0, 500),
-        link: params.link || '/notifications',
+        link,
         read: false,
       });
+      return { dispatched: fallbackErr ? 0 : 1, fallbackUsed: true };
     }
+
+    return { dispatched: 0, fallbackUsed: true };
   } catch {
     // Notifications should never abort verified financial mutations
+    return { dispatched: 0, fallbackUsed: false };
   }
 }
 

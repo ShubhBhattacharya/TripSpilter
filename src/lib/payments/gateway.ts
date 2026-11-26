@@ -102,6 +102,7 @@ export interface CreateGatewayRefundInput {
   providerPaymentId: string;
   amountPaise: number;
   reason?: string;
+  idempotencyKey?: string;
 }
 
 export interface CreateGatewayRefundResult {
@@ -109,6 +110,7 @@ export interface CreateGatewayRefundResult {
   provider: 'razorpay' | 'unconfigured';
   providerRefundId: string | null;
   status: 'processed' | 'pending' | 'waiting_for_credentials';
+  rawResponse?: Record<string, unknown>;
   missingCredentials?: string[];
   disclaimer: string;
 }
@@ -116,6 +118,7 @@ export interface CreateGatewayRefundResult {
 /**
  * Authorized Server-Side Payment Refund Initiation (Razorpay Refunds API).
  * Returns waiting_for_credentials if provider keys are not configured.
+ * Supports safe bounded retries ONLY when an explicit idempotencyKey is supplied.
  */
 export async function createServerPaymentRefund(
   input: CreateGatewayRefundInput
@@ -136,32 +139,45 @@ export async function createServerPaymentRefund(
   }
 
   const basicAuth = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
-  const res = await fetch(
-    `https://api.razorpay.com/v1/payments/${encodeURIComponent(input.providerPaymentId)}/refund`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${basicAuth}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        amount: input.amountPaise,
-        notes: input.reason ? { reason: input.reason.slice(0, 140) } : undefined,
-      }),
-      signal: AbortSignal.timeout(10000),
-    }
-  );
+  const maxAttempts = input.idempotencyKey ? 2 : 1;
+  let res: Response | null = null;
 
-  if (!res.ok) {
-    throw new Error(`Payment provider rejected refund request (HTTP ${res.status}).`);
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    res = await fetch(
+      `https://api.razorpay.com/v1/payments/${encodeURIComponent(input.providerPaymentId)}/refund`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${basicAuth}`,
+          'Content-Type': 'application/json',
+          ...(input.idempotencyKey ? { 'X-Idempotency-Key': input.idempotencyKey } : {}),
+        },
+        body: JSON.stringify({
+          amount: input.amountPaise,
+          notes: {
+            ...(input.reason ? { reason: input.reason.slice(0, 140) } : {}),
+            ...(input.idempotencyKey ? { idempotencyKey: input.idempotencyKey.slice(0, 80) } : {}),
+          },
+        }),
+        signal: AbortSignal.timeout(10000),
+      }
+    );
+
+    if (res.ok || res.status < 500 || attempt === maxAttempts) break;
+    await new Promise((r) => setTimeout(r, 350));
   }
 
-  const refund = await res.json();
+  if (!res || !res.ok) {
+    throw new Error(`Payment provider rejected refund request (HTTP ${res?.status ?? 'network_error'}).`);
+  }
+
+  const refund = (await res.json()) as Record<string, unknown>;
   return {
     configured: true,
     provider: 'razorpay',
-    providerRefundId: String(refund.id),
+    providerRefundId: String(refund.id || ''),
     status: refund.status === 'processed' ? 'processed' : 'pending',
-    disclaimer: 'Refund initiated with Razorpay. Final status reconciles via webhook.',
+    rawResponse: refund,
+    disclaimer: 'Refund initiated with Razorpay. Final status reconciles via verified webhook.',
   };
 }
