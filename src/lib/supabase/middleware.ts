@@ -1,5 +1,13 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { isValidSupabaseConfig } from '../config/env';
+
+const PROTECTED_PREFIXES = ['/trips', '/qr-split', '/profile', '/settings'];
+const AUTH_ROUTES = ['/login', '/signup', '/forgot-password'];
+
+export function isProtectedAppPath(pathname: string): boolean {
+  return PROTECTED_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({
@@ -8,13 +16,24 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const pathname = request.nextUrl.pathname;
+  const isAuthRoute = AUTH_ROUTES.includes(pathname);
+  const isProtectedRoute = isProtectedAppPath(pathname);
 
-  // If Supabase is not configured yet, bypass middleware to avoid blocking
-  if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes('placeholder')) {
+  // Fail closed on protected routes whenever Supabase credentials are missing or placeholder values
+  if (!isValidSupabaseConfig()) {
+    if (isProtectedRoute) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/login';
+      url.searchParams.set('error', 'supabase-unconfigured');
+      url.searchParams.set('redirectTo', pathname);
+      return NextResponse.redirect(url);
+    }
     return response;
   }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
@@ -62,16 +81,7 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const pathname = request.nextUrl.pathname;
-  const isAuthRoute =
-    pathname === '/login' || pathname === '/signup' || pathname === '/forgot-password';
-  const isProtectedRoute =
-    pathname.startsWith('/trips') ||
-    pathname.startsWith('/qr-split') ||
-    pathname.startsWith('/profile') ||
-    pathname.startsWith('/settings');
-
-  // If user is logged in and visits login/signup, redirect to dashboard
+  // If user is logged in and visits login/signup/forgot-password, redirect to home
   if (user && isAuthRoute) {
     const url = request.nextUrl.clone();
     url.pathname = '/';

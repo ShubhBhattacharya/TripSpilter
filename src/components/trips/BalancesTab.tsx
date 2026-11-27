@@ -34,13 +34,11 @@ export const BalancesTab: React.FC<BalancesTabProps> = ({ tripId, debts: initial
     const target = debts.find((d) => d.id === debtId);
     const nextStatus = target?.status === 'SETTLED' ? 'PENDING' : 'SETTLED';
 
-    if (
-      nextStatus === 'SETTLED' &&
-      target &&
-      tripId &&
-      !tripId.startsWith('local-') &&
-      !tripId.startsWith('trip-')
-    ) {
+    const isRealPersistedTrip = Boolean(
+      tripId && !tripId.startsWith('local-') && !tripId.startsWith('trip-')
+    );
+
+    if (nextStatus === 'SETTLED' && target && isRealPersistedTrip) {
       try {
         const res = await fetch(`/api/trips/${tripId}/settlements`, {
           method: 'POST',
@@ -52,10 +50,13 @@ export const BalancesTab: React.FC<BalancesTabProps> = ({ tripId, debts: initial
           }),
         });
         if (!res.ok) {
-          toast.info('Marked settled locally (server verification requires valid trip member UUIDs).');
+          const errJson = await res.json().catch(() => ({}));
+          toast.error(errJson.error || 'Failed to save settlement record to PostgreSQL.');
+          return;
         }
       } catch {
-        // ignore network error in offline mode
+        toast.error('Network error: unable to record settlement.');
+        return;
       }
     }
 

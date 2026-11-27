@@ -72,8 +72,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 
   useEffect(() => {
+    const isExplicitDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+
     if (!isSupabaseConfigured || !supabase) {
       const timer = setTimeout(() => {
+        if (!isExplicitDemoMode) {
+          setProfile(null);
+          setIsLoading(false);
+          return;
+        }
         if (typeof window !== 'undefined' && sessionStorage.getItem('tripsplit_preview_signed_out') === 'true') {
           setIsLoading(false);
           return;
@@ -96,14 +103,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           }
         }
-        if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') {
-          setProfile({
-            id: mockUser.id,
-            display_name: mockUser.name,
-            upi_id: mockUser.upiId,
-            avatar_url: mockUser.avatar,
-          });
-        }
+        setProfile({
+          id: mockUser.id,
+          display_name: mockUser.name,
+          upi_id: mockUser.upiId,
+          avatar_url: mockUser.avatar,
+        });
         setIsLoading(false);
       }, 0);
       return () => clearTimeout(timer);
@@ -145,6 +150,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [supabase, fetchProfile]);
 
   const signInAsDemo = (demoData?: { name?: string; email?: string; upiId?: string }) => {
+    if (process.env.NEXT_PUBLIC_DEMO_MODE !== 'true' || isSupabaseConfigured) {
+      return;
+    }
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('tripsplit_preview_signed_out');
       const demoObj = {
@@ -180,14 +188,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateProfile = async (data: { displayName: string; upiId: string }): Promise<boolean> => {
     if (!isSupabaseConfigured) {
-      setProfile((prev) => ({
-        id: prev?.id || 'demo_user',
-        display_name: data.displayName,
-        upi_id: data.upiId,
-        avatar_url: prev?.avatar_url || mockUser.avatar,
-      }));
-      setShowOnboarding(false);
-      return true;
+      if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') {
+        setProfile((prev) => ({
+          id: prev?.id || 'demo_user',
+          display_name: data.displayName,
+          upi_id: data.upiId,
+          avatar_url: prev?.avatar_url || mockUser.avatar,
+        }));
+        setShowOnboarding(false);
+        return true;
+      }
+      return false;
     }
 
     if (!user || !supabase) return false;
