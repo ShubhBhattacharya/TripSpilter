@@ -465,8 +465,8 @@ export const ExpenseDashboardView: React.FC = () => {
       <JoinTripModal
         isOpen={isJoinTripOpen}
         onClose={() => setIsJoinTripOpen(false)}
-        onJoinSuccess={(code) => {
-          router.push(`/trips/trip-manali-2026?joined=${encodeURIComponent(code)}`);
+        onJoinSuccess={(tripIdOrCode) => {
+          router.push(`/trips/${encodeURIComponent(tripIdOrCode)}`);
         }}
       />
 

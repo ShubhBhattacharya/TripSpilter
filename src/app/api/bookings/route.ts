@@ -18,6 +18,9 @@ const createBookingDraftSchema = z.object({
   amount: z.number().min(0).max(10000000),
   currency: z.string().default('INR'),
   providerName: z.string().max(100).optional(),
+  supplierCode: z
+    .enum(['amadeus', 'liteapi', 'hotelbeds', 'duffel', 'razorpay', 'stripe', 'viator', 'external_redirect'])
+    .optional(),
   externalUrl: z.string().url().optional(),
 });
 
@@ -78,6 +81,7 @@ export async function POST(request: Request) {
         provider_status: 'DRAFT',
         external_url: parsed.data.externalUrl || null,
         currency: parsed.data.currency,
+        metadata: parsed.data.supplierCode ? { supplierCode: parsed.data.supplierCode } : {},
         booked_by: user.id,
       })
       .select()

@@ -3,11 +3,12 @@
 import React, { useState } from 'react';
 import { X, Users, Key, ArrowRight, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '../auth/AuthProvider';
 
 interface JoinTripModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onJoinSuccess?: (tripCode: string) => void;
+  onJoinSuccess?: (tripIdOrCode: string) => void;
 }
 
 export const JoinTripModal: React.FC<JoinTripModalProps> = ({
@@ -15,29 +16,51 @@ export const JoinTripModal: React.FC<JoinTripModalProps> = ({
   onClose,
   onJoinSuccess,
 }) => {
+  const { isConfigured } = useAuth();
   const [inviteCode, setInviteCode] = useState('');
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    const cleanCode = inviteCode.trim().toUpperCase();
-    if (!cleanCode) {
-      setError('Please enter a 6-digit trip invite code or link.');
+    const raw = inviteCode.trim();
+    if (!raw) {
+      setError('Please enter a trip invite code or link.');
+      return;
+    }
+
+    if (!isConfigured) {
+      setError(
+        'Joining shared database trips via invite code requires live Supabase authentication & database configuration.'
+      );
       return;
     }
 
     setIsJoining(true);
-    setTimeout(() => {
-      setIsJoining(false);
-      toast.success(`Successfully connected to trip "${cleanCode}"! 🚀`);
-      if (onJoinSuccess) onJoinSuccess(cleanCode);
+    try {
+      const res = await fetch('/api/trips/invitations/accept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inviteCode: raw }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setError(json.error || 'Invalid or expired invite code.');
+        return;
+      }
+
+      toast.success('Joined trip workspace successfully!');
+      if (onJoinSuccess) onJoinSuccess(String(json.tripId || raw));
       onClose();
-    }, 600);
+    } catch {
+      setError('Network error while redeeming invite code. Please retry.');
+    } finally {
+      setIsJoining(false);
+    }
   };
 
   return (

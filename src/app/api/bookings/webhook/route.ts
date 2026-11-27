@@ -7,22 +7,13 @@ import {
   BookingLifecycleStatus,
   validateBookingTransition,
 } from '../../../../lib/financial/booking-state-machine';
+import {
+  doesWebhookProviderMatchBooking,
+  resolveBookingWebhookSecret,
+  validateSupplierWebhookPayloadConsistency,
+} from '../../../../lib/financial/webhook-security';
 
 export const runtime = 'nodejs';
-
-const KNOWN_SUPPLIER_TOKENS = ['amadeus', 'liteapi', 'hotelbeds', 'duffel', 'razorpay', 'stripe', 'viator'];
-
-function doesWebhookProviderMatchBooking(webhookProvider: string, bookingProviderName: string | null): boolean {
-  const wp = webhookProvider.trim().toLowerCase();
-  const bp = (bookingProviderName || '').trim().toLowerCase();
-  if (!wp || !KNOWN_SUPPLIER_TOKENS.includes(wp)) {
-    return false;
-  }
-  if (!bp || bp.includes('external provider') || bp.includes('direct')) {
-    return true;
-  }
-  return bp.includes(wp);
-}
 
 const supplierWebhookSchema = z.object({
   eventId: z.string().min(4).max(120),
@@ -44,37 +35,16 @@ const supplierWebhookSchema = z.object({
 /**
  * Trusted Supplier Booking Webhook Endpoint.
  * Exclusively handles verified transitions to Confirmed by supplier / Failed / Refunded:
- * 1. Verifies HMAC-SHA256 signature using BOOKING_PROVIDER_WEBHOOK_SECRET.
+ * 1. Parses request JSON cleanly, resolves per-provider HMAC secret, & verifies signature BEFORE DB writes.
  * 2. Enforces +-5 minute timestamp anti-replay window.
  * 3. Supports idempotency & retry tracking on booking_webhook_events (processing -> processed / failed).
- * 4. Verifies supplier provider identity against booking.provider_name.
- * 5. Verifies linked payment refund reconciliation before allowing Refunded.
+ * 4. Strictly rejects blank/direct/redirect bookings from supplier webhook confirmation.
+ * 5. Validates supplierPayload bookingId, amountPaise & currency consistency + linked refund reconciliation.
  */
 export async function POST(request: Request) {
-  const webhookSecret = process.env.BOOKING_PROVIDER_WEBHOOK_SECRET?.trim();
-  if (!webhookSecret) {
-    return NextResponse.json(
-      {
-        configured: false,
-        status: 'WAITING FOR SUPPLIER WEBHOOK CREDENTIALS',
-        missingCredential: 'BOOKING_PROVIDER_WEBHOOK_SECRET',
-      },
-      { status: 503 }
-    );
-  }
-
   const rawBody = await request.text();
-  const signature = request.headers.get('x-booking-signature') || request.headers.get('x-webhook-signature');
-  if (!verifyWebhookSignature(rawBody, signature, webhookSecret)) {
-    return NextResponse.json({ error: 'Invalid supplier webhook signature' }, { status: 401 });
-  }
-
-  const timestampHeader = request.headers.get('x-webhook-timestamp');
-  if (!validateWebhookTimestamp(timestampHeader)) {
-    return NextResponse.json(
-      { error: 'Missing or expired x-webhook-timestamp replay protection window' },
-      { status: 401 }
-    );
+  if (!rawBody) {
+    return NextResponse.json({ error: 'Empty webhook payload' }, { status: 400 });
   }
 
   let parsedBody: z.infer<typeof supplierWebhookSchema>;
@@ -90,6 +60,36 @@ export async function POST(request: Request) {
     parsedBody = parsed.data;
   } catch {
     return NextResponse.json({ error: 'Malformed JSON body' }, { status: 400 });
+  }
+
+  // Provider-specific secret resolution before touching Supabase
+  const { secret: webhookSecret, missingCredential } = resolveBookingWebhookSecret(parsedBody.provider);
+  if (!webhookSecret) {
+    return NextResponse.json(
+      {
+        configured: false,
+        status: 'WAITING FOR SUPPLIER WEBHOOK CREDENTIALS',
+        missingCredential,
+      },
+      { status: 503 }
+    );
+  }
+
+  const signature =
+    request.headers.get('x-booking-signature') ||
+    request.headers.get('x-razorpay-signature') ||
+    request.headers.get('x-webhook-signature');
+
+  if (!verifyWebhookSignature(rawBody, signature, webhookSecret)) {
+    return NextResponse.json({ error: 'Invalid supplier webhook signature' }, { status: 401 });
+  }
+
+  const timestampHeader = request.headers.get('x-webhook-timestamp');
+  if (!validateWebhookTimestamp(timestampHeader)) {
+    return NextResponse.json(
+      { error: 'Missing or expired x-webhook-timestamp replay protection window' },
+      { status: 401 }
+    );
   }
 
   const serviceRoleKey = getServerServiceRoleKey();
@@ -117,7 +117,6 @@ export async function POST(request: Request) {
     if (existingEvent.processing_status === 'processing') {
       return NextResponse.json({ error: 'Webhook delivery currently processing' }, { status: 409 });
     }
-    // Re-claim failed webhook delivery for safe retry
     const { data: claimedRetry } = await adminClient
       .from('booking_webhook_events')
       .update({
@@ -171,11 +170,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Target booking not found' }, { status: 404 });
     }
 
-    // Verify supplier identity against booking's configured provider
-    if (!doesWebhookProviderMatchBooking(parsedBody.provider, booking.provider_name as string | null)) {
-      const msg = `Supplier provider "${parsedBody.provider}" does not match booking configured supplier "${booking.provider_name || 'unknown'}".`;
+    // Strict supplier identity binding check (blocks blank/direct/external redirect bypass!)
+    const providerMatch = doesWebhookProviderMatchBooking(
+      parsedBody.provider,
+      booking.provider_name as string | null,
+      (booking.metadata as Record<string, unknown> | null) || null
+    );
+    if (!providerMatch.matched) {
+      const msg = providerMatch.reason || 'Supplier identity verification failed';
       await markEventFailed(msg);
       return NextResponse.json({ error: msg }, { status: 403 });
+    }
+
+    // Verify amount, currency, and bookingId assertions inside supplierPayload
+    const payloadConsistency = validateSupplierWebhookPayloadConsistency({
+      bookingId: String(booking.id),
+      expectedAmountPaise: Number(booking.amount_paise || 0),
+      expectedCurrency: String(booking.currency || 'INR'),
+      supplierPayload: parsedBody.supplierPayload,
+    });
+    if (!payloadConsistency.valid) {
+      await markEventFailed(payloadConsistency.reason || 'Payload consistency check failed');
+      return NextResponse.json({ error: payloadConsistency.reason }, { status: 422 });
     }
 
     const eventToStatus: Record<typeof parsedBody.eventType, BookingLifecycleStatus> = {
