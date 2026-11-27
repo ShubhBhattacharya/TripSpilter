@@ -159,6 +159,8 @@ export const PlatformTrustFooter: React.FC = () => {
               <li><Link href="/forgot-password" className="hover:text-white transition-colors">Reset Password</Link></li>
               <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
               <li><Link href="/terms" className="hover:text-white transition-colors">Terms &amp; Conditions</Link></li>
+              <li><Link href="/refunds" className="hover:text-white transition-colors">Refunds &amp; Cancellations</Link></li>
+              <li><Link href="/contact" className="hover:text-white transition-colors">Contact &amp; Grievance</Link></li>
             </ul>
           </div>
         </div>

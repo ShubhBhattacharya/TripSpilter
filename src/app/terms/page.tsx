@@ -23,6 +23,13 @@ export default function TermsPage() {
           </span>
         </div>
 
+        <div
+          role="status"
+          className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-900"
+        >
+          Draft — [TO BE REVIEWED BY COUNSEL BEFORE PUBLIC LAUNCH]
+        </div>
+
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#173B70]">
             TripSplitter Terms & Conditions
