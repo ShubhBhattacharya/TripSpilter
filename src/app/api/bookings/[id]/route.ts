@@ -46,6 +46,9 @@ export async function GET(
   if (!isSupabaseConfigured) {
     return NextResponse.json({ error: 'Loading booking history requires Supabase configuration' }, { status: 503 });
   }
+  if (!z.string().uuid().safeParse(bookingId).success) {
+    return NextResponse.json({ error: 'Invalid booking UUID' }, { status: 400 });
+  }
 
   try {
     const supabase = await createClient();
@@ -90,6 +93,9 @@ export async function PATCH(
   const { id: bookingId } = await params;
   if (!isSupabaseConfigured) {
     return NextResponse.json({ error: 'Updating bookings requires Supabase configuration' }, { status: 503 });
+  }
+  if (!z.string().uuid().safeParse(bookingId).success) {
+    return NextResponse.json({ error: 'Invalid booking UUID' }, { status: 400 });
   }
 
   try {

@@ -31,6 +31,10 @@ export async function GET(request: Request) {
       isDemo: true,
     });
   }
+  const { z: zod } = await import('zod');
+  if (!zod.string().uuid().safeParse(tripId).success) {
+    return NextResponse.json({ error: 'Invalid tripId UUID' }, { status: 400 });
+  }
 
   try {
     const supabase = await createClient();

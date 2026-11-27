@@ -42,6 +42,12 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const paymentOrderId = url.searchParams.get('paymentOrderId');
     const tripId = url.searchParams.get('tripId');
+    if (paymentOrderId && !z.string().uuid().safeParse(paymentOrderId).success) {
+      return NextResponse.json({ error: 'Invalid paymentOrderId UUID' }, { status: 400 });
+    }
+    if (tripId && !z.string().uuid().safeParse(tripId).success) {
+      return NextResponse.json({ error: 'Invalid tripId UUID' }, { status: 400 });
+    }
 
     const supabase = await createClient();
     const user = await requireAuthenticatedUser(supabase);

@@ -132,7 +132,20 @@ export async function POST(request: Request) {
         .select()
         .single();
 
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      if (error) {
+        if (error.code === '23505' && parsed.data.idempotencyKey) {
+          const { data: winningOrder } = await supabase
+            .from('payment_orders')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('idempotency_key', parsed.data.idempotencyKey)
+            .maybeSingle();
+          if (winningOrder) {
+            return NextResponse.json({ order: winningOrder, idempotentReplay: true });
+          }
+        }
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
       return NextResponse.json({ ...gatewayResult, order: dbOrder }, { status: 201 });
     }
 

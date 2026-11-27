@@ -51,18 +51,61 @@ export default function NotificationsPage() {
     };
   }, [user?.id]);
 
+  const markAsRead = async (id: string) => {
+    const prevSnapshot = notifications;
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    try {
+      const res = await fetch('/api/notifications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      if (!res.ok) {
+        setNotifications(prevSnapshot);
+        toast.error('Unable to mark notification as read.');
+      }
+    } catch {
+      setNotifications(prevSnapshot);
+      toast.error('Network error while updating notification.');
+    }
+  };
+
   const markAllAsRead = async () => {
+    const prevSnapshot = notifications;
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     try {
-      await fetch('/api/notifications', {
+      const res = await fetch('/api/notifications', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ markAll: true }),
       });
+      if (!res.ok) {
+        setNotifications(prevSnapshot);
+        toast.error('Failed to mark all notifications as read.');
+        return;
+      }
+      toast.success('All notifications marked as read');
     } catch {
-      // ignore if demo
+      setNotifications(prevSnapshot);
+      toast.error('Network error while updating notifications.');
     }
-    toast.success('All notifications marked as read');
+  };
+
+  const clearReadNotifications = async () => {
+    const prevSnapshot = notifications;
+    setNotifications((prev) => prev.filter((n) => !n.read));
+    try {
+      const res = await fetch('/api/notifications?clearRead=true', { method: 'DELETE' });
+      if (!res.ok) {
+        setNotifications(prevSnapshot);
+        toast.error('Failed to clear read notifications.');
+        return;
+      }
+      toast.success('Cleared read notifications');
+    } catch {
+      setNotifications(prevSnapshot);
+      toast.error('Network error while clearing notifications.');
+    }
   };
 
   const getIcon = (type?: NotificationItem['type']) => {
@@ -100,13 +143,24 @@ export default function NotificationsPage() {
             </div>
 
             {notifications.length > 0 && (
-              <button
-                type="button"
-                onClick={markAllAsRead}
-                className="text-xs font-semibold text-[#1685D4] hover:underline"
-              >
-                Mark all as read
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={markAllAsRead}
+                  className="text-xs font-semibold text-[#1685D4] hover:underline"
+                >
+                  Mark all as read
+                </button>
+                {notifications.some((n) => n.read) && (
+                  <button
+                    type="button"
+                    onClick={clearReadNotifications}
+                    className="text-xs font-semibold text-rose-600 hover:underline"
+                  >
+                    Clear read
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
@@ -151,7 +205,16 @@ export default function NotificationsPage() {
                     <p className="text-xs text-[#475569] mt-1 leading-relaxed">{item.message}</p>
                   </div>
                   {!item.read && (
-                    <span className="w-2 h-2 rounded-full bg-[#1685D4] shrink-0 mt-2" />
+                    <button
+                      type="button"
+                      onClick={() => markAsRead(item.id)}
+                      title="Mark notification as read"
+                      aria-label={`Mark ${item.title} as read`}
+                      className="text-[11px] font-semibold text-[#1685D4] hover:underline shrink-0 flex items-center gap-1.5 mt-0.5"
+                    >
+                      <span className="w-2 h-2 rounded-full bg-[#1685D4]" />
+                      <span>Read</span>
+                    </button>
                   )}
                 </div>
               ))}

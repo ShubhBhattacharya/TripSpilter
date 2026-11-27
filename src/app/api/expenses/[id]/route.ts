@@ -37,6 +37,9 @@ export async function PATCH(
   if (!isSupabaseConfigured) {
     return NextResponse.json({ error: 'Editing expenses requires Supabase configuration' }, { status: 503 });
   }
+  if (!z.string().uuid().safeParse(expenseId).success) {
+    return NextResponse.json({ error: 'Invalid expense UUID' }, { status: 400 });
+  }
 
   try {
     const body = await request.json();
@@ -198,6 +201,9 @@ export async function DELETE(
   const { id: expenseId } = await params;
   if (!isSupabaseConfigured) {
     return NextResponse.json({ error: 'Deleting expenses requires Supabase configuration' }, { status: 503 });
+  }
+  if (!z.string().uuid().safeParse(expenseId).success) {
+    return NextResponse.json({ error: 'Invalid expense UUID' }, { status: 400 });
   }
 
   try {

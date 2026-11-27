@@ -11,9 +11,12 @@ import {
   LogOut,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { upiIdRegex } from '../../lib/validations/api';
+
+const PERMS_STORAGE_KEY = 'tripsplit_user_permissions';
 
 export default function ProfileSettingsPage() {
-  const { user, profile, updateProfile, signOut } = useAuth();
+  const { user, profile, isConfigured, updateProfile, signOut } = useAuth();
 
   const [displayName, setDisplayName] = useState(
     profile?.display_name || user?.user_metadata?.full_name || (user?.email ? user.email.split('@')[0] : '')
@@ -45,7 +48,7 @@ export default function ProfileSettingsPage() {
     return () => clearTimeout(timer);
   }, [profile, user]);
 
-  // Privacy permissions state
+  // Privacy permissions state — hydrated from localStorage + /api/preferences when configured
   const [permissions, setPermissions] = useState({
     camera: true,
     notifications: true,
@@ -54,15 +57,68 @@ export default function ProfileSettingsPage() {
     location: false,
   });
 
-  const togglePermission = (key: keyof typeof permissions) => {
-    setPermissions((prev) => {
-      const updated = { ...prev, [key]: !prev[key] };
-      toast.success(`Permission "${key}" updated!`);
-      return updated;
-    });
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const saved = localStorage.getItem(PERMS_STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed === 'object') {
+            setPermissions((prev) => ({ ...prev, ...parsed }));
+          }
+        }
+      } catch {
+        // ignore storage errors
+      }
+    }, 0);
+
+    if (isConfigured && user) {
+      fetch('/api/preferences')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((json) => {
+          if (json?.preferences && typeof json.preferences.email_notifications === 'boolean') {
+            setPermissions((prev) => ({ ...prev, notifications: json.preferences.email_notifications }));
+          }
+        })
+        .catch(() => {});
+    }
+    return () => clearTimeout(timer);
+  }, [isConfigured, user]);
+
+  const togglePermission = async (key: keyof typeof permissions) => {
+    const nextVal = !permissions[key];
+    const updated = { ...permissions, [key]: nextVal };
+    setPermissions(updated);
+    try {
+      localStorage.setItem(PERMS_STORAGE_KEY, JSON.stringify(updated));
+    } catch {
+      // ignore storage quota errors
+    }
+
+    if (key === 'notifications' && isConfigured && user) {
+      try {
+        const res = await fetch('/api/preferences', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email_notifications: nextVal }),
+        });
+        if (!res.ok) {
+          toast.error('Saved locally, but failed to sync notification preference to server.');
+          return;
+        }
+      } catch {
+        toast.error('Saved locally, but network error prevented server sync.');
+        return;
+      }
+    }
+    toast.success(`Preference "${key}" updated.`);
   };
 
   const handleCopyUpi = () => {
+    if (!upiId.trim()) {
+      toast.error('Enter a UPI ID first.');
+      return;
+    }
     navigator.clipboard.writeText(upiId);
     setCopiedUpi(true);
     toast.success('UPI ID copied to clipboard!');
@@ -71,14 +127,29 @@ export default function ProfileSettingsPage() {
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanName = displayName.trim();
+    const cleanUpi = upiId.trim().toLowerCase();
+    if (cleanName.length < 2) {
+      toast.error('Display name must be at least 2 characters.');
+      return;
+    }
+    if (!upiIdRegex.test(cleanUpi)) {
+      toast.error('Enter a valid UPI ID (e.g. yourname@okhdfcbank or number@paytm).');
+      return;
+    }
+
     setIsSaving(true);
     const success = await updateProfile({
-      displayName: displayName.trim(),
-      upiId: upiId.trim().toLowerCase(),
+      displayName: cleanName,
+      upiId: cleanUpi,
     });
     setIsSaving(false);
     if (success) {
-      toast.success('Profile and UPI settings saved successfully! 🚀');
+      toast.success(
+        isConfigured
+          ? 'Profile and UPI settings synced to Supabase!'
+          : 'Profile & UPI updated in local preview mode.'
+      );
     } else {
       toast.error('Failed to save profile. Check connection.');
     }

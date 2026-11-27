@@ -135,15 +135,24 @@ export async function POST(request: Request) {
         .eq('provider_order_id', paymentEntity.order_id)
         .maybeSingle();
 
-      if (
-        existingOrder &&
-        eventType === 'payment.captured' &&
-        typeof paymentEntity.amount === 'number' &&
-        paymentEntity.amount < Number(existingOrder.amount_paise)
-      ) {
-        const msg = `Captured payment amount (${paymentEntity.amount} paise) is less than order amount (${existingOrder.amount_paise} paise).`;
-        await markFailed(msg);
-        return NextResponse.json({ error: msg }, { status: 422 });
+      if (existingOrder && eventType === 'payment.captured') {
+        const expectedCurrency = String(existingOrder.currency || 'INR').trim().toUpperCase();
+        const payloadCurrency = paymentEntity.currency
+          ? String(paymentEntity.currency).trim().toUpperCase()
+          : '';
+        if (payloadCurrency && payloadCurrency !== expectedCurrency) {
+          const msg = `Captured payment currency (${payloadCurrency}) does not match order currency (${expectedCurrency}).`;
+          await markFailed(msg);
+          return NextResponse.json({ error: msg }, { status: 422 });
+        }
+        if (
+          typeof paymentEntity.amount === 'number' &&
+          paymentEntity.amount < Number(existingOrder.amount_paise)
+        ) {
+          const msg = `Captured payment amount (${paymentEntity.amount} paise) is less than order amount (${existingOrder.amount_paise} paise).`;
+          await markFailed(msg);
+          return NextResponse.json({ error: msg }, { status: 422 });
+        }
       }
 
       const newOrderStatus =

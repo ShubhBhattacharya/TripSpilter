@@ -34,6 +34,9 @@ export async function GET(request: Request) {
 
     const convId = new URL(request.url).searchParams.get('conversationId');
     if (convId) {
+      if (!z.string().uuid().safeParse(convId).success) {
+        return NextResponse.json({ error: 'Invalid conversationId UUID' }, { status: 400 });
+      }
       const { data: messages, error } = await supabase
         .from('ai_messages')
         .select('*')
@@ -103,7 +106,7 @@ export async function POST(request: Request) {
         preferredProvider: parsed.data.preferredProvider,
         tripId: parsed.data.tripId,
         currentPath: parsed.data.currentPath,
-        allowPaidLlm: Boolean(userId || !isSupabaseConfigured),
+        allowPaidLlm: Boolean(userId),
       },
       { userId, supabase: supabaseClient }
     );

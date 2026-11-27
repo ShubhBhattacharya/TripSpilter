@@ -79,6 +79,9 @@ export async function DELETE(request: Request) {
 
     let query = supabase.from('notifications').delete().eq('user_id', user.id);
     if (id) {
+      if (!z.string().uuid().safeParse(id).success) {
+        return NextResponse.json({ error: 'Invalid notification id UUID' }, { status: 400 });
+      }
       query = query.eq('id', id);
     } else if (clearRead) {
       query = query.eq('read', true);

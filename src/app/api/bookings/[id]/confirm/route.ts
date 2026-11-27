@@ -38,6 +38,9 @@ export async function POST(
   if (!isSupabaseConfigured) {
     return NextResponse.json({ error: 'Booking confirmation requires Supabase configuration' }, { status: 503 });
   }
+  if (!z.string().uuid().safeParse(bookingId).success) {
+    return NextResponse.json({ error: 'Invalid booking UUID' }, { status: 400 });
+  }
 
   try {
     const rawBody = (await request.json()) as Record<string, unknown>;

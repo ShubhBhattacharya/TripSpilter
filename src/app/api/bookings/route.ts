@@ -28,6 +28,9 @@ export async function GET(request: Request) {
   const tripId = new URL(request.url).searchParams.get('tripId');
   if (!tripId) return NextResponse.json({ error: 'tripId is required' }, { status: 400 });
   if (!isSupabaseConfigured) return NextResponse.json({ bookings: [], configured: false });
+  if (!z.string().uuid().safeParse(tripId).success) {
+    return NextResponse.json({ error: 'Invalid tripId UUID' }, { status: 400 });
+  }
 
   try {
     const supabase = await createClient();
