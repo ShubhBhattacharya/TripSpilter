@@ -268,7 +268,7 @@ describe('Phase 8 Security, Provider Binding, Complete RLS & Invitation Tests', 
   it('Phase 8 migration fixes trip_members invite escalation and completes RLS policies across core tables', () => {
     const sqlPath = path.join(
       process.cwd(),
-      'supabase/migrations/20261127_phase8_complete_rls_and_webhook_hardening.sql'
+      'supabase/migrations/20261127000003_phase8_complete_rls_and_webhook_hardening.sql'
     );
     const sql = fs.readFileSync(sqlPath, 'utf8');
 

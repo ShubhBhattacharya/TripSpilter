@@ -26,8 +26,8 @@ export default function MyTripsPage() {
   const router = useRouter();
   const { isConfigured } = useAuth();
 
-  const isDemoMode = !isConfigured || process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
-  const [trips, setTrips] = useState<Trip[]>(() => (isDemoMode && !isConfigured ? mockTrips : []));
+  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true' && !isConfigured;
+  const [trips, setTrips] = useState<Trip[]>(() => (isDemoMode ? mockTrips : []));
   const [loading, setLoading] = useState<boolean>(isConfigured);
   const [selectedStatus, setSelectedStatus] = useState<'ALL' | 'ACTIVE' | 'UPCOMING' | 'COMPLETED'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -302,27 +302,79 @@ export default function MyTripsPage() {
       <CreateTripModal
         isOpen={isCreateTripOpen}
         onClose={() => setIsCreateTripOpen(false)}
-        onCreate={(tripData) => {
-          const newTrip: Trip = {
-            id: `trip-${Date.now()}`,
-            title: tripData.title,
-            tagline: `Exploring ${tripData.destination}`,
-            destination: tripData.destination,
-            coverImage: 'https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?auto=format&fit=crop&w=1200&q=80',
-            startDate: tripData.startDate,
-            endDate: tripData.endDate,
-            budget: tripData.budget,
-            totalSpend: 0,
-            status: 'ACTIVE',
-            members: defaultMembers,
-            itinerary: [],
-            polls: [],
-            bookings: [],
-            vendorSplits: [],
-            debts: [],
-          };
-          setTrips((prev) => [newTrip, ...prev]);
-          toast.success(`Trip "${tripData.title}" created! 🚀`);
+        onCreate={async (tripData) => {
+          const coverImage =
+            'https://images.unsplash.com/photo-1626621341517-bbf3d9990a23?auto=format&fit=crop&w=1200&q=80';
+
+          if (!isConfigured) {
+            if (process.env.NEXT_PUBLIC_DEMO_MODE !== 'true') {
+              toast.error('Trip persistence requires live Supabase configuration.');
+              return;
+            }
+            const demoTrip: Trip = {
+              id: `trip-local-${Date.now()}`,
+              title: tripData.title,
+              tagline: `Exploring ${tripData.destination} (Local Demo)`,
+              destination: tripData.destination,
+              coverImage,
+              startDate: tripData.startDate,
+              endDate: tripData.endDate,
+              budget: tripData.budget,
+              totalSpend: 0,
+              status: 'ACTIVE',
+              members: defaultMembers,
+              itinerary: [],
+              polls: [],
+              bookings: [],
+              vendorSplits: [],
+              debts: [],
+            };
+            setTrips((prev) => [demoTrip, ...prev]);
+            toast.success(`Trip "${tripData.title}" created in local dev demo mode.`);
+            return;
+          }
+
+          try {
+            const res = await fetch('/api/trips', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                title: tripData.title,
+                destination: tripData.destination,
+                startDate: tripData.startDate,
+                endDate: tripData.endDate,
+                budget: tripData.budget,
+                coverImage,
+              }),
+            });
+            const data = await res.json();
+            if (!res.ok || !data.trip) {
+              toast.error(data.error || 'Failed to save trip to PostgreSQL.');
+              return;
+            }
+            const savedTrip: Trip = {
+              id: data.trip.id,
+              title: data.trip.title || tripData.title,
+              tagline: `Exploring ${data.trip.destination || tripData.destination}`,
+              destination: data.trip.destination || tripData.destination,
+              coverImage: data.trip.cover_image || coverImage,
+              startDate: data.trip.start_date || tripData.startDate,
+              endDate: data.trip.end_date || tripData.endDate,
+              budget: Number(data.trip.budget ?? tripData.budget),
+              totalSpend: 0,
+              status: data.trip.status || 'ACTIVE',
+              members: defaultMembers,
+              itinerary: [],
+              polls: [],
+              bookings: [],
+              vendorSplits: [],
+              debts: [],
+            };
+            setTrips((prev) => [savedTrip, ...prev]);
+            toast.success(`Trip "${savedTrip.title}" saved to PostgreSQL!`);
+          } catch {
+            toast.error('Network error while saving trip.');
+          }
         }}
       />
 
