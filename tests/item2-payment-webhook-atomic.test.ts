@@ -225,7 +225,7 @@ describe('Item 2: Atomic transactional payment webhook + 503 fail-closed + stale
   it('defines process_payment_webhook RPC restricted to service_role with 5-minute stale reclaim', () => {
     const rpcMigration = path.resolve(
       process.cwd(),
-      'supabase/migrations/20261127100002_payment_webhook_transaction_rpc.sql'
+      'supabase/migrations/20261128000002_payment_webhook_transaction_rpc.sql'
     );
     expect(fs.existsSync(rpcMigration)).toBe(true);
     const sql = fs.readFileSync(rpcMigration, 'utf8');
