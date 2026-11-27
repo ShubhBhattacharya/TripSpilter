@@ -12,6 +12,8 @@ import {
 import { evaluateMemberRemovalSafety } from '../../../../../lib/financial/split-engine';
 import { recordTripActivity } from '../../../../../lib/notifications/server';
 
+const uuidSchema = z.string().uuid();
+
 const rolePatchSchema = z.object({
   memberUserId: z.string().uuid(),
   role: z.enum(['member', 'admin']),
@@ -24,6 +26,9 @@ export async function GET(
   const { id: tripId } = await params;
   if (!isSupabaseConfigured) {
     return NextResponse.json({ error: 'Supabase configuration required', configured: false }, { status: 503 });
+  }
+  if (!uuidSchema.safeParse(tripId).success) {
+    return NextResponse.json({ error: 'Invalid trip UUID' }, { status: 400 });
   }
 
   try {
@@ -53,6 +58,9 @@ export async function PATCH(
   if (!isSupabaseConfigured) {
     return NextResponse.json({ error: 'Supabase configuration required' }, { status: 503 });
   }
+  if (!uuidSchema.safeParse(tripId).success) {
+    return NextResponse.json({ error: 'Invalid trip UUID' }, { status: 400 });
+  }
 
   try {
     const body = await request.json();
@@ -64,6 +72,27 @@ export async function PATCH(
     const supabase = await createClient();
     const user = await requireAuthenticatedUser(supabase);
     await requireTripAdmin(supabase, tripId, user.id);
+
+    if (parsed.data.role === 'member') {
+      const { data: currentMembers } = await supabase
+        .from('trip_members')
+        .select('user_id, role')
+        .eq('trip_id', tripId);
+
+      const targetMember = (currentMembers || []).find((m) => String(m.user_id) === parsed.data.memberUserId);
+      if (!targetMember) {
+        return NextResponse.json({ error: 'Member not found in trip' }, { status: 404 });
+      }
+      const otherAdmins = (currentMembers || []).filter(
+        (m) => String(m.role) === 'admin' && String(m.user_id) !== parsed.data.memberUserId
+      );
+      if (String(targetMember.role) === 'admin' && otherAdmins.length === 0) {
+        return NextResponse.json(
+          { error: 'Cannot demote the last remaining trip admin. Promote another member to admin first.' },
+          { status: 409 }
+        );
+      }
+    }
 
     const { data, error } = await supabase
       .from('trip_members')
@@ -92,9 +121,15 @@ export async function DELETE(
   if (!isSupabaseConfigured) {
     return NextResponse.json({ error: 'Supabase configuration required' }, { status: 503 });
   }
+  if (!uuidSchema.safeParse(tripId).success) {
+    return NextResponse.json({ error: 'Invalid trip UUID' }, { status: 400 });
+  }
 
   try {
     const targetMemberId = new URL(request.url).searchParams.get('userId');
+    if (targetMemberId && !uuidSchema.safeParse(targetMemberId).success) {
+      return NextResponse.json({ error: 'Invalid target userId UUID' }, { status: 400 });
+    }
     const supabase = await createClient();
     const user = await requireAuthenticatedUser(supabase);
 
@@ -108,10 +143,24 @@ export async function DELETE(
     }
 
     const [{ data: members }, { data: expenses }, { data: settlements }] = await Promise.all([
-      supabase.from('trip_members').select('user_id').eq('trip_id', tripId),
+      supabase.from('trip_members').select('user_id, role').eq('trip_id', tripId),
       supabase.from('expenses').select('id, paid_by, total_amount, expense_splits(user_id, amount_owed, status)').eq('trip_id', tripId),
       supabase.from('settlements').select('id, from_user_id, to_user_id, amount, status').eq('trip_id', tripId),
     ]);
+
+    const targetRow = (members || []).find((m) => String(m.user_id) === memberIdToRemove);
+    if (!targetRow) {
+      return NextResponse.json({ error: 'Member not found in trip' }, { status: 404 });
+    }
+    const remainingAdmins = (members || []).filter(
+      (m) => String(m.role) === 'admin' && String(m.user_id) !== memberIdToRemove
+    );
+    if (String(targetRow.role) === 'admin' && remainingAdmins.length === 0) {
+      return NextResponse.json(
+        { error: 'The last remaining trip admin cannot leave or be removed without appointing another admin first.' },
+        { status: 409 }
+      );
+    }
 
     const safety = evaluateMemberRemovalSafety({
       memberIdToRemove,

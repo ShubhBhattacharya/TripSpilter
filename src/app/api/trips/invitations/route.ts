@@ -27,6 +27,9 @@ export async function GET(request: Request) {
   if (!isSupabaseConfigured) {
     return NextResponse.json({ invitations: [], configured: false });
   }
+  if (!z.string().uuid().safeParse(tripId).success) {
+    return NextResponse.json({ error: 'Invalid tripId UUID' }, { status: 400 });
+  }
 
   try {
     const supabase = await createClient();

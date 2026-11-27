@@ -62,8 +62,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Malformed JSON body' }, { status: 400 });
   }
 
+  const canonicalProvider = parsedBody.provider.trim().toLowerCase();
+
   // Provider-specific secret resolution before touching Supabase
-  const { secret: webhookSecret, missingCredential } = resolveBookingWebhookSecret(parsedBody.provider);
+  const { secret: webhookSecret, missingCredential } = resolveBookingWebhookSecret(canonicalProvider);
   if (!webhookSecret) {
     return NextResponse.json(
       {
@@ -106,7 +108,7 @@ export async function POST(request: Request) {
   const { data: existingEvent } = await adminClient
     .from('booking_webhook_events')
     .select('id, processing_status, retry_count')
-    .eq('provider', parsedBody.provider)
+    .eq('provider', canonicalProvider)
     .eq('event_id', parsedBody.eventId)
     .maybeSingle();
 
@@ -134,7 +136,7 @@ export async function POST(request: Request) {
     }
   } else {
     const { error: replayErr } = await adminClient.from('booking_webhook_events').insert({
-      provider: parsedBody.provider,
+      provider: canonicalProvider,
       event_id: parsedBody.eventId,
       event_type: parsedBody.eventType,
       signature_verified: true,
@@ -154,7 +156,7 @@ export async function POST(request: Request) {
     await adminClient
       .from('booking_webhook_events')
       .update({ processing_status: 'failed', last_error: reason.slice(0, 300) })
-      .eq('provider', parsedBody.provider)
+      .eq('provider', canonicalProvider)
       .eq('event_id', parsedBody.eventId);
   };
 
@@ -172,7 +174,7 @@ export async function POST(request: Request) {
 
     // Strict supplier identity binding check (blocks blank/direct/external redirect bypass!)
     const providerMatch = doesWebhookProviderMatchBooking(
-      parsedBody.provider,
+      canonicalProvider,
       booking.provider_name as string | null,
       (booking.metadata as Record<string, unknown> | null) || null
     );
@@ -283,13 +285,13 @@ export async function POST(request: Request) {
       new_status: targetStatus,
       source: 'webhook',
       supplier_ref: parsedBody.providerConfirmationRef || null,
-      notes: `Verified supplier webhook event ${parsedBody.eventId} (${parsedBody.provider})`,
+      notes: `Verified supplier webhook event ${parsedBody.eventId} (${canonicalProvider})`,
     });
 
     await adminClient
       .from('booking_webhook_events')
       .update({ processing_status: 'processed', last_error: null })
-      .eq('provider', parsedBody.provider)
+      .eq('provider', canonicalProvider)
       .eq('event_id', parsedBody.eventId);
 
     return NextResponse.json({ received: true, verified: true, booking: updated });

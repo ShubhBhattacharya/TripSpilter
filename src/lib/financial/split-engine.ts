@@ -507,6 +507,25 @@ export function evaluateMemberRemovalSafety(params: {
     };
   }
 
+  const OPEN_SETTLEMENT_STATUSES = [
+    'pending',
+    'payment_initiated',
+    'awaiting_confirmation',
+    'manually_reported_paid',
+  ];
+  const hasOpenSettlement = params.settlements.some(
+    (st) =>
+      (st.fromUserId === params.memberIdToRemove || st.toUserId === params.memberIdToRemove) &&
+      OPEN_SETTLEMENT_STATUSES.includes(st.status)
+  );
+  if (hasOpenSettlement) {
+    return {
+      canRemoveSafely: false,
+      outstandingNetRupees: 0,
+      reason: 'Member has an active or unverified settlement in progress — verify or resolve it before removing.',
+    };
+  }
+
   return { canRemoveSafely: true, outstandingNetRupees: 0 };
 }
 

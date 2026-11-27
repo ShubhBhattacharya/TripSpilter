@@ -34,10 +34,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429, headers });
     }
 
-    // Extract code if full invite link was pasted
+    // Extract code cleanly even when a trailing slash or ?code=... invite URL is pasted
     const rawInput = parsed.data.inviteCode.trim();
-    const codeMatch = rawInput.match(/code=([A-Za-z0-9_-]+)/i);
-    const cleanedCode = (codeMatch ? codeMatch[1] : rawInput.split('/').pop() || rawInput).trim().toUpperCase();
+    const codeMatch = rawInput.match(/[?&]code=([A-Za-z0-9_-]+)/i) || rawInput.match(/^code=([A-Za-z0-9_-]+)/i);
+    const pathSegment = rawInput.split('?')[0].split('/').filter(Boolean).pop() || rawInput;
+    const cleanedCode = (codeMatch ? codeMatch[1] : pathSegment).trim().toUpperCase();
 
     const { data, error } = await supabase.rpc('accept_trip_invitation', {
       p_invite_code: cleanedCode,
