@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
 import { createClient } from '../../../../lib/supabase/server';
 import { isSupabaseConfigured } from '../../../../lib/supabase/client';
+import { getServerServiceRoleKey, isValidSupabaseConfig } from '../../../../lib/config/env';
 import {
   requireAuthenticatedUser,
   requireTripMembership,
@@ -120,7 +122,21 @@ export async function POST(request: Request) {
     }
 
     const idempotencyKey = headerIdemKey || parsed.data.idempotencyKey;
+    const serviceRoleKey = getServerServiceRoleKey();
+    if (!isValidSupabaseConfig() || !serviceRoleKey) {
+      return NextResponse.json(
+        {
+          error:
+            'Refunds BLOCKED: server SUPABASE_SERVICE_ROLE_KEY is required to run trusted provider refund finalization.',
+          status: 'blocked_missing_service_role',
+          missingCredential: 'SUPABASE_SERVICE_ROLE_KEY',
+        },
+        { status: 503 }
+      );
+    }
+
     const supabase = await createClient();
+    const adminClient = createSupabaseAdmin(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey);
     const user = await requireAuthenticatedUser(supabase);
 
     const rl = await checkRateLimit(getClientIdentifier('payment_refund', request, user.id), 10, 60000);
@@ -244,7 +260,7 @@ export async function POST(request: Request) {
       });
     } catch (gatewayErr) {
       const errMsg = gatewayErr instanceof Error ? gatewayErr.message : 'Provider call failed';
-      await supabase.rpc('finalize_payment_refund', {
+      await adminClient.rpc('finalize_payment_refund', {
         p_refund_id: refundId,
         p_new_status: 'failed',
         p_provider_refund_id: null,
@@ -255,7 +271,7 @@ export async function POST(request: Request) {
     }
 
     if (!gatewayRefund.configured) {
-      await supabase.rpc('finalize_payment_refund', {
+      await adminClient.rpc('finalize_payment_refund', {
         p_refund_id: refundId,
         p_new_status: 'waiting_for_credentials',
         p_provider_refund_id: null,
@@ -265,8 +281,37 @@ export async function POST(request: Request) {
       return NextResponse.json({ refundId, ...gatewayRefund }, { status: 503, headers });
     }
 
-    // 4. Reconcile provider refund result back into Postgres
-    const { data: finalizedRow, error: finalizeErr } = await supabase.rpc('finalize_payment_refund', {
+    // 4. Independently verify provider refund response identity & amount before finalizing
+    const rawResp = gatewayRefund.rawResponse || {};
+    const respPaymentId = rawResp.payment_id ? String(rawResp.payment_id) : null;
+    const respAmountPaise = typeof rawResp.amount === 'number' ? rawResp.amount : null;
+
+    if (
+      !gatewayRefund.providerRefundId ||
+      (respPaymentId && respPaymentId !== order.provider_payment_id) ||
+      (respAmountPaise !== null && respAmountPaise !== refundPaise)
+    ) {
+      const mismatchMsg = `Provider refund response mismatch (expected payment ${order.provider_payment_id} / ${refundPaise} paise, got ${respPaymentId || 'none'} / ${respAmountPaise ?? 'none'}).`;
+      await adminClient.rpc('finalize_payment_refund', {
+        p_refund_id: refundId,
+        p_new_status: 'reconciliation_required',
+        p_provider_refund_id: gatewayRefund.providerRefundId || null,
+        p_error_message: mismatchMsg,
+        p_reconciliation_status: 'provider_db_mismatch',
+      });
+      return NextResponse.json(
+        {
+          error: mismatchMsg,
+          reconciliationRequired: true,
+          refundId,
+          providerRefundId: gatewayRefund.providerRefundId,
+        },
+        { status: 502, headers }
+      );
+    }
+
+    // 5. Finalize refund strictly via trusted server service_role client
+    const { data: finalizedRow, error: finalizeErr } = await adminClient.rpc('finalize_payment_refund', {
       p_refund_id: refundId,
       p_new_status: gatewayRefund.status,
       p_provider_refund_id: gatewayRefund.providerRefundId,

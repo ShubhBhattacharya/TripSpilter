@@ -314,8 +314,8 @@ BEGIN
   REVOKE ALL ON FUNCTION public.reserve_payment_refund(UUID, BIGINT, TEXT, TEXT) FROM PUBLIC, anon;
   GRANT EXECUTE ON FUNCTION public.reserve_payment_refund(UUID, BIGINT, TEXT, TEXT) TO authenticated;
 
-  REVOKE ALL ON FUNCTION public.finalize_payment_refund(UUID, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC, anon;
-  GRANT EXECUTE ON FUNCTION public.finalize_payment_refund(UUID, TEXT, TEXT, TEXT, TEXT) TO authenticated;
+  REVOKE ALL ON FUNCTION public.finalize_payment_refund(UUID, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC, anon, authenticated;
+  GRANT EXECUTE ON FUNCTION public.finalize_payment_refund(UUID, TEXT, TEXT, TEXT, TEXT) TO service_role;
 EXCEPTION
   WHEN undefined_function THEN NULL;
 END $$;

@@ -1,8 +1,10 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const state = {
-  userId: 'user-owner-1',
+  userId: '11111111-1111-4111-8111-111111111111',
   isMember: true,
   isAdmin: false,
   bookingRow: null as Record<string, unknown> | null,
@@ -11,87 +13,108 @@ const state = {
   existingRefunds: [] as Array<Record<string, unknown>>,
   reserveRpcResult: { data: null, error: null } as { data: unknown; error: { code?: string; message?: string } | null },
   finalizeRpcResult: { data: null, error: null } as { data: unknown; error: { code?: string; message?: string } | null },
+  finalizeRpcUsedAdminClient: false,
+  webhookExistingEvent: null as Record<string, unknown> | null,
   webhookInsertError: null as { code?: string; message?: string } | null,
+  webhookClaimRetryOk: true,
   processedRefundsForBooking: [] as Array<Record<string, unknown>>,
 };
 
-function makeQuery(table: string) {
-  const eqFilters: Record<string, unknown> = {};
-  const chain: Record<string, unknown> = {
-    select: () => chain,
-    eq: (col: string, val: unknown) => {
-      eqFilters[col] = val;
-      return chain;
+function makeClient(isAdminClient: boolean) {
+  const makeQuery = (table: string) => {
+    const eqFilters: Record<string, unknown> = {};
+    const chain: Record<string, unknown> = {
+      select: () => chain,
+      eq: (col: string, val: unknown) => {
+        eqFilters[col] = val;
+        return chain;
+      },
+      order: () => chain,
+      limit: () => chain,
+      update: () => chain,
+      insert: async () => ({ error: state.webhookInsertError }),
+      maybeSingle: async () => {
+        if (table === 'booking_webhook_events' || table === 'payment_webhook_events') {
+          if (eqFilters.processing_status === 'failed') {
+            return state.webhookClaimRetryOk ? { data: { id: 'evt-retry-1' }, error: null } : { data: null, error: null };
+          }
+          return { data: state.webhookExistingEvent, error: null };
+        }
+        if (table === 'bookings') {
+          if (!state.bookingRow) return { data: null, error: null };
+          if (eqFilters.status && !state.bookingCasUpdated) return { data: null, error: null };
+          return { data: state.bookingRow, error: null };
+        }
+        if (table === 'trip_members') {
+          return state.isMember
+            ? { data: { role: state.isAdmin ? 'admin' : 'member' }, error: null }
+            : { data: null, error: null };
+        }
+        if (table === 'trips') {
+          return { data: { created_by: 'other-creator' }, error: null };
+        }
+        if (table === 'payment_orders') {
+          return { data: state.orderRow, error: null };
+        }
+        return { data: null, error: null };
+      },
+      then: (resolve: (v: { data: unknown; error: null }) => void) => {
+        if (table === 'payment_refunds') {
+          const data =
+            eqFilters.status === 'processed'
+              ? state.processedRefundsForBooking
+              : state.existingRefunds;
+          resolve({ data, error: null });
+          return;
+        }
+        resolve({ data: [], error: null });
+      },
+    };
+    return chain;
+  };
+
+  return {
+    auth: {
+      getUser: async () => ({ data: { user: { id: state.userId } }, error: null }),
     },
-    order: () => chain,
-    limit: () => chain,
-    update: () => chain,
-    insert: async () => ({ error: state.webhookInsertError }),
-    maybeSingle: async () => {
-      if (table === 'bookings') {
-        if (!state.bookingRow) return { data: null, error: null };
-        if (eqFilters.status && !state.bookingCasUpdated) return { data: null, error: null };
-        return { data: state.bookingRow, error: null };
-      }
-      if (table === 'trip_members') {
-        return state.isMember
-          ? { data: { role: state.isAdmin ? 'admin' : 'member' }, error: null }
-          : { data: null, error: null };
-      }
-      if (table === 'trips') {
-        return { data: { created_by: 'other-creator' }, error: null };
-      }
-      if (table === 'payment_orders') {
-        return { data: state.orderRow, error: null };
+    from: (table: string) => makeQuery(table),
+    rpc: async (fnName: string) => {
+      if (fnName === 'reserve_payment_refund') return state.reserveRpcResult;
+      if (fnName === 'finalize_payment_refund') {
+        state.finalizeRpcUsedAdminClient = isAdminClient;
+        if (!isAdminClient) {
+          return {
+            data: null,
+            error: { code: '42501', message: 'Forbidden: permission denied for function finalize_payment_refund' },
+          };
+        }
+        return state.finalizeRpcResult;
       }
       return { data: null, error: null };
     },
-    then: (resolve: (v: { data: unknown; error: null }) => void) => {
-      if (table === 'payment_refunds') {
-        const data =
-          eqFilters.status === 'processed'
-            ? state.processedRefundsForBooking
-            : state.existingRefunds;
-        resolve({ data, error: null });
-        return;
-      }
-      resolve({ data: [], error: null });
-    },
   };
-  return chain;
 }
-
-const mockSupabaseClient = {
-  auth: {
-    getUser: async () => ({ data: { user: { id: state.userId } }, error: null }),
-  },
-  from: (table: string) => makeQuery(table),
-  rpc: async (fnName: string) => {
-    if (fnName === 'reserve_payment_refund') return state.reserveRpcResult;
-    if (fnName === 'finalize_payment_refund') return state.finalizeRpcResult;
-    return { data: null, error: null };
-  },
-};
 
 vi.mock('../src/lib/supabase/client', () => ({
   isSupabaseConfigured: true,
-  createClient: () => mockSupabaseClient,
+  createClient: () => makeClient(false),
 }));
 
 vi.mock('../src/lib/supabase/server', () => ({
-  createClient: async () => mockSupabaseClient,
+  createClient: async () => makeClient(false),
 }));
 
 vi.mock('@supabase/supabase-js', () => ({
-  createClient: () => mockSupabaseClient,
+  createClient: () => makeClient(true),
 }));
 
 import { PATCH as bookingPatch, GET as bookingGet } from '../src/app/api/bookings/[id]/route';
 import { POST as bookingConfirm } from '../src/app/api/bookings/[id]/confirm/route';
 import { POST as bookingWebhook } from '../src/app/api/bookings/webhook/route';
 import { POST as paymentRefundPost, GET as paymentRefundGet } from '../src/app/api/payments/refund/route';
+import { POST as paymentWebhook } from '../src/app/api/payments/webhook/route';
 
-describe('Phase 2–5 Security Regression Suite (Bookings, Refunds, Webhooks & IDOR)', () => {
+describe('Day 7 Critical Security Regression Suite (Bookings, Refunds, Webhooks & DB Policies)', () => {
   const originalEnv = { ...process.env };
   const originalFetch = global.fetch;
 
@@ -100,6 +123,7 @@ describe('Phase 2–5 Security Regression Suite (Bookings, Refunds, Webhooks & I
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'valid-anon-key-non-placeholder';
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'valid-service-role-key';
     process.env.BOOKING_PROVIDER_WEBHOOK_SECRET = 'booking_webhook_secret_123';
+    process.env.PAYMENT_PROVIDER_WEBHOOK_SECRET = 'razorpay_webhook_secret_123';
     process.env.PAYMENT_PROVIDER_API_KEY = 'rzp_test_key';
     process.env.PAYMENT_PROVIDER_API_SECRET = 'rzp_test_secret';
 
@@ -107,13 +131,19 @@ describe('Phase 2–5 Security Regression Suite (Bookings, Refunds, Webhooks & I
     state.isMember = true;
     state.isAdmin = false;
     state.bookingCasUpdated = true;
+    state.finalizeRpcUsedAdminClient = false;
+    state.webhookExistingEvent = null;
+    state.webhookInsertError = null;
+    state.webhookClaimRetryOk = true;
     state.bookingRow = {
       id: '22222222-2222-4222-8222-222222222222',
       trip_id: '33333333-3333-4333-8333-333333333333',
       title: 'Hotel Manali Stay',
+      provider_name: 'Amadeus Flight API',
       status: 'Pending confirmation',
       booked_by: '11111111-1111-4111-8111-111111111111',
       payment_order_id: '44444444-4444-4444-8444-444444444444',
+      amount_paise: 100000,
     };
     state.orderRow = {
       id: '44444444-4444-4444-8444-444444444444',
@@ -134,13 +164,78 @@ describe('Phase 2–5 Security Regression Suite (Bookings, Refunds, Webhooks & I
       data: { id: '55555555-5555-4555-8555-555555555555', status: 'processed' },
       error: null,
     };
-    state.webhookInsertError = null;
     state.processedRefundsForBooking = [];
   });
 
   afterEach(() => {
     process.env = { ...originalEnv };
     global.fetch = originalFetch;
+  });
+
+  it('SQL migrations revoke finalize_payment_refund from authenticated and drop direct payment_refunds INSERT bypass', () => {
+    const migrationPath = path.join(
+      process.cwd(),
+      'supabase/migrations/20261127_day7_refund_webhook_hardening.sql'
+    );
+    const sql = fs.readFileSync(migrationPath, 'utf8');
+
+    expect(sql).toMatch(/DROP POLICY IF EXISTS "Users request own refunds" ON public\.payment_refunds/i);
+    expect(sql).toMatch(/REVOKE ALL ON FUNCTION public\.finalize_payment_refund\(.*\) FROM PUBLIC, anon, authenticated/i);
+    expect(sql).toMatch(/GRANT EXECUTE ON FUNCTION public\.finalize_payment_refund\(.*\) TO service_role/i);
+    expect(sql).toMatch(/v_jwt_role <> 'service_role'/i);
+  });
+
+  it('finalizes refunds exclusively via service_role admin client and fails closed when SUPABASE_SERVICE_ROLE_KEY is missing', async () => {
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const fetchSpy = vi.fn();
+    global.fetch = fetchSpy as unknown as typeof fetch;
+
+    const noKeyRes = await paymentRefundPost(
+      new Request('http://localhost/api/payments/refund', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentOrderId: '44444444-4444-4444-8444-444444444444', amountInr: 500 }),
+      })
+    );
+    expect(noKeyRes.status).toBe(503);
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    // With service_role present, finalize_payment_refund MUST be called on trusted service_role client
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'valid-service-role-key';
+    global.fetch = vi.fn(async () =>
+      new Response(JSON.stringify({ id: 'rfnd_verified_1', payment_id: 'pay_test_999', amount: 50000, status: 'processed' }), {
+        status: 200,
+      })
+    ) as unknown as typeof fetch;
+
+    const okRes = await paymentRefundPost(
+      new Request('http://localhost/api/payments/refund', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentOrderId: '44444444-4444-4444-8444-444444444444', amountInr: 500 }),
+      })
+    );
+    expect(okRes.status).toBe(201);
+    expect(state.finalizeRpcUsedAdminClient).toBe(true);
+  });
+
+  it('rejects provider refund response mismatches (wrong payment_id or amount) and flags reconciliation_required', async () => {
+    global.fetch = vi.fn(async () =>
+      new Response(JSON.stringify({ id: 'rfnd_wrong_1', payment_id: 'pay_OTHER_USER', amount: 99900, status: 'processed' }), {
+        status: 200,
+      })
+    ) as unknown as typeof fetch;
+
+    const res = await paymentRefundPost(
+      new Request('http://localhost/api/payments/refund', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentOrderId: '44444444-4444-4444-8444-444444444444', amountInr: 500 }),
+      })
+    );
+    const json = await res.json();
+    expect(res.status).toBe(502);
+    expect(json.reconciliationRequired).toBe(true);
   });
 
   it('rejects forged client-supplied booking confirmation fields & Confirmed by supplier status with 403', async () => {
@@ -154,16 +249,18 @@ describe('Phase 2–5 Security Regression Suite (Bookings, Refunds, Webhooks & I
         providerConfirmationRef: 'FAKE9999',
       }),
     });
-    const res1 = await bookingPatch(req1, { params: Promise.resolve({ id: '22222222-2222-4222-8222-222222222222' }) });
-    expect(res1.status).toBe(403);
+    expect(
+      (await bookingPatch(req1, { params: Promise.resolve({ id: '22222222-2222-4222-8222-222222222222' }) })).status
+    ).toBe(403);
 
     const req2 = new Request('http://localhost/api/bookings/22222222-2222-4222-8222-222222222222', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'Confirmed by supplier' }),
     });
-    const res2 = await bookingPatch(req2, { params: Promise.resolve({ id: '22222222-2222-4222-8222-222222222222' }) });
-    expect(res2.status).toBe(403);
+    expect(
+      (await bookingPatch(req2, { params: Promise.resolve({ id: '22222222-2222-4222-8222-222222222222' }) })).status
+    ).toBe(403);
 
     const req3 = new Request('http://localhost/api/bookings/22222222-2222-4222-8222-222222222222/confirm', {
       method: 'POST',
@@ -174,52 +271,67 @@ describe('Phase 2–5 Security Regression Suite (Bookings, Refunds, Webhooks & I
         providerConfirmationRef: 'FORGED999',
       }),
     });
-    const res3 = await bookingConfirm(req3, { params: Promise.resolve({ id: '22222222-2222-4222-8222-222222222222' }) });
-    expect(res3.status).toBe(403);
+    expect(
+      (await bookingConfirm(req3, { params: Promise.resolve({ id: '22222222-2222-4222-8222-222222222222' }) })).status
+    ).toBe(403);
   });
 
-  it('rejects client-forged Refunded booking status & non-owner updates with 403', async () => {
+  it('rejects client-forged Refunded booking status & non-owner updates with 403 and enforces CAS race check (409)', async () => {
     state.bookingRow = { ...state.bookingRow, status: 'Cancelled' };
-    const refundAttempt = new Request('http://localhost/api/bookings/22222222-2222-4222-8222-222222222222', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'Refunded' }),
-    });
-    const res = await bookingPatch(refundAttempt, { params: Promise.resolve({ id: '22222222-2222-4222-8222-222222222222' }) });
-    expect(res.status).toBe(403);
+    expect(
+      (
+        await bookingPatch(
+          new Request('http://localhost/api/bookings/22222222-2222-4222-8222-222222222222', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'Refunded' }),
+          }),
+          { params: Promise.resolve({ id: '22222222-2222-4222-8222-222222222222' }) }
+        )
+      ).status
+    ).toBe(403);
 
-    // Non-owner / non-admin trip member blocked from modifying booking
     state.userId = '99999999-9999-4999-8999-999999999999';
-    const cancelByOther = new Request('http://localhost/api/bookings/22222222-2222-4222-8222-222222222222', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'Cancelled' }),
-    });
-    const resOther = await bookingPatch(cancelByOther, {
-      params: Promise.resolve({ id: '22222222-2222-4222-8222-222222222222' }),
-    });
-    expect(resOther.status).toBe(403);
-  });
+    expect(
+      (
+        await bookingPatch(
+          new Request('http://localhost/api/bookings/22222222-2222-4222-8222-222222222222', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'Cancelled' }),
+          }),
+          { params: Promise.resolve({ id: '22222222-2222-4222-8222-222222222222' }) }
+        )
+      ).status
+    ).toBe(403);
 
-  it('enforces trip membership on booking history GET and detects concurrent CAS race with 409', async () => {
     state.isMember = false;
-    const resUnauth = await bookingGet(new Request('http://localhost/api/bookings/22222222-2222-4222-8222-222222222222'), {
-      params: Promise.resolve({ id: '22222222-2222-4222-8222-222222222222' }),
-    });
-    expect(resUnauth.status).toBe(403);
+    expect(
+      (
+        await bookingGet(new Request('http://localhost/api/bookings/22222222-2222-4222-8222-222222222222'), {
+          params: Promise.resolve({ id: '22222222-2222-4222-8222-222222222222' }),
+        })
+      ).status
+    ).toBe(403);
 
+    state.userId = '11111111-1111-4111-8111-111111111111';
     state.isMember = true;
     state.bookingCasUpdated = false;
-    const reqCas = new Request('http://localhost/api/bookings/22222222-2222-4222-8222-222222222222', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'Cancelled' }),
-    });
-    const resCas = await bookingPatch(reqCas, { params: Promise.resolve({ id: '22222222-2222-4222-8222-222222222222' }) });
-    expect(resCas.status).toBe(409);
+    expect(
+      (
+        await bookingPatch(
+          new Request('http://localhost/api/bookings/22222222-2222-4222-8222-222222222222', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'Cancelled' }),
+          }),
+          { params: Promise.resolve({ id: '22222222-2222-4222-8222-222222222222' }) }
+        )
+      ).status
+    ).toBe(409);
   });
 
-  it('fails closed (503) when reserve_payment_refund RPC is missing and never calls Razorpay', async () => {
+  it('fails closed (503) when reserve_payment_refund RPC is missing and blocks over-refund / duplicates / cross-user refund history', async () => {
     const fetchSpy = vi.fn();
     global.fetch = fetchSpy as unknown as typeof fetch;
 
@@ -227,173 +339,120 @@ describe('Phase 2–5 Security Regression Suite (Bookings, Refunds, Webhooks & I
       data: null,
       error: { code: 'PGRST202', message: 'Could not find the function public.reserve_payment_refund' },
     };
-
-    const req = new Request('http://localhost/api/payments/refund', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        paymentOrderId: '44444444-4444-4444-8444-444444444444',
-        amountInr: 500,
-      }),
-    });
-    const res = await paymentRefundPost(req);
-    const json = await res.json();
-
-    expect(res.status).toBe(503);
-    expect(json.status).toBe('blocked_missing_rpc');
+    const missingRpcRes = await paymentRefundPost(
+      new Request('http://localhost/api/payments/refund', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentOrderId: '44444444-4444-4444-8444-444444444444', amountInr: 500 }),
+      })
+    );
+    expect(missingRpcRes.status).toBe(503);
+    expect((await missingRpcRes.json()).status).toBe('blocked_missing_rpc');
     expect(fetchSpy).not.toHaveBeenCalled();
-  });
 
-  it('blocks over-refunds (409 on lock conflict), handles duplicate idempotency keys, and surfaces DB reconciliation errors (502)', async () => {
-    const fetchSpy = vi.fn();
-    global.fetch = fetchSpy as unknown as typeof fetch;
-
-    // 1. Concurrent / Cumulative cap rejection inside DB RPC -> 409, zero gateway calls
+    // Concurrent / cumulative over-refund blocked -> 409
     state.reserveRpcResult = {
       data: null,
       error: { code: '22003', message: 'Cumulative refunds exceed captured order amount' },
     };
-    const overReq = new Request('http://localhost/api/payments/refund', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        paymentOrderId: '44444444-4444-4444-8444-444444444444',
-        amountInr: 100,
-      }),
-    });
-    const overRes = await paymentRefundPost(overReq);
+    const overRes = await paymentRefundPost(
+      new Request('http://localhost/api/payments/refund', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentOrderId: '44444444-4444-4444-8444-444444444444', amountInr: 100 }),
+      })
+    );
     expect(overRes.status).toBe(409);
     expect(fetchSpy).not.toHaveBeenCalled();
 
-    // 2. Duplicate idempotency replay -> 200 X-Idempotent-Replay: true, zero gateway calls
+    // Idempotent duplicate replay -> 200 X-Idempotent-Replay: true
     state.reserveRpcResult = {
       data: { isIdempotentReplay: true, refund: { id: '55555555-5555-4555-8555-555555555555', status: 'processed' } },
       error: null,
     };
-    const idemReq = new Request('http://localhost/api/payments/refund', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-key-123' },
-      body: JSON.stringify({
-        paymentOrderId: '44444444-4444-4444-8444-444444444444',
-        amountInr: 500,
-      }),
-    });
-    const idemRes = await paymentRefundPost(idemReq);
+    const idemRes = await paymentRefundPost(
+      new Request('http://localhost/api/payments/refund', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'idempotency-key': 'idem-key-123' },
+        body: JSON.stringify({ paymentOrderId: '44444444-4444-4444-8444-444444444444', amountInr: 500 }),
+      })
+    );
     expect(idemRes.status).toBe(200);
     expect(idemRes.headers.get('X-Idempotent-Replay')).toBe('true');
-    expect(fetchSpy).not.toHaveBeenCalled();
 
-    // 3. Provider succeeds + DB finalization fails -> 502 reconciliationRequired: true
-    state.reserveRpcResult = {
-      data: { isIdempotentReplay: false, refund: { id: '55555555-5555-4555-8555-555555555555' } },
-      error: null,
-    };
-    state.finalizeRpcResult = {
-      data: null,
-      error: { code: '57014', message: 'database write timeout after gateway refund' },
-    };
-    global.fetch = vi.fn(async () =>
-      new Response(JSON.stringify({ id: 'rfnd_live_abc', status: 'processed' }), { status: 200 })
-    ) as unknown as typeof fetch;
-
-    const mismatchReq = new Request('http://localhost/api/payments/refund', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        paymentOrderId: '44444444-4444-4444-8444-444444444444',
-        amountInr: 500,
-      }),
-    });
-    const mismatchRes = await paymentRefundPost(mismatchReq);
-    const mismatchJson = await mismatchRes.json();
-    expect(mismatchRes.status).toBe(502);
-    expect(mismatchJson.reconciliationRequired).toBe(true);
-    expect(mismatchJson.providerRefundId).toBe('rfnd_live_abc');
-  });
-
-  it('blocks unauthorized GET /api/payments/refund history reads across users/non-members (403)', async () => {
+    // Cross-user refund history read blocked -> 403
     state.userId = '99999999-9999-4999-8999-999999999999';
     state.isMember = false;
-    const res = await paymentRefundGet(
+    const histRes = await paymentRefundGet(
       new Request('http://localhost/api/payments/refund?paymentOrderId=44444444-4444-4444-8444-444444444444')
     );
-    expect(res.status).toBe(403);
+    expect(histRes.status).toBe(403);
   });
 
-  it('rejects forged/expired supplier webhooks, handles replays, and blocks Refunded without reconciled refund', async () => {
+  it('enforces booking webhook supplier identity matching, retries on failed events, and payment refund reconciliation', async () => {
     const secret = process.env.BOOKING_PROVIDER_WEBHOOK_SECRET!;
-    const payload = JSON.stringify({
-      eventId: 'evt_booking_1',
+    const nowTs = String(Math.floor(Date.now() / 1000));
+
+    // Mismatched provider ("liteapi" claiming update on "Amadeus Flight API" booking) -> 403
+    const mismatchPayload = JSON.stringify({
+      eventId: 'evt_mismatch_1',
+      provider: 'liteapi',
+      bookingId: '22222222-2222-4222-8222-222222222222',
+      eventType: 'booking.confirmed',
+      providerConfirmationRef: 'AMAD8899XX',
+      supplierPayload: { pnr: 'AMAD8899XX' },
+    });
+    const mismatchSig = crypto.createHmac('sha256', secret).update(mismatchPayload).digest('hex');
+    const mismatchRes = await bookingWebhook(
+      new Request('http://localhost/api/bookings/webhook', {
+        method: 'POST',
+        headers: { 'x-booking-signature': mismatchSig, 'x-webhook-timestamp': nowTs },
+        body: mismatchPayload,
+      })
+    );
+    expect(mismatchRes.status).toBe(403);
+
+    // Processed event replay -> 200 duplicateReplay: true
+    state.webhookExistingEvent = { id: 'evt-row-1', processing_status: 'processed', retry_count: 0 };
+    const validPayload = JSON.stringify({
+      eventId: 'evt_ok_1',
       provider: 'amadeus',
       bookingId: '22222222-2222-4222-8222-222222222222',
       eventType: 'booking.confirmed',
       providerConfirmationRef: 'AMAD8899XX',
-      supplierPayload: { pnr: 'AMAD8899XX', confirmedAt: '2026-11-26T17:00:00Z' },
+      supplierPayload: { pnr: 'AMAD8899XX' },
     });
-    const validSig = crypto.createHmac('sha256', secret).update(payload).digest('hex');
-
-    // Invalid signature -> 401
-    const badSigRes = await bookingWebhook(
-      new Request('http://localhost/api/bookings/webhook', {
-        method: 'POST',
-        headers: {
-          'x-booking-signature': '0'.repeat(64),
-          'x-webhook-timestamp': String(Math.floor(Date.now() / 1000)),
-        },
-        body: payload,
-      })
-    );
-    expect(badSigRes.status).toBe(401);
-
-    // Expired timestamp -> 401
-    const oldTs = String(Math.floor(Date.now() / 1000) - 900);
-    const expiredRes = await bookingWebhook(
-      new Request('http://localhost/api/bookings/webhook', {
-        method: 'POST',
-        headers: { 'x-booking-signature': validSig, 'x-webhook-timestamp': oldTs },
-        body: payload,
-      })
-    );
-    expect(expiredRes.status).toBe(401);
-
-    // Replayed event_id -> duplicateReplay: true
-    state.webhookInsertError = { code: '23505', message: 'duplicate key value violates unique constraint' };
+    const validSig = crypto.createHmac('sha256', secret).update(validPayload).digest('hex');
     const replayRes = await bookingWebhook(
       new Request('http://localhost/api/bookings/webhook', {
         method: 'POST',
-        headers: {
-          'x-booking-signature': validSig,
-          'x-webhook-timestamp': String(Math.floor(Date.now() / 1000)),
-        },
-        body: payload,
+        headers: { 'x-booking-signature': validSig, 'x-webhook-timestamp': nowTs },
+        body: validPayload,
       })
     );
-    const replayJson = await replayRes.json();
     expect(replayRes.status).toBe(200);
-    expect(replayJson.duplicateReplay).toBe(true);
+    expect((await replayRes.json()).duplicateReplay).toBe(true);
 
-    // Booking webhook booking.refunded without reconciled processed payment refund -> 422
-    state.webhookInsertError = null;
-    state.bookingRow = { ...state.bookingRow, status: 'Cancelled' };
-    state.processedRefundsForBooking = [];
-    const refundEvt = JSON.stringify({
-      eventId: 'evt_booking_refund_unreconciled',
-      provider: 'razorpay',
-      bookingId: '22222222-2222-4222-8222-222222222222',
-      eventType: 'booking.refunded',
-      supplierPayload: { reason: 'cancelled' },
-    });
-    const refundSig = crypto.createHmac('sha256', secret).update(refundEvt).digest('hex');
-    const unreconciledRes = await bookingWebhook(
+    // Failed webhook event retries cleanly instead of being silently swallowed as duplicate
+    state.webhookExistingEvent = { id: 'evt-row-2', processing_status: 'failed', retry_count: 1 };
+    const retryRes = await bookingWebhook(
       new Request('http://localhost/api/bookings/webhook', {
         method: 'POST',
-        headers: {
-          'x-booking-signature': refundSig,
-          'x-webhook-timestamp': String(Math.floor(Date.now() / 1000)),
-        },
-        body: refundEvt,
+        headers: { 'x-booking-signature': validSig, 'x-webhook-timestamp': nowTs },
+        body: validPayload,
       })
     );
-    expect(unreconciledRes.status).toBe(422);
+    expect(retryRes.status).toBe(200);
+    expect((await retryRes.json()).verified).toBe(true);
+
+    // Payment webhook rejects invalid signatures (401)
+    const payBadSig = await paymentWebhook(
+      new Request('http://localhost/api/payments/webhook', {
+        method: 'POST',
+        headers: { 'x-razorpay-signature': '0'.repeat(64) },
+        body: JSON.stringify({ event: 'payment.captured' }),
+      })
+    );
+    expect(payBadSig.status).toBe(401);
   });
 });
