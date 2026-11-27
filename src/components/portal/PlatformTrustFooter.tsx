@@ -16,16 +16,16 @@ import {
 export const PlatformTrustFooter: React.FC = () => {
   return (
     <div className="space-y-8 pt-4">
-      {/* 11. TripSplitter Core Benefits & Existing Outing HQ Bridge */}
+      {/* 11. TripSplit Core Benefits & Existing Outing HQ Bridge */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-white rounded-3xl border border-[#E5EAF1] shadow-xs p-5 sm:p-8 space-y-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#E5EAF1] pb-5">
             <div>
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-700">
-                Why Plan &amp; Travel With TripSplitter
+                Why Plan &amp; Travel With TripSplit
               </span>
               <h2 className="text-xl sm:text-2xl font-extrabold text-[#172B4D] mt-0.5">
-                Built for Real Group Travel — Zero Wallet Escrow
+                You pay merchants directly. TripSplit does not hold your money.
               </h2>
             </div>
             <div className="flex flex-wrap gap-2.5">
@@ -56,7 +56,7 @@ export const PlatformTrustFooter: React.FC = () => {
               <Calculator className="w-5 h-5 text-emerald-600" />
               <h3 className="text-sm font-bold text-[#172B4D]">Exact Integer-Paise Math</h3>
               <p className="text-xs text-[#64748B] leading-relaxed">
-                Equal, percentage, itemized, and custom splits plus minimum-transfer debt optimization verified down to ₹0.01.
+                Equal, percentage, itemized, and custom splits plus minimum-transfer debt optimization. Split to the exact paisa.
               </p>
             </div>
             <div className="p-4 rounded-2xl bg-[#F8FAFC] border border-[#E5EAF1] space-y-1.5">
@@ -116,7 +116,7 @@ export const PlatformTrustFooter: React.FC = () => {
               <div className="w-8 h-8 rounded-xl bg-[#1666F2] flex items-center justify-center">
                 <Compass className="w-4 h-4" />
               </div>
-              <span className="font-extrabold text-base">TripSplitter</span>
+              <span className="font-extrabold text-base">TripSplit</span>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
               Full-stack Indian &amp; global trip planner, 360° destination explorer, AI companion, and direct-to-vendor UPI bill splitter.
@@ -166,7 +166,7 @@ export const PlatformTrustFooter: React.FC = () => {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-400">
-          <p>© 2026 TripSplitter. Zero-escrow direct UPI travel architecture.</p>
+          <p>© 2026 TripSplit. You pay merchants directly. TripSplit does not hold your money.</p>
           <p>Live weather &amp; currency via Open-Meteo and ECB Frankfurter adapters.</p>
         </div>
       </footer>

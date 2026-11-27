@@ -302,7 +302,7 @@ export const DestinationDetailView: React.FC<DestinationDetailViewProps> = ({
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 px-3.5 py-2 rounded-xl border border-[#DCE4EF] text-xs font-bold text-[#172B4D] hover:bg-slate-50"
               >
-                Booking.com <ExternalLink className="w-3 h-3" />
+                Search hotels (external) <ExternalLink className="w-3 h-3" />
               </a>
             </div>
           </div>
@@ -350,7 +350,7 @@ export const DestinationDetailView: React.FC<DestinationDetailViewProps> = ({
             <div className="space-y-1.5">
               <p className="text-xs font-extrabold text-[#047857] uppercase tracking-wider">Catalog Estimate Inclusions</p>
               <p className="text-xs text-[#64748B] leading-relaxed">
-                Curated local sightseeing route, baseline daily stay/dining estimate (₹{destination.startingPrice.toLocaleString('en-IN')}/day), interactive 360° spot exploration, and group expense ledger setup.
+                Curated local sightseeing route, indicative daily stay/dining estimate (₹{destination.startingPrice.toLocaleString('en-IN')}/day, reviewed 2026-11-27), interactive 360° spot exploration, and group expense ledger setup.
               </p>
             </div>
             <div className="space-y-1.5">
@@ -422,7 +422,7 @@ export const DestinationDetailView: React.FC<DestinationDetailViewProps> = ({
                       <span>Best: {spot.bestTime}</span>
                     </div>
                     <span className="font-extrabold text-[#173B70] num-inr">
-                      {spot.cost === 0 ? 'Free Entry' : `Est. ₹${spot.cost.toLocaleString('en-IN')}`}
+                      {spot.cost === 0 ? 'Free Entry' : `Est. ₹${spot.cost.toLocaleString('en-IN')} · Indicative estimate (reviewed 2026-11-27)`}
                     </span>
                   </div>
                 </div>

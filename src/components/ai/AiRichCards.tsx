@@ -45,7 +45,7 @@ export const AiRichCards: React.FC<AiRichCardsProps> = ({ cards, onQuickPrompt }
                       <CalendarDays className="w-3 h-3" /> {card.days}-Day Catalog Plan
                     </span>
                     <span className="text-[11px] font-bold num-inr bg-emerald-500/20 border border-emerald-300/30 px-2 py-0.5 rounded-full">
-                      Est. ₹{card.budgetEstimateInr.toLocaleString('en-IN')}
+                      Est. ₹{card.budgetEstimateInr.toLocaleString('en-IN')} (Indicative estimate, reviewed 2026-11-27)
                     </span>
                   </div>
                   <div>

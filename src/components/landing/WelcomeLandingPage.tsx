@@ -140,14 +140,14 @@ export const WelcomeLandingPage: React.FC<WelcomeLandingPageProps> = ({
                 </h1>
 
                 <p className="text-sm sm:text-base text-slate-200 max-w-xl font-normal leading-relaxed">
-                  Collaborative group itineraries, shared ticket vaults, and direct-to-vendor UPI bill splitting. No pooled money, no wallet float, and zero settlement awkwardness.
+                  Collaborative group itineraries, shared ticket vaults, and direct-to-vendor UPI bill splitting. You pay merchants directly. TripSplit does not hold your money.
                 </p>
 
                 {/* Trust Badges */}
                 <div className="pt-2 flex flex-wrap items-center gap-4 text-xs font-medium text-slate-200">
                   <div className="flex items-center gap-1.5">
                     <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                    <span>Zero Float Risk</span>
+                    <span>Direct Merchant Pay</span>
                   </div>
                   <div className="w-1 h-1 rounded-full bg-slate-400" />
                   <div className="flex items-center gap-1.5">

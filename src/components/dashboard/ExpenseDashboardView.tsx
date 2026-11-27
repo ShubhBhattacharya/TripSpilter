@@ -327,7 +327,7 @@ export const ExpenseDashboardView: React.FC = () => {
                   Expense &amp; Group Outing HQ
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-100 font-normal leading-relaxed">
-                  Manage group itineraries, track shared expenses, and split merchant bills directly via UPI with zero wallet float.
+                  Manage group itineraries, track shared expenses, and split merchant bills directly via UPI. You pay merchants directly. TripSplit does not hold your money.
                 </p>
               </div>
 

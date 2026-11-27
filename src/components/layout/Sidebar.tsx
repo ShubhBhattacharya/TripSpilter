@@ -126,7 +126,7 @@ export const Sidebar: React.FC = () => {
       <div className="mx-4 mt-4 p-3 rounded-xl bg-[#F4F7FB] border border-[#E5EAF1]">
         <div className="flex items-center gap-1.5 text-xs font-semibold text-[#173B70] mb-1">
           <ShieldCheck className="w-4 h-4 text-[#0A9B78]" />
-          <span>Zero Escrow Architecture</span>
+          <span>Direct-to-Vendor UPI</span>
         </div>
         <p className="text-[11px] text-[#64748B] leading-relaxed">
           Members pay the vendor directly from their UPI app. No pooling, zero fees.
