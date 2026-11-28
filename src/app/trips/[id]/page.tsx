@@ -130,7 +130,7 @@ function TripWorkspaceContent() {
 
             const typedExpenses = (dbExpenses || []) as Array<{
               id: string;
-              paid_by: string;
+              paid_by: string | null;
               total_amount: number;
               expense_splits?: Array<{ id: string; user_id: string; amount_owed: number; status: string }>;
             }>;
@@ -148,7 +148,7 @@ function TripWorkspaceContent() {
               memberIds,
               expenses: typedExpenses.map((e) => ({
                 id: e.id,
-                paidBy: e.paid_by,
+                paidBy: e.paid_by ?? null,
                 totalAmount: Number(e.total_amount),
               })),
               splits: typedExpenses.flatMap((e) =>

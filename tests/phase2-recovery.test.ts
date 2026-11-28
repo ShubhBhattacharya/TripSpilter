@@ -147,6 +147,7 @@ describe('Phase 2 Supabase Recovery, Migrations Ordering, Middleware Fail-Closed
       '20261127000004_phase9_audit_remediations.sql',
       '20261128000001_expense_splits_immutable_amounts.sql',
       '20261128000002_payment_webhook_transaction_rpc.sql',
+      '20261128000003_auth_triggers_and_fk_safety.sql',
     ]);
 
     const sqlByFile = files.map((f) => ({

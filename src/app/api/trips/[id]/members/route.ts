@@ -167,7 +167,7 @@ export async function DELETE(
       memberIds: Array.from(new Set((members || []).map((m) => String(m.user_id)))),
       expenses: (expenses || []).map((e) => ({
         id: String(e.id),
-        paidBy: String(e.paid_by),
+        paidBy: e.paid_by ? String(e.paid_by) : null,
         totalAmount: Number(e.total_amount),
       })),
       splits: (expenses || []).flatMap((e) =>

@@ -43,7 +43,7 @@ Optional integrations: `OPENAI_API_KEY` / `GEMINI_API_KEY` (AI Travel Companion)
 
 ### Dependency-Safe Apply Order (`supabase/migrations/`)
 
-All 12 migrations are now strictly ordered chronologically:
+All 13 migrations are strictly ordered chronologically:
 
 1. `20261121000001_complete_schema.sql`
 2. `20261122000001_security_hardening.sql`
@@ -55,8 +55,9 @@ All 12 migrations are now strictly ordered chronologically:
 8. `20261127000002_day7_refund_webhook_hardening.sql`
 9. `20261127000003_phase8_complete_rls_and_webhook_hardening.sql`
 10. `20261127000004_phase9_audit_remediations.sql`
-11. `20261128000001_expense_splits_immutable_amounts.sql` *(new on reconciled branch)*
-12. `20261128000002_payment_webhook_transaction_rpc.sql` *(new on reconciled branch)*
+11. `20261128000001_expense_splits_immutable_amounts.sql`
+12. `20261128000002_payment_webhook_transaction_rpc.sql`
+13. `20261128000003_auth_triggers_and_fk_safety.sql` *(Phase 5A critical remediation)*
 
 ### Exact Commands
 
