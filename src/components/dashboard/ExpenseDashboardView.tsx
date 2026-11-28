@@ -36,8 +36,8 @@ export const ExpenseDashboardView: React.FC = () => {
   const { profile, user, isConfigured } = useAuth();
   const tripCounterRef = useRef(1);
 
-  const isDemoMode = !isConfigured || process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
-  const [trips, setTrips] = useState<Trip[]>(() => (isDemoMode && !isConfigured ? mockTrips : []));
+  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true' && !isConfigured;
+  const [trips, setTrips] = useState<Trip[]>(() => (isDemoMode ? mockTrips : []));
   const [loadingTrips, setLoadingTrips] = useState<boolean>(isConfigured);
   const [searchTripQuery] = useState('');
 
@@ -220,6 +220,10 @@ export const ExpenseDashboardView: React.FC = () => {
       };
 
       if (!isConfigured) {
+        if (process.env.NEXT_PUBLIC_DEMO_MODE !== 'true') {
+          toast.error('Creating persisted trips requires live Supabase configuration.');
+          return;
+        }
         setTrips((prev) => [newTrip, ...prev]);
         try {
           const stored = JSON.parse(localStorage.getItem('tripsplit_custom_trips') || '[]');
@@ -227,7 +231,7 @@ export const ExpenseDashboardView: React.FC = () => {
         } catch {
           // ignore storage error
         }
-        toast.success(`Trip "${tripData.title}" created!`);
+        toast.success(`Trip "${tripData.title}" created in local demo mode!`);
         return;
       }
 
@@ -327,7 +331,7 @@ export const ExpenseDashboardView: React.FC = () => {
                   Expense &amp; Group Outing HQ
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-100 font-normal leading-relaxed">
-                  Manage group itineraries, track shared expenses, and split merchant bills directly via UPI with zero wallet float.
+                  Manage group itineraries, track shared expenses, and split merchant bills directly via UPI. You pay merchants directly. TripSplit does not hold your money.
                 </p>
               </div>
 

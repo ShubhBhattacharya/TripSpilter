@@ -47,7 +47,7 @@ interface SplitAuthLayoutProps {
   children: React.ReactNode;
 }
 
-export const TripSplitterLogoMark: React.FC<{ darkText?: boolean }> = ({ darkText = true }) => (
+export const TripSplitLogoMark: React.FC<{ darkText?: boolean }> = ({ darkText = true }) => (
   <Link href="/" className="inline-flex items-center gap-2.5 group focus:outline-none">
     <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#1666F2] via-[#173B70] to-[#0A9B78] text-white flex items-center justify-center shadow-md ring-1 ring-white/20 group-hover:scale-[1.03] transition-transform">
       <Compass className="w-5 h-5" />
@@ -58,7 +58,7 @@ export const TripSplitterLogoMark: React.FC<{ darkText?: boolean }> = ({ darkTex
           darkText ? 'text-[#172B4D]' : 'text-white'
         }`}
       >
-        TripSplitter
+        TripSplit
       </span>
       <span
         className={`text-[10px] font-semibold tracking-wider uppercase mt-0.5 ${
@@ -107,10 +107,10 @@ export const SplitAuthLayout: React.FC<SplitAuthLayoutProps> = ({ children }) =>
         <div className="relative z-10 h-full flex flex-col justify-between p-5 sm:p-7 lg:p-10 text-white">
           {/* Top Brand Bar */}
           <div className="flex items-center justify-between gap-3">
-            <TripSplitterLogoMark darkText={false} />
+            <TripSplitLogoMark darkText={false} />
             <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-semibold bg-white/12 backdrop-blur-md border border-white/20 px-3 py-1.5 rounded-full text-sky-100">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
-              Zero-Escrow UPI Security
+              Direct Merchant UPI
             </span>
           </div>
 

@@ -201,9 +201,11 @@ export const StaysAndPartnersSection: React.FC<StaysAndPartnersSectionProps> = (
                       href={stay.externalSearchUrl}
                       target="_blank"
                       rel="noopener noreferrer"
+                      title="External link: opens hotel search on partner site"
+                      aria-label={`Search hotels for ${stay.title} (external link)`}
                       className="text-[11px] font-bold text-[#64748B] hover:text-[#1666F2] inline-flex items-center gap-1"
                     >
-                      <span>Live Rates</span>
+                      <span>Search hotels (external)</span>
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   </div>

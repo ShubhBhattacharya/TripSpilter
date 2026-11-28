@@ -230,7 +230,7 @@ export function calculateItemizedSplit(input: ItemizedSplitInput): {
 
 export interface RawExpense {
   id: string;
-  paidBy: string;
+  paidBy: string | null;
   totalAmount: number;
 }
 
@@ -289,11 +289,13 @@ export function calculateNetBalances(params: {
 
   let totalTripSpendPaise = 0;
 
-  // Add payments by payer
+  // Add payments by payer (safely ignore null paidBy when a former payer account was deleted)
   for (const exp of expenses) {
     const amtPaise = toPaise(exp.totalAmount);
     totalTripSpendPaise += amtPaise;
-    paidPaise[exp.paidBy] = (paidPaise[exp.paidBy] || 0) + amtPaise;
+    if (exp.paidBy) {
+      paidPaise[exp.paidBy] = (paidPaise[exp.paidBy] || 0) + amtPaise;
+    }
   }
 
   // Add consumption shares

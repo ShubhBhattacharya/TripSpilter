@@ -1,4 +1,4 @@
-name: TripSplitter CI
+name: TripSplit CI
 
 on:
   push:

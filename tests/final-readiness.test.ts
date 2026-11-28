@@ -120,6 +120,47 @@ function makeClient() {
       }),
     },
     from: (table: string) => makeQuery(table),
+    rpc: async (fnName: string, args: Record<string, unknown>) => {
+      if (fnName !== 'process_payment_webhook') {
+        return { data: null, error: null };
+      }
+      const eventId = String(args.p_event_id);
+      const eventType = String(args.p_event_type);
+      const payload = args.p_payload as Record<string, unknown>;
+      const paymentEntity = (
+        payload.payload as {
+          payment?: { entity?: { id?: string; order_id?: string; amount?: number; currency?: string } };
+        }
+      )?.payment?.entity;
+
+      if (paymentEntity?.order_id && eventType === 'payment.captured') {
+        const expectedCurrency = String(state.storedOrder.currency || 'INR').toUpperCase();
+        const gotCurrency = String(paymentEntity.currency || '').toUpperCase();
+        if (gotCurrency && gotCurrency !== expectedCurrency) {
+          return {
+            data: { status: 'validation_error', httpStatus: 422, error: 'Currency mismatch' },
+            error: null,
+          };
+        }
+        if (typeof paymentEntity.amount === 'number' && paymentEntity.amount < Number(state.storedOrder.amount_paise)) {
+          return {
+            data: { status: 'validation_error', httpStatus: 422, error: 'Underpaid' },
+            error: null,
+          };
+        }
+      }
+
+      if (eventType === 'refund.processed') {
+        const totalProcessed = state.processedRefundRows.reduce((s, r) => s + Number(r.amount_paise || 0), 0);
+        const orderAmt = Number(state.storedOrder.amount_paise || 0);
+        const nextStatus = totalProcessed >= orderAmt ? 'refunded' : totalProcessed > 0 ? 'partially_refunded' : 'captured';
+        state.lastOrderUpdate = { status: nextStatus };
+        state.storedOrder = { ...state.storedOrder, status: nextStatus };
+      }
+
+      state.webhookEvents.push({ provider: 'razorpay', event_id: eventId, processing_status: 'processed' });
+      return { data: { status: 'processed', eventId, reclaimedStale: false }, error: null };
+    },
   };
 }
 

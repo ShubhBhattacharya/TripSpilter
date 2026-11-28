@@ -3,7 +3,7 @@
 import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { createClient, isSupabaseConfigured } from '../../lib/supabase/client';
-import { SplitAuthLayout, TripSplitterLogoMark } from '../../components/auth/SplitAuthLayout';
+import { SplitAuthLayout, TripSplitLogoMark } from '../../components/auth/SplitAuthLayout';
 import {
   Mail,
   ArrowRight,
@@ -68,7 +68,7 @@ function ForgotPasswordForm() {
     <div className="w-full space-y-6">
       <div className="space-y-2">
         <div className="lg:hidden mb-3">
-          <TripSplitterLogoMark darkText={true} />
+          <TripSplitLogoMark darkText={true} />
         </div>
         <div className="w-11 h-11 rounded-2xl bg-[#1666F2]/10 text-[#1666F2] flex items-center justify-center mb-1">
           <KeyRound className="w-5 h-5" />

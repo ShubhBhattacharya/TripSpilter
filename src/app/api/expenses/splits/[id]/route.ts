@@ -50,6 +50,12 @@ export async function PATCH(
     ) as PaymentVerificationState;
 
     if (!isSupabaseConfigured) {
+      if (process.env.NEXT_PUBLIC_DEMO_MODE !== 'true') {
+        return NextResponse.json(
+          { error: 'Updating split statuses requires Supabase configuration', configured: false },
+          { status: 503 }
+        );
+      }
       return NextResponse.json({
         message: 'Split status updated in demo mode',
         splitId,
@@ -112,7 +118,7 @@ export async function PATCH(
       expenses: {
         id: string;
         trip_id: string;
-        paid_by: string;
+        paid_by: string | null;
       };
     }
 
@@ -124,7 +130,7 @@ export async function PATCH(
 
     // 2. Determine User's Role for this payment
     const isDebtor = user.id === debtorId;
-    const isCreditor = user.id === creditorId;
+    const isCreditor = Boolean(creditorId) && user.id === creditorId;
 
     // Check if user is trip admin
     const { data: memberRow } = await supabase
@@ -186,7 +192,7 @@ export async function PATCH(
       dispatchTripNotifications({
         supabase,
         tripId,
-        recipientUserIds: [debtorId, creditorId],
+        recipientUserIds: creditorId ? [debtorId, creditorId] : [debtorId],
         title: `Split payment updated: ${finalStatus.replace(/_/g, ' ')}`,
         message: `Share of ₹${Number(typedRecord.amount_owed).toLocaleString('en-IN')} moved to "${finalStatus}".`,
         type: 'settlement',

@@ -75,10 +75,15 @@ export const AuthExperience: React.FC<AuthExperienceProps> = ({
   const [rememberMe, setRememberMe] = useState<boolean>(true);
   const [agreedToTerms, setAgreedToTerms] = useState<boolean>(true);
 
+  const isExplicitDemoEnabled = process.env.NEXT_PUBLIC_DEMO_MODE === 'true' && !isSupabaseConfigured;
+
   // Feedback state
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(() => {
     if (!urlError) return null;
+    if (urlError === 'supabase-unconfigured') {
+      return 'Live authentication is not configured on this server (missing Supabase URL or Anon Key). Public travel discovery remains open.';
+    }
     if (urlError === 'auth-code-error') {
       return 'Authentication code expired or invalid. Please sign in again.';
     }
@@ -142,15 +147,14 @@ export const AuthExperience: React.FC<AuthExperienceProps> = ({
     }, 450);
   };
 
-  // Handler 1: Google OAuth (real Supabase flow + honest preview fallback)
+  // Handler 1: Google OAuth (real Supabase flow ONLY — never silent fake login)
   const handleGoogleAuth = async () => {
     clearAlerts();
 
     if (!isSupabaseConfigured || !supabase) {
-      completeDemoSession({
-        name: accountType === 'business' ? 'TripSplitter Team Lead' : 'Google Demo Traveler',
-        email: accountType === 'business' ? 'team@company-preview.example' : 'traveler.google@example.com',
-      });
+      setError(
+        'Google Sign-In requires live Supabase Authentication credentials (NEXT_PUBLIC_SUPABASE_URL & NEXT_PUBLIC_SUPABASE_ANON_KEY).'
+      );
       return;
     }
 
@@ -255,7 +259,7 @@ export const AuthExperience: React.FC<AuthExperienceProps> = ({
         return;
       }
 
-      setSuccessMsg('Mobile verified! Redirecting to TripSplitter...');
+      setSuccessMsg('Mobile verified! Redirecting to TripSplit...');
       setTimeout(() => {
         router.push(safeRedirect);
         router.refresh();
@@ -308,13 +312,11 @@ export const AuthExperience: React.FC<AuthExperienceProps> = ({
       return;
     }
 
-    // Graceful preview behavior only when cloud Supabase credentials are absent
+    // Never silently create a fake account on Email Sign In / Sign Up when Supabase is absent
     if (!isSupabaseConfigured || !supabase) {
-      const prefix = fullName.trim() || emailCheck.normalized.split('@')[0] || 'Traveler';
-      completeDemoSession({
-        name: prefix.charAt(0).toUpperCase() + prefix.slice(1),
-        email: emailCheck.normalized,
-      });
+      setError(
+        'Authentication failed: Live Supabase Auth is not configured in this environment. Configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.'
+      );
       return;
     }
 
@@ -411,7 +413,7 @@ export const AuthExperience: React.FC<AuthExperienceProps> = ({
       {/* Auth Form Header */}
       <div className="space-y-1.5">
         <h1 className="text-2xl sm:text-[28px] font-extrabold tracking-tight text-[#172B4D] leading-tight">
-          Welcome to TripSplitter
+          Welcome to TripSplit
         </h1>
         <p className="text-sm text-[#64748B]">
           Sign in or create an account to continue your journey.
@@ -462,11 +464,28 @@ export const AuthExperience: React.FC<AuthExperienceProps> = ({
 
       {/* Local Preview Environment Notice when Supabase env vars are absent */}
       {!isSupabaseConfigured && (
-        <div className="p-3 rounded-2xl bg-sky-50/80 border border-sky-200/90 flex items-start gap-2.5 text-xs text-sky-900">
-          <Info className="w-4 h-4 shrink-0 mt-0.5 text-[#1685D4]" />
-          <p className="leading-relaxed">
-            <strong>Preview Environment:</strong> Live Supabase auth credentials are not set locally. Google Demo, Email Preview, and Guest Traveler are active without touching production data.
-          </p>
+        <div className="p-3 rounded-2xl bg-sky-50/80 border border-sky-200/90 flex flex-col gap-2 text-xs text-sky-900">
+          <div className="flex items-start gap-2.5">
+            <Info className="w-4 h-4 shrink-0 mt-0.5 text-[#1685D4]" />
+            <p className="leading-relaxed">
+              <strong>Supabase Auth Unconfigured:</strong> Real signup, login, and protected routes require live Supabase project credentials.
+            </p>
+          </div>
+          {isExplicitDemoEnabled && (
+            <button
+              type="button"
+              data-testid="explicit-demo-preview-btn"
+              onClick={() =>
+                completeDemoSession({
+                  name: 'Explicit Demo Previewer',
+                  email: 'demo-preview@local.invalid',
+                })
+              }
+              className="self-start px-3 py-1.5 rounded-lg bg-sky-900 text-white text-[11px] font-bold hover:bg-[#173B70] transition-colors cursor-pointer"
+            >
+              Continue in Explicit Dev Demo Mode (Local Only — Not Supabase)
+            </button>
+          )}
         </div>
       )}
 
@@ -960,7 +979,7 @@ export const AuthExperience: React.FC<AuthExperienceProps> = ({
             <div className="min-w-0">
               <p className="text-xs font-bold text-[#172B4D]">Corporate & Organizer Access</p>
               <p className="text-[11px] text-[#64748B]">
-                Manage team outings & shared vendor budgets via TripSplitter Auth.
+                Manage team outings & shared vendor budgets via TripSplit Auth.
               </p>
             </div>
             <div className="flex items-center gap-1 bg-white border border-[#E2E8F0] p-0.5 rounded-lg text-[11px] font-bold shrink-0">
@@ -1142,14 +1161,14 @@ export const AuthExperience: React.FC<AuthExperienceProps> = ({
       <div className="pt-2 text-center text-xs text-[#64748B]">
         {defaultIntent === 'login' ? (
           <>
-            New to TripSplitter?{' '}
+            New to TripSplit?{' '}
             <Link href="/signup" className="font-bold text-[#1666F2] hover:underline">
               Create free account
             </Link>
           </>
         ) : (
           <>
-            Already have a TripSplitter account?{' '}
+            Already have a TripSplit account?{' '}
             <Link href="/login" className="font-bold text-[#1666F2] hover:underline">
               Sign in
             </Link>
@@ -1160,7 +1179,7 @@ export const AuthExperience: React.FC<AuthExperienceProps> = ({
       {/* Verified Legal & Trust Footer */}
       <footer className="pt-4 border-t border-[#E2E8F0] text-center">
         <p className="text-[11px] text-[#64748B] leading-relaxed">
-          By continuing, you agree to TripSplitter&apos;s{' '}
+          By continuing, you agree to TripSplit&apos;s{' '}
           <Link href="/terms" className="font-semibold text-[#1666F2] hover:underline">
             Terms &amp; Conditions
           </Link>{' '}

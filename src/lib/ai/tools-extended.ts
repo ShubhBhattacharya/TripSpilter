@@ -374,7 +374,7 @@ export async function executeExtendedAiTool(
       const memberIds = Array.from(new Set((members || []).map((m) => String(m.user_id))));
       const rawExpenses = (expenses || []).map((e) => ({
         id: String(e.id),
-        paidBy: String(e.paid_by),
+        paidBy: e.paid_by ? String(e.paid_by) : null,
         totalAmount: Number(e.total_amount),
       }));
       const rawSplits = (expenses || []).flatMap((e) =>

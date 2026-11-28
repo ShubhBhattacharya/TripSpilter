@@ -44,7 +44,7 @@ export async function GET(
     const memberIds = Array.from(new Set((members || []).map((m) => m.user_id)));
     const rawExpenses = (expenses || []).map((e) => ({
       id: e.id,
-      paidBy: e.paid_by,
+      paidBy: e.paid_by ?? null,
       totalAmount: Number(e.total_amount),
     }));
     const rawSplits = (expenses || []).flatMap((e) =>

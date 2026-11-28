@@ -3,8 +3,8 @@ import Link from 'next/link';
 import { ArrowLeft, ShieldCheck } from 'lucide-react';
 
 export const metadata = {
-  title: 'Privacy Policy — TripSplitter',
-  description: 'How TripSplitter handles authentication sessions, trip data, and direct-to-vendor UPI payments.',
+  title: 'Privacy Policy — TripSplit',
+  description: 'How TripSplit handles authentication sessions, trip data, and direct-to-vendor UPI payments.',
 };
 
 export default function PrivacyPolicyPage() {
@@ -19,13 +19,20 @@ export default function PrivacyPolicyPage() {
             <ArrowLeft className="w-4 h-4" /> Back to Sign In
           </Link>
           <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full">
-            <ShieldCheck className="w-3.5 h-3.5" /> Zero Escrow Policy
+            <ShieldCheck className="w-3.5 h-3.5" /> Direct Merchant UPI
           </span>
+        </div>
+
+        <div
+          role="status"
+          className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-900"
+        >
+          Draft — [TO BE REVIEWED BY COUNSEL BEFORE PUBLIC LAUNCH]
         </div>
 
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#173B70]">
-            TripSplitter Privacy Policy
+            TripSplit Privacy Policy
           </h1>
           <p className="text-xs text-[#64748B] mt-1">Effective Date: November 25, 2026</p>
         </div>
@@ -33,14 +40,14 @@ export default function PrivacyPolicyPage() {
         <section className="space-y-2 text-sm text-[#334155] leading-relaxed">
           <h2 className="text-base font-bold text-[#172B4D]">1. Authentication & Account Information</h2>
           <p>
-            When you sign in to TripSplitter using Google OAuth, email/password, or mobile OTP (where configured), we process your account identifier, display name, and optional UPI ID strictly to manage your sessions, group itineraries, shared expenses, and settlement balances via Supabase Auth and Row-Level Security (RLS).
+            When you sign in to TripSplit using Google OAuth, email/password, or mobile OTP (where configured), we process your account identifier, display name, and optional UPI ID strictly to manage your sessions, group itineraries, shared expenses, and settlement balances via Supabase Auth and Row-Level Security (RLS).
           </p>
         </section>
 
         <section className="space-y-2 text-sm text-[#334155] leading-relaxed">
           <h2 className="text-base font-bold text-[#172B4D]">2. Direct-to-Vendor Payments & Non-Custodial Handling</h2>
           <p>
-            TripSplitter operates a zero-escrow workflow. Direct UPI payment links redirect to your chosen banking or UPI application. We never store your UPI PIN, bank credentials, or card CVV numbers. Server-side webhook verification checks only cryptographic transaction signatures when an authorized gateway provider is enabled.
+            You pay merchants directly. TripSplit does not hold your money. Direct UPI payment links redirect to your chosen banking or UPI application. We never store your UPI PIN, bank credentials, or card CVV numbers. Server-side webhook verification checks only cryptographic transaction signatures when an authorized gateway provider is enabled.
           </p>
         </section>
 
@@ -63,7 +70,7 @@ export default function PrivacyPolicyPage() {
             Read Terms & Conditions →
           </Link>
           <Link href="/" className="font-semibold text-[#173B70] hover:underline">
-            Go to TripSplitter Home
+            Go to TripSplit Home
           </Link>
         </div>
       </div>

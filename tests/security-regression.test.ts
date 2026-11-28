@@ -175,7 +175,7 @@ describe('Day 7 Critical Security Regression Suite (Bookings, Refunds, Webhooks 
   it('SQL migrations revoke finalize_payment_refund from authenticated and drop direct payment_refunds INSERT bypass', () => {
     const migrationPath = path.join(
       process.cwd(),
-      'supabase/migrations/20261127_day7_refund_webhook_hardening.sql'
+      'supabase/migrations/20261127000002_day7_refund_webhook_hardening.sql'
     );
     const sql = fs.readFileSync(migrationPath, 'utf8');
 

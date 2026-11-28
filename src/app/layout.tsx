@@ -8,7 +8,14 @@ import { Toaster } from "sonner";
 export const metadata: Metadata = {
   title: "TripSplit — Direct-to-Vendor UPI Bill Splitter & Trip Planner",
   description:
-    "All-in-one collaborative trip planner, outing manager, and direct-to-vendor UPI bill splitter for India.",
+    "All-in-one collaborative trip planner, outing manager, and direct-to-vendor UPI bill splitter. You pay merchants directly. TripSplit does not hold your money.",
+  openGraph: {
+    title: "TripSplit — Direct-to-Vendor UPI Bill Splitter & Trip Planner",
+    description:
+      "All-in-one collaborative trip planner, outing manager, and direct-to-vendor UPI bill splitter. You pay merchants directly. TripSplit does not hold your money.",
+    type: "website",
+    siteName: "TripSplit",
+  },
 };
 
 export const viewport: Viewport = {
