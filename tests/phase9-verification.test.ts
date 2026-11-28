@@ -437,7 +437,7 @@ describe('Phase 9 End-to-End Verification & Regression Suite', () => {
   it('verifies Phase 9 SQL migration closes last-admin, confirmed-booking delete, and notification insert gaps', () => {
     const sqlPath = path.join(
       process.cwd(),
-      'supabase/migrations/20261127_phase9_audit_remediations.sql'
+      'supabase/migrations/20261127000004_phase9_audit_remediations.sql'
     );
     const sql = fs.readFileSync(sqlPath, 'utf8');
 

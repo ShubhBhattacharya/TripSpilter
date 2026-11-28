@@ -109,12 +109,15 @@ export const MultiStepOnboardingModal: React.FC<MultiStepOnboardingModalProps> =
     }
 
     setIsSubmitting(true);
-    // Save to profile
-    await updateProfile({
+    const saved = await updateProfile({
       displayName: displayName.trim(),
       upiId: upiId.trim().toLowerCase() || 'traveler@upi',
     });
     setIsSubmitting(false);
+    if (!saved) {
+      setError('Failed to save profile to database. Ensure Supabase is configured and try again.');
+      return;
+    }
 
     // Save preferences locally
     try {

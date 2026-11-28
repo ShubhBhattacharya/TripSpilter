@@ -89,8 +89,9 @@ export const BookingsVaultTab: React.FC<BookingsVaultTabProps> = ({
       documentType: 'PDF',
     };
 
+    const isRealPersistedTrip = Boolean(tripId && !tripId.startsWith('local-') && !tripId.startsWith('trip-'));
     try {
-      if (tripId && !tripId.startsWith('local-') && !tripId.startsWith('trip-')) {
+      if (isRealPersistedTrip) {
         const res = await fetch('/api/bookings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -102,19 +103,22 @@ export const BookingsVaultTab: React.FC<BookingsVaultTabProps> = ({
             amount: amt,
           }),
         });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.booking) {
-            createdItem = {
-              ...createdItem,
-              id: data.booking.id,
-              bookingRef: data.booking.booking_ref,
-            };
-          }
+        const data = await res.json();
+        if (!res.ok || !data.booking) {
+          toast.error(data.error || 'Failed to persist booking draft to PostgreSQL.');
+          return;
         }
+        createdItem = {
+          ...createdItem,
+          id: data.booking.id,
+          bookingRef: data.booking.booking_ref,
+        };
       }
     } catch {
-      // fallback cleanly to local draft state
+      if (isRealPersistedTrip) {
+        toast.error('Network error: could not persist booking draft.');
+        return;
+      }
     } finally {
       setIsSavingBooking(false);
     }

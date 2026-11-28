@@ -25,6 +25,12 @@ export async function GET(request: Request) {
   }
 
   if (!isSupabaseConfigured) {
+    if (process.env.NEXT_PUBLIC_DEMO_MODE !== 'true') {
+      return NextResponse.json(
+        { error: 'Reading persisted expenses requires Supabase configuration', configured: false },
+        { status: 503 }
+      );
+    }
     return NextResponse.json({
       message: 'Demo mode expenses',
       expenses: [],
@@ -131,6 +137,12 @@ export async function POST(request: Request) {
     const idempotencyKey = headerIdempotencyKey || bodyIdempotencyKey;
 
     if (!isSupabaseConfigured) {
+      if (process.env.NEXT_PUBLIC_DEMO_MODE !== 'true') {
+        return NextResponse.json(
+          { error: 'Creating persisted expenses requires Supabase configuration', configured: false },
+          { status: 503 }
+        );
+      }
       return NextResponse.json(
         {
           message: 'Expense created in demo mode',

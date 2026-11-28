@@ -102,6 +102,12 @@ export async function POST(request: Request) {
     const { title, destination, startDate, endDate, budget, coverImage } = validation.data;
 
     if (!isSupabaseConfigured) {
+      if (process.env.NEXT_PUBLIC_DEMO_MODE !== 'true') {
+        return NextResponse.json(
+          { error: 'Creating persisted trips requires Supabase configuration', configured: false },
+          { status: 503 }
+        );
+      }
       return NextResponse.json(
         {
           isDemo: true,

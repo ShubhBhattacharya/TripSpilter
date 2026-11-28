@@ -50,6 +50,12 @@ export async function PATCH(
     ) as PaymentVerificationState;
 
     if (!isSupabaseConfigured) {
+      if (process.env.NEXT_PUBLIC_DEMO_MODE !== 'true') {
+        return NextResponse.json(
+          { error: 'Updating split statuses requires Supabase configuration', configured: false },
+          { status: 503 }
+        );
+      }
       return NextResponse.json({
         message: 'Split status updated in demo mode',
         splitId,
