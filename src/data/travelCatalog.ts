@@ -114,15 +114,15 @@ export interface PlatformOfferItem {
 }
 
 /**
- * Strictly grounded TripSplitter platform programs and adapter status cards.
+ * Strictly grounded TripSplit platform programs and adapter status cards.
  * Never fabricates coupon codes, percentage discounts, or commercial bank tie-ups.
  */
 export const PLATFORM_OFFERS: PlatformOfferItem[] = [
   {
     id: 'offer-upi-zero-fee',
     category: 'packages',
-    categoryLabel: 'Zero-Escrow Payments',
-    title: '0% Wallet Float on Direct-to-Vendor UPI Bill Splits',
+    categoryLabel: 'Direct Merchant Payments',
+    title: 'You pay merchants directly. TripSplit does not hold your money.',
     description:
       'Every group member pays merchants directly from their own UPI app without wallet holding fees.',
     validityText: 'Active Platform Standard',

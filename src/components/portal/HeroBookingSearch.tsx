@@ -202,11 +202,11 @@ export const HeroBookingSearch: React.FC<HeroBookingSearchProps> = ({
     if (activeCategory === 'insurance') {
       setOutcome({
         category: 'insurance',
-        title: 'Travel Insurance — Coming Soon',
-        subtitle: 'Partner insurer onboarding required before policy issuance',
-        statusTag: 'Coming Soon',
+        title: 'Travel Helplines',
+        subtitle: 'Pan-India tourist & emergency support contacts',
+        statusTag: 'Helplines',
         message:
-          'TripSplitter does not offer unverified insurance quotes. Meanwhile, you have instant access to pan-India tourist & emergency helplines (112, 1363, 139).',
+          'TripSplit provides instant access to pan-India tourist & emergency helplines (112, 1363, 139).',
       });
       return;
     }
@@ -462,7 +462,7 @@ export const HeroBookingSearch: React.FC<HeroBookingSearchProps> = ({
       <div className="relative z-20 max-w-6xl mx-auto px-3 sm:px-6 -mt-20">
         {/* Elevated Category Icons Pill Strip */}
         <div className="max-w-5xl mx-auto -mb-5 relative z-30 bg-white rounded-2xl shadow-lg border border-[#E5EAF1] px-2 sm:px-4 py-2 flex items-center justify-between gap-1 overflow-x-auto no-scrollbar">
-          {PORTAL_NAV_CATEGORIES.map((cat) => {
+          {PORTAL_NAV_CATEGORIES.filter((cat) => cat.searchSupported).map((cat) => {
             const Icon = TAB_ICONS[cat.id];
             const active = activeCategory === cat.id;
             return (
@@ -974,7 +974,7 @@ export const HeroBookingSearch: React.FC<HeroBookingSearchProps> = ({
                   Travel Insurance Integration — Coming Soon
                 </span>
                 <p className="text-xs text-amber-800">
-                  Policy underwriting requires an authorized insurer API integration. No synthetic insurance policies are sold on TripSplitter.
+                  Policy underwriting requires an authorized insurer API integration. No synthetic insurance policies are sold on TripSplit.
                 </p>
               </div>
               <a

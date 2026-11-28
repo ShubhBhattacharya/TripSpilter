@@ -96,7 +96,7 @@ export const TravelTopNav: React.FC<TravelTopNavProps> = ({
               <Compass className="w-5 h-5" />
             </div>
             <div className="flex flex-col leading-none">
-              <span className="font-extrabold text-lg tracking-tight text-white">TripSplitter</span>
+              <span className="font-extrabold text-lg tracking-tight text-white">TripSplit</span>
               <span className="text-[10px] font-semibold tracking-wider uppercase text-sky-300/90 mt-0.5">
                 Travel • Book • Split
               </span>
@@ -274,7 +274,7 @@ export const TravelTopNav: React.FC<TravelTopNavProps> = ({
           className="bg-[#0F2342]/95 border-t border-white/10"
         >
           <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 flex items-center gap-1 overflow-x-auto no-scrollbar">
-            {PORTAL_NAV_CATEGORIES.map((cat) => {
+            {PORTAL_NAV_CATEGORIES.filter((cat) => cat.searchSupported).map((cat) => {
               const Icon = CATEGORY_ICONS[cat.id];
               const isActive = activeCategory === cat.id;
               return (

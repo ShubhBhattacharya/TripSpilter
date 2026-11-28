@@ -296,7 +296,7 @@ export const VendorSplitTab: React.FC<VendorSplitTabProps> = ({
               Direct-to-Vendor UPI Splitter
             </span>
             <span className="text-[10px] bg-[#0A9B78]/10 text-[#0A9B78] px-2 py-0.5 rounded-full border border-[#0A9B78]/20 font-semibold">
-              Zero Escrow • Zero Fees
+              Direct Pay • Zero Fees
             </span>
           </div>
           <h3 className="text-base sm:text-lg font-bold text-[#172B4D]">

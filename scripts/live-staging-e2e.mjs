@@ -35,8 +35,12 @@ function checkPreflight() {
     process.exit(3);
   }
   const supaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (supaUrl.includes('ycfasggikwwmxejhgawf') && process.env.ALLOW_YCFAS_REF !== 'true') {
-    console.error('BLOCKED: Refusing to mutate UNKNOWN project ycfasggikwwmxejhgawf without dedicated staging confirmation.');
+  if (supaUrl.includes('ycfasggikwwmxejhgawf')) {
+    console.error('ABORTED: Refusing to run E2E harness against legacy project ycfasggikwwmxejhgawf.');
+    process.exit(3);
+  }
+  if (!supaUrl.includes('dotpmdvxvmsrbzcmkqrp') && process.env.ALLOW_ALT_STAGING_REF !== 'true') {
+    console.error('BLOCKED: Set NEXT_PUBLIC_SUPABASE_URL to verified staging ref dotpmdvxvmsrbzcmkqrp (or ALLOW_ALT_STAGING_REF=true).');
     process.exit(2);
   }
 }
@@ -80,15 +84,25 @@ async function runLiveE2E() {
     }
     console.log('PASS [1/10] User signup and login verified');
 
-    // 2. Session persistence and logout
+    // 2. Session persistence and logout (verify persistence, then signOut revokes session on isolated client)
+    const sessionCheckClient = createClient(supaUrl, anonKey);
+    const { data: sessionLogin, error: sessionLoginErr } = await sessionCheckClient.auth.signInWithPassword({
+      email: users.a.email,
+      password: pass,
+    });
+    assert.ifError(sessionLoginErr);
+    assert.ok(sessionLogin.session?.access_token);
+    const { data: persistedUser } = await sessionCheckClient.auth.getUser(sessionLogin.session.access_token);
+    assert.equal(persistedUser.user?.id, users.a.id);
+    const { error: signOutErr } = await sessionCheckClient.auth.signOut();
+    assert.ifError(signOutErr);
+    const { data: postLogoutSession } = await sessionCheckClient.auth.getSession();
+    assert.equal(postLogoutSession.session, null);
+    console.log('PASS [2/10] Session persistence and logout verified');
+
     const clientA = createClient(supaUrl, anonKey, {
       global: { headers: { Authorization: `Bearer ${users.a.token}` } },
     });
-    const { data: persistedUser } = await clientA.auth.getUser(users.a.token);
-    assert.equal(persistedUser.user?.id, users.a.id);
-    const { error: signOutErr } = await clientA.auth.signOut();
-    assert.ifError(signOutErr);
-    console.log('PASS [2/10] Session persistence and logout verified');
 
     // 3. Profile creation and updates
     const { data: profileRow, error: profFetchErr } = await clientA

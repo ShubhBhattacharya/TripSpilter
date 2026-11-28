@@ -3,8 +3,8 @@ import Link from 'next/link';
 import { ArrowLeft, FileText } from 'lucide-react';
 
 export const metadata = {
-  title: 'Terms & Conditions — TripSplitter',
-  description: 'Terms governing use of TripSplitter group travel planning and expense splitting services.',
+  title: 'Terms & Conditions — TripSplit',
+  description: 'Terms governing use of TripSplit group travel planning and expense splitting services.',
 };
 
 export default function TermsPage() {
@@ -23,9 +23,16 @@ export default function TermsPage() {
           </span>
         </div>
 
+        <div
+          role="status"
+          className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-900"
+        >
+          Draft — [TO BE REVIEWED BY COUNSEL BEFORE PUBLIC LAUNCH]
+        </div>
+
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#173B70]">
-            TripSplitter Terms & Conditions
+            TripSplit Terms & Conditions
           </h1>
           <p className="text-xs text-[#64748B] mt-1">Effective Date: November 25, 2026</p>
         </div>
@@ -33,7 +40,7 @@ export default function TermsPage() {
         <section className="space-y-2 text-sm text-[#334155] leading-relaxed">
           <h2 className="text-base font-bold text-[#172B4D]">1. Service Scope</h2>
           <p>
-            TripSplitter provides collaborative trip itinerary discovery, AI-assisted planning tools, and deterministic expense splitting utilities for personal and corporate/team travel groups. You are responsible for verifying final booking policies and travel documentation directly with external providers.
+            TripSplit provides collaborative trip itinerary discovery, AI-assisted planning tools, and deterministic expense splitting utilities for personal and corporate/team travel groups. You are responsible for verifying final booking policies and travel documentation directly with external providers.
           </p>
         </section>
 
@@ -47,7 +54,7 @@ export default function TermsPage() {
         <section className="space-y-2 text-sm text-[#334155] leading-relaxed">
           <h2 className="text-base font-bold text-[#172B4D]">3. Account Responsibility</h2>
           <p>
-            Keep your email credentials, OTPs, and recovery links confidential.TripSplitter enforces authentication checks before allowing database writes, trip membership updates, or expense edits.
+            Keep your email credentials, OTPs, and recovery links confidential. TripSplit enforces authentication checks before allowing database writes, trip membership updates, or expense edits.
           </p>
         </section>
 
@@ -63,7 +70,7 @@ export default function TermsPage() {
             Read Privacy Policy →
           </Link>
           <Link href="/" className="font-semibold text-[#173B70] hover:underline">
-            Go to TripSplitter Home
+            Go to TripSplit Home
           </Link>
         </div>
       </div>

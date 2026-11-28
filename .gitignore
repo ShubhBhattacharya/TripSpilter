@@ -36,13 +36,13 @@ yarn-error.log*
 !.env.example
 
 # vercel
-.vercel
+.vercel/
 
-# typescript
+# artifacts and build cache
+.next/
+tsconfig.tsbuildinfo
 *.tsbuildinfo
 next-env.d.ts
-
-.vercel
-
+report.pdf
 TripSpilter/
 temp_office_extract/

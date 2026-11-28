@@ -165,9 +165,12 @@ export const DestinationCollections: React.FC<DestinationCollectionsProps> = ({
                       <h3 className="text-base font-extrabold leading-tight">{dest.name}</h3>
                       <p className="text-[11px] text-slate-200 line-clamp-2 mt-1">{dest.tagline}</p>
                     </div>
-                    <div className="flex items-center justify-between pt-2 border-t border-white/15">
-                      <span className="text-xs font-bold text-sky-200 num-inr">
+                    <div className="flex items-center justify-between pt-2 border-t border-white/15 gap-2">
+                      <span className="text-[11px] font-bold text-sky-200 num-inr leading-tight">
                         Est. ₹{dest.startingPrice.toLocaleString('en-IN')}/day
+                        <span className="block text-[9px] font-medium text-sky-100/80">
+                          Indicative estimate (reviewed 2026-11-27)
+                        </span>
                       </span>
                       <Link
                         href={`/destinations/${dest.id}`}
@@ -267,7 +270,7 @@ export const DestinationCollections: React.FC<DestinationCollectionsProps> = ({
               <TrendingUp className="w-5 h-5 text-[#1666F2]" />
               <span>Trending Indian Destinations</span>
             </h2>
-            <p className="text-xs text-[#64748B]">Most-explored destinations across TripSplitter’s 60-city index</p>
+            <p className="text-xs text-[#64748B]">Most-explored destinations across TripSplit’s 60-city index</p>
           </div>
           <Link href="/explore" className="text-xs font-extrabold text-[#1666F2] hover:underline">
             Explore All 60 Cities →
@@ -342,11 +345,14 @@ export const DestinationCollections: React.FC<DestinationCollectionsProps> = ({
                       {dest.spots.map((s) => s.name.split(' ')[0]).slice(0, 3).join(', ')}
                     </p>
                   </div>
-                  <div className="pt-2 border-t border-[#E5EAF1] flex items-center justify-between">
-                    <span className="text-xs font-extrabold text-[#173B70] num-inr">
+                  <div className="pt-2 border-t border-[#E5EAF1] flex items-center justify-between gap-2">
+                    <span className="text-xs font-extrabold text-[#173B70] num-inr leading-tight">
                       Est. ₹{threeDayEstimate.toLocaleString('en-IN')}/pax
+                      <span className="block text-[9px] font-semibold text-[#64748B]">
+                        Indicative estimate (reviewed 2026-11-27)
+                      </span>
                     </span>
-                    <span className="text-[11px] font-bold text-[#1666F2]">Inspect →</span>
+                    <span className="text-[11px] font-bold text-[#1666F2] shrink-0">Inspect →</span>
                   </div>
                 </Link>
               );

@@ -259,7 +259,7 @@ export const AuthExperience: React.FC<AuthExperienceProps> = ({
         return;
       }
 
-      setSuccessMsg('Mobile verified! Redirecting to TripSplitter...');
+      setSuccessMsg('Mobile verified! Redirecting to TripSplit...');
       setTimeout(() => {
         router.push(safeRedirect);
         router.refresh();
@@ -413,7 +413,7 @@ export const AuthExperience: React.FC<AuthExperienceProps> = ({
       {/* Auth Form Header */}
       <div className="space-y-1.5">
         <h1 className="text-2xl sm:text-[28px] font-extrabold tracking-tight text-[#172B4D] leading-tight">
-          Welcome to TripSplitter
+          Welcome to TripSplit
         </h1>
         <p className="text-sm text-[#64748B]">
           Sign in or create an account to continue your journey.
@@ -979,7 +979,7 @@ export const AuthExperience: React.FC<AuthExperienceProps> = ({
             <div className="min-w-0">
               <p className="text-xs font-bold text-[#172B4D]">Corporate & Organizer Access</p>
               <p className="text-[11px] text-[#64748B]">
-                Manage team outings & shared vendor budgets via TripSplitter Auth.
+                Manage team outings & shared vendor budgets via TripSplit Auth.
               </p>
             </div>
             <div className="flex items-center gap-1 bg-white border border-[#E2E8F0] p-0.5 rounded-lg text-[11px] font-bold shrink-0">
@@ -1161,14 +1161,14 @@ export const AuthExperience: React.FC<AuthExperienceProps> = ({
       <div className="pt-2 text-center text-xs text-[#64748B]">
         {defaultIntent === 'login' ? (
           <>
-            New to TripSplitter?{' '}
+            New to TripSplit?{' '}
             <Link href="/signup" className="font-bold text-[#1666F2] hover:underline">
               Create free account
             </Link>
           </>
         ) : (
           <>
-            Already have a TripSplitter account?{' '}
+            Already have a TripSplit account?{' '}
             <Link href="/login" className="font-bold text-[#1666F2] hover:underline">
               Sign in
             </Link>
@@ -1179,7 +1179,7 @@ export const AuthExperience: React.FC<AuthExperienceProps> = ({
       {/* Verified Legal & Trust Footer */}
       <footer className="pt-4 border-t border-[#E2E8F0] text-center">
         <p className="text-[11px] text-[#64748B] leading-relaxed">
-          By continuing, you agree to TripSplitter&apos;s{' '}
+          By continuing, you agree to TripSplit&apos;s{' '}
           <Link href="/terms" className="font-semibold text-[#1666F2] hover:underline">
             Terms &amp; Conditions
           </Link>{' '}
